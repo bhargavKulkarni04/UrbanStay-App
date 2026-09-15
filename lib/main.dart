@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/app_colors.dart';
 import 'features/onboarding/presentation/screens/onboarding_walkthrough_screen.dart';
+import 'features/owner_setup/presentation/screens/owner_setup_screen.dart';
 import 'features/tenant_dashboard/presentation/screens/tenant_dashboard_screen.dart';
 import 'features/tenant_payments/presentation/screens/rent_payment_screen.dart';
 
@@ -39,8 +40,8 @@ class UrbanStayApp extends StatelessWidget {
         ),
         textTheme: GoogleFonts.outfitTextTheme(),
       ),
-      // 🏢 Central Hub: Tenant Dashboard Screen
-      home: const TenantDashboardScreen(),
+      // 🏢 Owner Setup Screen (with dynamic room sharing breakdown)
+      home: const OwnerSetupScreen(),
     );
   }
 }

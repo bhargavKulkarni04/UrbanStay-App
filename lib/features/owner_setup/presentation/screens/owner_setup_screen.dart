@@ -57,7 +57,24 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
   String? _floorCount;
   final _roomsEachFloorController = TextEditingController();
   final _totalRoomsController = TextEditingController();
+  final Map<String, TextEditingController> _floorRoomsControllers = {};
   String? _namingFormat;
+
+  // Apartment Units Flat Mapping & Occupancy State
+  final Map<String, List<String>> _bhkAssignedFlats = {
+    '1 BHK': [],
+    '2 BHK': [],
+    '3 BHK': [],
+  };
+  String _selectedBhkTab = '1 BHK';
+  final Map<String, Map<String, int>> _bhkOccupancy = {
+    '1 BHK': {'Hall': 3, 'Standard Bedroom': 2, 'Master Bedroom': 2},
+    '2 BHK': {'Hall': 3, 'Standard Bedroom': 2, 'Master Bedroom': 2},
+    '3 BHK': {'Hall': 3, 'Standard Bedroom': 2, 'Master Bedroom': 2},
+  };
+  bool _showAddCustomBhk = false;
+  final _customBhkController = TextEditingController();
+
   final List<String> _selectedSharings = [];
   final Map<String, TextEditingController> _rentControllers = {};
   final Map<String, TextEditingController> _depositControllers = {};
@@ -118,6 +135,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     _gfRoomsCountController.dispose();
     _roomsEachFloorController.dispose();
     _totalRoomsController.dispose();
+    _customBhkController.dispose();
     _customSharingController.dispose();
     _customDueDayController.dispose();
     _customLateFeeController.dispose();
@@ -127,6 +145,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     _upiIdController.dispose();
     _creditingPhoneController.dispose();
 
+    for (var c in _floorRoomsControllers.values) {
+      c.dispose();
+    }
     for (var c in _rentControllers.values) {
       c.dispose();
     }
@@ -134,6 +155,199 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  List<String> _getFloorNames() {
+    final hasGround = _groundFloorHasRooms == true;
+    int upperCount = 0;
+
+    if (_floorCount != null) {
+      if (_floorCount!.contains('1st') || _floorCount!.startsWith('1 ')) {
+        upperCount = 1;
+      } else if (_floorCount!.contains('2')) {
+        upperCount = 2;
+      } else if (_floorCount!.contains('3')) {
+        upperCount = 3;
+      } else if (_floorCount!.contains('4')) {
+        upperCount = 4;
+      } else if (_floorCount!.contains('5')) {
+        upperCount = 5;
+      }
+    }
+    if (upperCount == 0) upperCount = 3;
+
+    final List<String> floors = [];
+    if (hasGround) {
+      floors.add('Ground Floor');
+    }
+    for (int i = 1; i <= upperCount; i++) {
+      if (i == 1) {
+        floors.add('1st Floor');
+      } else if (i == 2) {
+        floors.add('2nd Floor');
+      } else if (i == 3) {
+        floors.add('3rd Floor');
+      } else {
+        floors.add('${i}th Floor');
+      }
+    }
+    return floors;
+  }
+
+  int _calculateTotalRooms() {
+    final floors = _getFloorNames();
+    int sum = 0;
+    for (final f in floors) {
+      final text = _floorRoomsControllers[f]?.text.trim() ?? '';
+      sum += int.tryParse(text) ?? 0;
+    }
+    return sum;
+  }
+
+  String _getBreakdownText() {
+    final floors = _getFloorNames();
+    final parts = <String>[];
+    for (final f in floors) {
+      final val = int.tryParse(_floorRoomsControllers[f]?.text.trim() ?? '') ?? 0;
+      parts.add('$val');
+    }
+    final total = _calculateTotalRooms();
+    if (parts.isEmpty) return '0 Rooms';
+    return '${parts.join(' + ')} = $total Rooms';
+  }
+
+  Map<String, List<String>> _getFlatsPerFloor() {
+    final Map<String, List<String>> result = {};
+    final floors = _getFloorNames();
+    final isAlpha = _namingFormat == 'A-1, A-2, B-1...';
+
+    for (int fIndex = 0; fIndex < floors.length; fIndex++) {
+      final floorName = floors[fIndex];
+      final count =
+          int.tryParse(_floorRoomsControllers[floorName]?.text.trim() ?? '') ??
+              4;
+      final List<String> flats = [];
+
+      for (int r = 1; r <= count; r++) {
+        if (isAlpha) {
+          final letter = String.fromCharCode(65 + fIndex);
+          flats.add('$letter-$r');
+        } else {
+          if (floorName == 'Ground Floor') {
+            flats.add('G-${r.toString().padLeft(2, '0')}');
+          } else {
+            final floorNumMatch = RegExp(r'\d+').firstMatch(floorName);
+            final floorNum = floorNumMatch != null
+                ? int.parse(floorNumMatch.group(0)!)
+                : (fIndex + 1);
+            flats.add('${floorNum}${r.toString().padLeft(2, '0')}');
+          }
+        }
+      }
+      result[floorName] = flats;
+    }
+    return result;
+  }
+
+  Widget _buildOccupancyRow({
+    required String title,
+    required int count,
+    required VoidCallback onDecrement,
+    required VoidCallback onIncrement,
+    bool isMaster = false,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  title,
+                  style: AppTypography.bodySemiBold.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                ),
+                if (isMaster) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.green.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      'Higher Rent',
+                      style: AppTypography.captionSmall.copyWith(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.green,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Max $count People',
+              style: AppTypography.captionSmall.copyWith(
+                fontSize: 12,
+                color: AppColors.muted,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: onDecrement,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: const Icon(Icons.remove, size: 15, color: AppColors.ink),
+              ),
+            ),
+            SizedBox(
+              width: 34,
+              child: Center(
+                child: Text(
+                  '$count',
+                  style: AppTypography.bodySemiBold.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: onIncrement,
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.green.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.green),
+                ),
+                child: const Icon(Icons.add, size: 15, color: AppColors.green),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
   }
 
   void _handleBack() {
@@ -1099,26 +1313,155 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         const SizedBox(height: 6),
         _buildDivider(),
 
-        // 3. Rooms per Floor & Total Rooms
-        Row(
-          children: [
-            Expanded(
-              child: _FloatingInput(
-                controller: _roomsEachFloorController,
-                label: 'Rooms per Floor (e.g. 4)',
-                keyboardType: TextInputType.number,
-              ),
+        // 3. Rooms on Each Floor (Apartment Units vs Standard PG)
+        if (_propertyStructure == 'Apartment Units') ...[
+          _buildSectionLabel('Rooms on Each Floor'),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _FloatingInput(
-                controller: _totalRoomsController,
-                label: 'Total Rooms (e.g. 18)',
-                keyboardType: TextInputType.number,
-              ),
+            child: Column(
+              children: _getFloorNames().asMap().entries.map((entry) {
+                final idx = entry.key;
+                final floorName = entry.value;
+                final floorsList = _getFloorNames();
+                final ctrl = _floorRoomsControllers.putIfAbsent(
+                  floorName,
+                  () => TextEditingController(text: '4'),
+                );
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    border: idx < floorsList.length - 1
+                        ? const Border(bottom: BorderSide(color: Color(0xFFF0F0F0)))
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        floorName,
+                        style: AppTypography.bodySemiBold.copyWith(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 60,
+                            height: 38,
+                            child: TextField(
+                              controller: ctrl,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              textAlign: TextAlign.center,
+                              style: AppTypography.bodySemiBold.copyWith(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
+                              onChanged: (_) {
+                                setState(() {
+                                  _totalRoomsController.text =
+                                      _calculateTotalRooms().toString();
+                                });
+                              },
+                              decoration: InputDecoration(
+                                contentPadding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                filled: true,
+                                fillColor: const Color(0xFFF9FAFB),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide:
+                                      const BorderSide(color: Color(0xFFE5E7EB)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide:
+                                      const BorderSide(color: Color(0xFFE5E7EB)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(
+                                      color: AppColors.green, width: 1.5),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Rooms',
+                            style: AppTypography.bodyRegular.copyWith(
+                              fontSize: 12.5,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total Rooms: ${_calculateTotalRooms()}',
+                  style: AppTypography.bodySemiBold.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _getBreakdownText(),
+                  style: AppTypography.captionSmall.copyWith(
+                    fontSize: 11,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          Row(
+            children: [
+              Expanded(
+                child: _FloatingInput(
+                  controller: _roomsEachFloorController,
+                  label: 'Rooms per Floor (e.g. 4)',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _FloatingInput(
+                  controller: _totalRoomsController,
+                  label: 'Total Rooms (e.g. 18)',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 6),
         _buildDivider(),
 
@@ -1144,132 +1487,434 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         const SizedBox(height: 6),
         _buildDivider(),
 
-        // 5. Sharing Types Multi-Select Pills (Zero pre-selected)
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildSectionLabel('Sharing Types Available'),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        // 5. Flat Mapping & Occupancy for Apartment Units OR Sharing Pills for Standard PG
+        if (_propertyStructure == 'Apartment Units') ...[
+          _buildSectionLabel('1. Assign Flats by Type'),
+          Text(
+            'Tap the flats on each floor that belong to each category.',
+            style: AppTypography.captionSmall.copyWith(
+              fontSize: 12,
+              color: AppColors.muted,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ..._bhkAssignedFlats.keys.map((bhk) {
+            final flatsPerFloor = _getFlatsPerFloor();
+            final count = _bhkAssignedFlats[bhk]?.length ?? 0;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: AppColors.green.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(4),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
-              child: Text(
-                'Select Multiple',
-                style: AppTypography.captionSmall.copyWith(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.green,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '$bhk Flats',
+                        style: AppTypography.bodySemiBold.copyWith(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.green.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '$count Flats',
+                          style: AppTypography.captionSmall.copyWith(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ...flatsPerFloor.entries.map((floorEntry) {
+                    final floorName = floorEntry.key;
+                    final flats = floorEntry.value;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            floorName,
+                            style: AppTypography.captionSmall.copyWith(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: flats.map((flat) {
+                              final isThisSelected =
+                                  _bhkAssignedFlats[bhk]?.contains(flat) ??
+                                      false;
+                              final isOtherAssigned =
+                                  _bhkAssignedFlats.entries.any(
+                                (e) => e.key != bhk && e.value.contains(flat),
+                              );
+                              final otherBhk = isOtherAssigned
+                                  ? _bhkAssignedFlats.entries
+                                      .firstWhere((e) => e.value.contains(flat))
+                                      .key
+                                  : null;
+
+                              return GestureDetector(
+                                onTap: isOtherAssigned
+                                    ? null
+                                    : () {
+                                        setState(() {
+                                          final list =
+                                              _bhkAssignedFlats[bhk]!;
+                                          if (isThisSelected) {
+                                            list.remove(flat);
+                                          } else {
+                                            list.add(flat);
+                                          }
+                                        });
+                                      },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isThisSelected
+                                        ? AppColors.green
+                                            .withValues(alpha: 0.08)
+                                        : (isOtherAssigned
+                                            ? const Color(0xFFF3F4F6)
+                                            : Colors.white),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isThisSelected
+                                          ? AppColors.green
+                                          : (isOtherAssigned
+                                              ? const Color(0xFFE5E7EB)
+                                              : const Color(0xFFD1D5DB)),
+                                      width: isThisSelected ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        flat,
+                                        style:
+                                            AppTypography.bodySemiBold.copyWith(
+                                          fontSize: 12.5,
+                                          fontWeight: isThisSelected
+                                              ? FontWeight.w700
+                                              : FontWeight.w600,
+                                          color: isThisSelected
+                                              ? AppColors.green
+                                              : (isOtherAssigned
+                                                  ? const Color(0xFF9CA3AF)
+                                                  : AppColors.ink),
+                                        ),
+                                      ),
+                                      if (isThisSelected) ...[
+                                        const SizedBox(width: 4),
+                                        const Icon(Icons.check,
+                                            size: 13, color: AppColors.green),
+                                      ],
+                                      if (isOtherAssigned) ...[
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          '($otherBhk)',
+                                          style: const TextStyle(
+                                            fontSize: 9.5,
+                                            color: Color(0xFF9CA3AF),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          }),
+
+          // Button to add custom BHK
+          if (!_showAddCustomBhk) ...[
+            GestureDetector(
+              onTap: () => setState(() => _showAddCustomBhk = true),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFFE5E7EB),
+                    style: BorderStyle.solid,
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    '+ Other (4 BHK / Custom)',
+                    style: AppTypography.bodySemiBold.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            ...[
-              '1-Share',
-              '2-Share',
-              '3-Share',
-              '4-Share',
-              '5-Share',
-              '6-Share'
-            ].map((type) {
-              final isSelected = _selectedSharings.contains(type);
-              return _buildSharingPill(
-                label: type,
-                isSelected: isSelected,
-                onTap: () {
-                  setState(() {
-                    if (isSelected) {
-                      _selectedSharings.remove(type);
-                    } else {
-                      _selectedSharings.add(type);
-                      _rentControllers.putIfAbsent(
-                          type, () => TextEditingController());
-                      _depositControllers.putIfAbsent(
-                          type, () => TextEditingController());
-                    }
-                  });
-                },
-              );
-            }),
-            _buildSharingPill(
-              label: '+ Type Sharing',
-              isSelected: _showCustomSharingInput,
-              onTap: () {
-                setState(() {
-                  _showCustomSharingInput = !_showCustomSharingInput;
-                });
-              },
+          ] else ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _FloatingInput(
+                      controller: _customBhkController,
+                      label: 'Flat Type Name (e.g. 4 BHK)',
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final name = _customBhkController.text.trim();
+                      if (name.isNotEmpty &&
+                          !_bhkAssignedFlats.containsKey(name)) {
+                        setState(() {
+                          _bhkAssignedFlats[name] = [];
+                          _bhkOccupancy[name] = {
+                            'Hall': 3,
+                            'Standard Bedroom': 2,
+                            'Master Bedroom': 2
+                          };
+                          _customBhkController.clear();
+                          _showAddCustomBhk = false;
+                        });
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.ink,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                    ),
+                    child: const Text('Add',
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
 
-        if (_showCustomSharingInput) ...[
-          const SizedBox(height: 8),
-          _FloatingInput(
-            controller: _customSharingController,
-            label: 'Enter Custom Sharing (e.g. 7 or 8-Share)',
-            keyboardType: TextInputType.number,
-            onSubmitted: (val) {
-              final num = int.tryParse(val);
-              if (num != null && num >= 1) {
-                final key = '$num-Share';
-                if (!_selectedSharings.contains(key)) {
-                  setState(() {
-                    _selectedSharings.add(key);
-                    _rentControllers.putIfAbsent(
-                        key, () => TextEditingController());
-                    _depositControllers.putIfAbsent(
-                        key, () => TextEditingController());
-                    _showCustomSharingInput = false;
-                    _customSharingController.clear();
-                  });
-                }
-              }
-            },
-          ),
-        ],
+          const SizedBox(height: 12),
+          _buildDivider(),
 
-        const SizedBox(height: 6),
-        _buildDivider(),
-
-        // 6. Monthly Rent & Deposit per Bed
-        Text(
-          'Monthly Rent & Deposit per Bed',
-          style: AppTypography.heading3.copyWith(
-            fontSize: 14.5,
-            fontWeight: FontWeight.w700,
-            color: AppColors.ink,
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        if (_selectedSharings.isEmpty)
+          // 2. Standard Occupancy Per Flat
           Container(
-            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFAFA),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: Center(
-              child: Text(
-                'Select sharing types above to configure rent & deposit pricing.',
-                style: AppTypography.bodyRegular.copyWith(
-                  fontSize: 13,
-                  color: AppColors.muted,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '2. Standard Occupancy Per Flat',
+                  style: AppTypography.bodySemiBold.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 12),
+                // Tabs container
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: _bhkOccupancy.keys.map((bhk) {
+                      final isActive = _selectedBhkTab == bhk;
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedBhkTab = bhk),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color:
+                                  isActive ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: isActive
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.05),
+                                        blurRadius: 3,
+                                        offset: const Offset(0, 1),
+                                      )
+                                    ]
+                                  : null,
+                            ),
+                            child: Center(
+                              child: Text(
+                                isActive ? '$bhk (Active)' : bhk,
+                                style: AppTypography.bodySemiBold.copyWith(
+                                  fontSize: 12,
+                                  fontWeight: isActive
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  color: isActive
+                                      ? AppColors.ink
+                                      : AppColors.muted,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                // Row 1: Hall / Living Area
+                _buildOccupancyRow(
+                  title: 'Hall / Living Area',
+                  count: _bhkOccupancy[_selectedBhkTab]?['Hall'] ?? 3,
+                  onDecrement: () {
+                    final cur = _bhkOccupancy[_selectedBhkTab]?['Hall'] ?? 3;
+                    if (cur > 0) {
+                      setState(() =>
+                          _bhkOccupancy[_selectedBhkTab]!['Hall'] = cur - 1);
+                    }
+                  },
+                  onIncrement: () {
+                    final cur = _bhkOccupancy[_selectedBhkTab]?['Hall'] ?? 3;
+                    setState(() =>
+                        _bhkOccupancy[_selectedBhkTab]!['Hall'] = cur + 1);
+                  },
+                ),
+                const Divider(height: 24, color: Color(0xFFF0F0F0)),
+                // Row 2: Standard Bedroom
+                _buildOccupancyRow(
+                  title: 'Standard Bedroom',
+                  count:
+                      _bhkOccupancy[_selectedBhkTab]?['Standard Bedroom'] ?? 2,
+                  onDecrement: () {
+                    final cur = _bhkOccupancy[_selectedBhkTab]?[
+                            'Standard Bedroom'] ??
+                        2;
+                    if (cur > 0) {
+                      setState(() => _bhkOccupancy[_selectedBhkTab]![
+                          'Standard Bedroom'] = cur - 1);
+                    }
+                  },
+                  onIncrement: () {
+                    final cur = _bhkOccupancy[_selectedBhkTab]?[
+                            'Standard Bedroom'] ??
+                        2;
+                    setState(() => _bhkOccupancy[_selectedBhkTab]![
+                        'Standard Bedroom'] = cur + 1);
+                  },
+                ),
+                const Divider(height: 24, color: Color(0xFFF0F0F0)),
+                // Row 3: Master Bedroom
+                _buildOccupancyRow(
+                  title: 'Master Bedroom',
+                  isMaster: true,
+                  count: _bhkOccupancy[_selectedBhkTab]?['Master Bedroom'] ?? 2,
+                  onDecrement: () {
+                    final cur =
+                        _bhkOccupancy[_selectedBhkTab]?['Master Bedroom'] ?? 2;
+                    if (cur > 0) {
+                      setState(() => _bhkOccupancy[_selectedBhkTab]![
+                          'Master Bedroom'] = cur - 1);
+                    }
+                  },
+                  onIncrement: () {
+                    final cur =
+                        _bhkOccupancy[_selectedBhkTab]?['Master Bedroom'] ?? 2;
+                    setState(() => _bhkOccupancy[_selectedBhkTab]![
+                        'Master Bedroom'] = cur + 1);
+                  },
+                ),
+              ],
             ),
-          )
-        else
-          ..._selectedSharings.map((sharing) {
+          ),
+
+          const SizedBox(height: 6),
+          _buildDivider(),
+
+          // 3. Monthly Rent & Deposit per Bed (Apartment Units)
+          Text(
+            'Monthly Rent & Deposit per Bed',
+            style: AppTypography.heading3.copyWith(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          ...[
+            {'name': 'Master Bedroom Bed', 'tag': 'Higher Rent'},
+            {'name': 'Standard Bedroom Bed', 'tag': 'Per Bed'},
+            {'name': 'Hall Bed', 'tag': 'Per Bed'},
+          ].map((item) {
+            final name = item['name']!;
+            final tag = item['tag']!;
+            final rentCtrl = _rentControllers.putIfAbsent(
+              name,
+              () => TextEditingController(
+                text: name.contains('Master')
+                    ? '9500'
+                    : (name.contains('Standard') ? '7500' : '5000'),
+              ),
+            );
+            final depCtrl = _depositControllers.putIfAbsent(
+              name,
+              () => TextEditingController(
+                text: name.contains('Master')
+                    ? '19000'
+                    : (name.contains('Standard') ? '15000' : '10000'),
+              ),
+            );
+
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
@@ -1285,7 +1930,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '$sharing Bed',
+                        name,
                         style: AppTypography.bodySemiBold.copyWith(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w700,
@@ -1300,7 +1945,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          'Per Bed',
+                          tag,
                           style: AppTypography.captionSmall.copyWith(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -1315,8 +1960,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                     children: [
                       Expanded(
                         child: _FloatingInput(
-                          controller: _rentControllers[sharing] ??
-                              TextEditingController(),
+                          controller: rentCtrl,
                           label: 'Monthly Rent (₹)',
                           keyboardType: TextInputType.number,
                         ),
@@ -1324,8 +1968,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: _FloatingInput(
-                          controller: _depositControllers[sharing] ??
-                              TextEditingController(),
+                          controller: depCtrl,
                           label: 'Deposit (₹)',
                           keyboardType: TextInputType.number,
                         ),
@@ -1336,6 +1979,181 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
               ),
             );
           }),
+        ] else ...[
+          // 5. Sharing Types Multi-Select Pills (Standard PG)
+          _buildSectionLabel('Sharing Types Available'),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ...[
+                '1-Share',
+                '2-Share',
+                '3-Share',
+                '4-Share',
+                '5-Share',
+                '6-Share',
+                'Master Room Sharing',
+              ].map((type) {
+                final isSelected = _selectedSharings.contains(type);
+                return _buildSharingPill(
+                  label: type,
+                  isSelected: isSelected,
+                  onTap: () {
+                    setState(() {
+                      if (isSelected) {
+                        _selectedSharings.remove(type);
+                      } else {
+                        _selectedSharings.add(type);
+                        _rentControllers.putIfAbsent(
+                            type, () => TextEditingController());
+                        _depositControllers.putIfAbsent(
+                            type, () => TextEditingController());
+                      }
+                    });
+                  },
+                );
+              }),
+              _buildSharingPill(
+                label: '+ Type Sharing',
+                isSelected: _showCustomSharingInput,
+                onTap: () {
+                  setState(() {
+                    _showCustomSharingInput = !_showCustomSharingInput;
+                  });
+                },
+              ),
+            ],
+          ),
+
+          if (_showCustomSharingInput) ...[
+            const SizedBox(height: 8),
+            _FloatingInput(
+              controller: _customSharingController,
+              label: 'Enter Custom Sharing (e.g. 7 or 8-Share)',
+              keyboardType: TextInputType.number,
+              onSubmitted: (val) {
+                final num = int.tryParse(val);
+                if (num != null && num >= 1) {
+                  final key = '$num-Share';
+                  if (!_selectedSharings.contains(key)) {
+                    setState(() {
+                      _selectedSharings.add(key);
+                      _rentControllers.putIfAbsent(
+                          key, () => TextEditingController());
+                      _depositControllers.putIfAbsent(
+                          key, () => TextEditingController());
+                      _showCustomSharingInput = false;
+                      _customSharingController.clear();
+                    });
+                  }
+                }
+              },
+            ),
+          ],
+
+          const SizedBox(height: 6),
+          _buildDivider(),
+
+          // 6. Monthly Rent & Deposit per Bed (Standard PG)
+          Text(
+            'Monthly Rent & Deposit per Bed',
+            style: AppTypography.heading3.copyWith(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          if (_selectedSharings.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAFAFA),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Center(
+                child: Text(
+                  'Select sharing types above to configure rent & deposit pricing.',
+                  style: AppTypography.bodyRegular.copyWith(
+                    fontSize: 13,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
+            )
+          else
+            ..._selectedSharings.map((sharing) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFAFAFA),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '$sharing Bed',
+                          style: AppTypography.bodySemiBold.copyWith(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.green.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Per Bed',
+                            style: AppTypography.captionSmall.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.green,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _FloatingInput(
+                            controller: _rentControllers[sharing] ??
+                                TextEditingController(),
+                            label: 'Monthly Rent (₹)',
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _FloatingInput(
+                            controller: _depositControllers[sharing] ??
+                                TextEditingController(),
+                            label: 'Deposit (₹)',
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
 
         const SizedBox(height: 6),
         _buildDivider(),

@@ -15,7 +15,8 @@ class OwnerDayCollectionScreen extends StatefulWidget {
   const OwnerDayCollectionScreen({super.key, this.onBack});
 
   @override
-  State<OwnerDayCollectionScreen> createState() => _OwnerDayCollectionScreenState();
+  State<OwnerDayCollectionScreen> createState() =>
+      _OwnerDayCollectionScreenState();
 }
 
 class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
@@ -29,6 +30,24 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   ];
 
   String _historyFilter = 'all'; // 'all', 'payments', 'rescheduled', 'rejected'
+  String _selectedFloor =
+      'all'; // 'all', 'Ground Floor', '1st Floor', '2nd Floor', '3rd Floor'
+
+  String _formatSubtitle(Map<String, dynamic> tenant) {
+    final floor = tenant['floor'] ?? '1st Floor';
+    final sharing = tenant['sharing'] ?? '2-Sharing';
+    String room = tenant['room'] ?? '';
+    if (room.isEmpty) {
+      final bedStr = (tenant['bed'] ?? '').toString();
+      final clean = bedStr
+          .replaceAll(RegExp(r'-[A-Za-z]$'), '')
+          .replaceAll('Bed ', 'Room ');
+      room = clean.isNotEmpty
+          ? (clean.startsWith('Room') ? clean : 'Room $clean')
+          : 'Room 101';
+    }
+    return '$floor • $sharing • $room';
+  }
 
   // Master Tenant List with Explicit Salary Cycle Pay Dates
   final List<Map<String, dynamic>> _tenants = [
@@ -36,7 +55,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't1',
       'name': 'Rahul Sharma',
       'initials': 'RS',
-      'bed': 'Bed 101-A',
+      'bed': 'Room 101',
+      'room': 'Room 101',
+      'sharing': '2-Sharing',
       'floor': '1st Floor',
       'work': 'Infosys',
       'phone': '9876543210',
@@ -52,7 +73,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't2',
       'name': 'Amit Verma',
       'initials': 'AV',
-      'bed': 'Bed 101-B',
+      'bed': 'Room 101',
+      'room': 'Room 101',
+      'sharing': '2-Sharing',
       'floor': '1st Floor',
       'work': 'Christ Univ',
       'phone': '9988776655',
@@ -67,7 +90,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't3',
       'name': 'Suresh Gowda',
       'initials': 'SG',
-      'bed': 'Bed G-01-A',
+      'bed': 'Room G-01',
+      'room': 'Room G-01',
+      'sharing': '2-Sharing',
       'floor': 'Ground Floor',
       'work': 'Flipkart',
       'phone': '9844001122',
@@ -83,7 +108,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't4',
       'name': 'Ananya Roy',
       'initials': 'AR',
-      'bed': 'Bed 102-A',
+      'bed': 'Room 102',
+      'room': 'Room 102',
+      'sharing': '3-Sharing',
       'floor': '1st Floor',
       'work': 'Accenture',
       'phone': '9822334455',
@@ -99,7 +126,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't5',
       'name': 'Manisha Patel',
       'initials': 'MP',
-      'bed': 'Bed 301-B',
+      'bed': 'Room 301',
+      'room': 'Room 301',
+      'sharing': '2-Sharing',
       'floor': '3rd Floor',
       'work': 'IBM',
       'phone': '9866443322',
@@ -115,7 +144,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't6',
       'name': 'Vikram Rao',
       'initials': 'VR',
-      'bed': 'Bed 102-C',
+      'bed': 'Room 102',
+      'room': 'Room 102',
+      'sharing': '3-Sharing',
       'floor': '1st Floor',
       'work': 'TCS',
       'phone': '9733445566',
@@ -129,7 +160,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't7',
       'name': 'Tanmay Bhat',
       'initials': 'TB',
-      'bed': 'Bed G-01-B',
+      'bed': 'Room G-01',
+      'room': 'Room G-01',
+      'sharing': '2-Sharing',
       'floor': 'Ground Floor',
       'work': 'Freelance',
       'phone': '9855112233',
@@ -144,7 +177,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't8',
       'name': 'Rohit Sen',
       'initials': 'RS',
-      'bed': 'Bed 103-A',
+      'bed': 'Room 103',
+      'room': 'Room 103',
+      'sharing': '2-Sharing',
       'floor': '1st Floor',
       'work': 'Wipro',
       'phone': '9811223344',
@@ -160,7 +195,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't9',
       'name': 'Naveen Kumar',
       'initials': 'NK',
-      'bed': 'Bed 103-B',
+      'bed': 'Room 103',
+      'room': 'Room 103',
+      'sharing': '2-Sharing',
       'floor': '1st Floor',
       'work': 'Razorpay',
       'phone': '9844119988',
@@ -176,7 +213,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't10',
       'name': 'Karthik Raja',
       'initials': 'KR',
-      'bed': 'Bed 201-A',
+      'bed': 'Room 201',
+      'room': 'Room 201',
+      'sharing': '2-Sharing',
       'floor': '2nd Floor',
       'work': 'Swiggy',
       'phone': '9741234567',
@@ -192,7 +231,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't11',
       'name': 'Priya Nair',
       'initials': 'PN',
-      'bed': 'Bed 201-B',
+      'bed': 'Room 201',
+      'room': 'Room 201',
+      'sharing': '2-Sharing',
       'floor': '2nd Floor',
       'work': 'Dell',
       'phone': '9819876543',
@@ -208,7 +249,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't12',
       'name': 'Nikhil Kamath',
       'initials': 'NK',
-      'bed': 'Bed G-02-A',
+      'bed': 'Room G-02',
+      'room': 'Room G-02',
+      'sharing': 'Single Room',
       'floor': 'Ground Floor',
       'work': 'Zerodha',
       'phone': '9899001122',
@@ -224,7 +267,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't13',
       'name': 'Rohan Patil',
       'initials': 'RP',
-      'bed': 'Bed 202-A',
+      'bed': 'Room 202',
+      'room': 'Room 202',
+      'sharing': '2-Sharing',
       'floor': '2nd Floor',
       'work': 'Wipro',
       'phone': '9811223344',
@@ -239,7 +284,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't14',
       'name': 'Sneha Reddy',
       'initials': 'SR',
-      'bed': 'Bed 202-B',
+      'bed': 'Room 202',
+      'room': 'Room 202',
+      'sharing': '2-Sharing',
       'floor': '2nd Floor',
       'work': 'Amazon',
       'phone': '9845009988',
@@ -255,7 +302,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't15',
       'name': 'Deepak Joshi',
       'initials': 'DJ',
-      'bed': 'Bed 301-A',
+      'bed': 'Room 301',
+      'room': 'Room 301',
+      'sharing': '2-Sharing',
       'floor': '3rd Floor',
       'work': 'Oracle',
       'phone': '9877112233',
@@ -269,7 +318,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't16',
       'name': 'Aditya Sen',
       'initials': 'AS',
-      'bed': 'Bed 302-A',
+      'bed': 'Room 302',
+      'room': 'Room 302',
+      'sharing': '2-Sharing',
       'floor': '3rd Floor',
       'work': 'Razorpay',
       'phone': '9811883377',
@@ -285,7 +336,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 't17',
       'name': 'Pooja Hegde',
       'initials': 'PH',
-      'bed': 'Bed 302-B',
+      'bed': 'Room 302',
+      'room': 'Room 302',
+      'sharing': '2-Sharing',
       'floor': '3rd Floor',
       'work': 'Capgemini',
       'phone': '9833557799',
@@ -304,7 +357,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 'h1',
       'type': 'payment_verified',
       'title': '₹8,500 Direct UPI Verified',
-      'tenant': 'Rahul Sharma (Bed 101-A)',
+      'tenant': 'Rahul Sharma • 1st Floor • 2-Sharing • Room 101',
+      'phone': '9876543210',
       'actor': 'Ramesh Gowda (Manager)',
       'time': '1 Aug 2026, 09:35 AM',
       'ref': 'UTR-423189765412',
@@ -314,7 +368,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 'h2',
       'type': 'rescheduled',
       'title': 'Salary Pay Date Changed: 5th ➔ 10th',
-      'tenant': 'Aditya Sen (Bed 302-A)',
+      'tenant': 'Aditya Sen • 3rd Floor • 2-Sharing • Room 302',
+      'phone': '9811883377',
       'actor': 'Bhargav S Kulkarni (Owner)',
       'time': '1 Aug 2026, 11:20 AM',
       'reason': 'Salary credit cycle confirmed on 10th by Razorpay HR',
@@ -324,7 +379,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 'h3',
       'type': 'payment_verified',
       'title': '₹8,000 Direct UPI Verified',
-      'tenant': 'Suresh Gowda (Bed G-01-A)',
+      'tenant': 'Suresh Gowda • Ground Floor • 2-Sharing • Room G-01',
+      'phone': '9844001122',
       'actor': 'Ramesh Gowda (Manager)',
       'time': '1 Aug 2026, 02:15 PM',
       'ref': 'UTR-338811229900',
@@ -334,7 +390,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 'h4',
       'type': 'payment_verified',
       'title': '₹7,500 Direct UPI Verified',
-      'tenant': 'Ananya Roy (Bed 102-A)',
+      'tenant': 'Ananya Roy • 1st Floor • 3-Sharing • Room 102',
+      'phone': '9822334455',
       'actor': 'Ramesh Gowda (Manager)',
       'time': '2 Aug 2026, 10:00 AM',
       'ref': 'UTR-110299384756',
@@ -344,11 +401,12 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'id': 'h5',
       'type': 'rejected',
       'title': 'Payment Rejected (Not Credited in Bank)',
-      'tenant': 'Tanmay Bhat (Bed G-01-B)',
+      'tenant': 'Tanmay Bhat • Ground Floor • 2-Sharing • Room G-01',
+      'phone': '9855112233',
       'actor': 'Arun Kumar (Co-Owner)',
       'time': '3 Aug 2026, 04:45 PM',
       'reason': 'UTR 9988221100 invalid - not reflected in HDFC Bank',
-      'badge': 'Declined',
+      'badge': 'Rejected',
     },
   ];
 
@@ -358,7 +416,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         behavior: SnackBarBehavior.floating,
@@ -404,7 +463,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -435,11 +495,11 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+                  child: const Icon(Icons.arrow_back_rounded,
+                      size: 18, color: AppColors.ink),
                 ),
               ),
               const SizedBox(width: 12),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -475,11 +535,15 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.badge_outlined, size: 12, color: AppColors.greenDark),
+                const Icon(Icons.badge_outlined,
+                    size: 12, color: AppColors.greenDark),
                 const SizedBox(width: 4),
                 Text(
                   _selectedStaffActor.split(' ')[0], // First name
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                  style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.greenDark),
                 ),
               ],
             ),
@@ -515,10 +579,17 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 7.5),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _activeTab == 'schedule' ? Colors.white : Colors.transparent,
+                    color: _activeTab == 'schedule'
+                        ? Colors.white
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: _activeTab == 'schedule'
-                        ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1))]
+                        ? const [
+                            BoxShadow(
+                                color: Color(0x08000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 1))
+                          ]
                         : null,
                   ),
                   child: Row(
@@ -527,15 +598,21 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       Icon(
                         Icons.calendar_month_outlined,
                         size: 14,
-                        color: _activeTab == 'schedule' ? AppColors.greenDark : AppColors.muted,
+                        color: _activeTab == 'schedule'
+                            ? AppColors.greenDark
+                            : AppColors.muted,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         'Salary Schedule',
                         style: GoogleFonts.outfit(
                           fontSize: 12,
-                          fontWeight: _activeTab == 'schedule' ? FontWeight.w800 : FontWeight.w600,
-                          color: _activeTab == 'schedule' ? AppColors.greenDark : AppColors.muted,
+                          fontWeight: _activeTab == 'schedule'
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: _activeTab == 'schedule'
+                              ? AppColors.greenDark
+                              : AppColors.muted,
                         ),
                       ),
                     ],
@@ -551,10 +628,17 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 7.5),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _activeTab == 'history' ? Colors.white : Colors.transparent,
+                    color: _activeTab == 'history'
+                        ? Colors.white
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: _activeTab == 'history'
-                        ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1))]
+                        ? const [
+                            BoxShadow(
+                                color: Color(0x08000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 1))
+                          ]
                         : null,
                   ),
                   child: Row(
@@ -563,15 +647,21 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       Icon(
                         Icons.history_rounded,
                         size: 14,
-                        color: _activeTab == 'history' ? AppColors.ink : AppColors.muted,
+                        color: _activeTab == 'history'
+                            ? AppColors.ink
+                            : AppColors.muted,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         'Audit & History (${_historyLogs.length})',
                         style: GoogleFonts.outfit(
                           fontSize: 12,
-                          fontWeight: _activeTab == 'history' ? FontWeight.w800 : FontWeight.w600,
-                          color: _activeTab == 'history' ? AppColors.ink : AppColors.muted,
+                          fontWeight: _activeTab == 'history'
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: _activeTab == 'history'
+                              ? AppColors.ink
+                              : AppColors.muted,
                         ),
                       ),
                     ],
@@ -588,10 +678,45 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   // ===========================================================================
   // 3. SCHEDULE CONTENT VIEW
   // ===========================================================================
+  Widget _buildFloorFilterChip(String id, String label) {
+    final isSel = _selectedFloor == id;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: () => setState(() => _selectedFloor = id),
+        borderRadius: BorderRadius.circular(99),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6.5),
+          decoration: BoxDecoration(
+            color: isSel ? AppColors.ink : Colors.white,
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(
+                color: isSel ? AppColors.ink : const Color(0xFFE5E7EB)),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 11.5,
+              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
+              color: isSel ? Colors.white : AppColors.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildScheduleContent(List<int> availableDays) {
-    final selectedTenants = _tenants.where((t) => (t['payDay'] as int) == _selectedDay).toList();
-    final dayTotalExpected = selectedTenants.fold<int>(0, (sum, t) => sum + (t['amount'] as int));
-    final dayPaidCount = selectedTenants.where((t) => t['status'] == 'paid').length;
+    final selectedTenants = _tenants.where((t) {
+      final matchesDay = (t['payDay'] as int) == _selectedDay;
+      final matchesFloor =
+          _selectedFloor == 'all' || t['floor'] == _selectedFloor;
+      return matchesDay && matchesFloor;
+    }).toList();
+    final dayTotalExpected =
+        selectedTenants.fold<int>(0, (sum, t) => sum + (t['amount'] as int));
+    final dayPaidCount =
+        selectedTenants.where((t) => t['status'] == 'paid').length;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -599,13 +724,34 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Floor Filter Chips Bar
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _buildFloorFilterChip('all', 'All Floors'),
+                _buildFloorFilterChip('Ground Floor', 'Ground Floor'),
+                _buildFloorFilterChip('1st Floor', '1st Floor'),
+                _buildFloorFilterChip('2nd Floor', '2nd Floor'),
+                _buildFloorFilterChip('3rd Floor', '3rd Floor'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
           // Horizontal Interactive Date Strip
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             child: Row(
               children: availableDays.map((d) {
-                final count = _tenants.where((t) => (t['payDay'] as int) == d).length;
+                final count = _tenants.where((t) {
+                  final matchesDay = (t['payDay'] as int) == d;
+                  final matchesFloor =
+                      _selectedFloor == 'all' || t['floor'] == _selectedFloor;
+                  return matchesDay && matchesFloor;
+                }).length;
                 final isSel = _selectedDay == d;
 
                 return Padding(
@@ -614,16 +760,23 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     onTap: () => setState(() => _selectedDay = d),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                       decoration: BoxDecoration(
                         color: isSel ? AppColors.green : Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: isSel ? AppColors.green : const Color(0xFFE5E7EB),
+                          color:
+                              isSel ? AppColors.green : const Color(0xFFE5E7EB),
                           width: isSel ? 1.5 : 1.0,
                         ),
                         boxShadow: isSel
-                            ? const [BoxShadow(color: Color(0x1808A63F), blurRadius: 6, offset: Offset(0, 2))]
+                            ? const [
+                                BoxShadow(
+                                    color: Color(0x1808A63F),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2))
+                              ]
                             : null,
                       ),
                       child: Column(
@@ -641,8 +794,11 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                             '$count Beds',
                             style: GoogleFonts.outfit(
                               fontSize: 10,
-                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                              color: isSel ? Colors.white.withValues(alpha: 0.9) : AppColors.muted,
+                              fontWeight:
+                                  isSel ? FontWeight.w800 : FontWeight.w600,
+                              color: isSel
+                                  ? Colors.white.withValues(alpha: 0.9)
+                                  : AppColors.muted,
                             ),
                           ),
                         ],
@@ -671,18 +827,25 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   children: [
                     Text(
                       '${_selectedDay}th of Month (Salary Cycle)',
-                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${selectedTenants.length} Tenants • $dayPaidCount Paid • ${selectedTenants.length - dayPaidCount} Due',
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11, color: AppColors.muted),
                     ),
                   ],
                 ),
                 Text(
                   '₹$dayTotalExpected',
-                  style: GoogleFonts.outfit(fontSize: 16.5, fontWeight: FontWeight.w900, color: AppColors.ink),
+                  style: GoogleFonts.outfit(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink),
                 ),
               ],
             ),
@@ -701,7 +864,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               child: Center(
                 child: Text(
                   'No tenants scheduled for ${_selectedDay}th of the month.',
-                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted),
+                  style:
+                      GoogleFonts.outfit(fontSize: 13, color: AppColors.muted),
                 ),
               ),
             )
@@ -755,7 +919,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: isPaid ? AppColors.greenLight : const Color(0xFFF3F4F6),
+                      color: isPaid
+                          ? AppColors.greenLight
+                          : const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Center(
@@ -783,7 +949,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${tenant['bed']} • ${tenant['floor']} • ${tenant['work']}',
+                        _formatSubtitle(tenant),
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -806,7 +972,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: isPaid
                           ? AppColors.greenLight
@@ -849,7 +1016,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             child: Row(
               children: [
                 Icon(
-                  isPaid ? Icons.verified_user_outlined : Icons.schedule_rounded,
+                  isPaid
+                      ? Icons.verified_user_outlined
+                      : Icons.schedule_rounded,
                   size: 13,
                   color: isPaid ? AppColors.greenDark : AppColors.muted,
                 ),
@@ -878,34 +1047,46 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showToast('Calling +91 ${tenant['phone']}...'),
-                  icon: const Icon(Icons.phone_outlined, size: 14, color: AppColors.ink),
+                  onPressed: () =>
+                      _showToast('Calling +91 ${tenant['phone']}...'),
+                  icon: const Icon(Icons.phone_outlined,
+                      size: 14, color: AppColors.ink),
                   label: Text(
                     'Call',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.ink,
                     side: const BorderSide(color: Color(0xFFE5E7EB)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showToast('WhatsApp Chat opened with ${tenant['name']} (+91 ${tenant['phone']}) ✓'),
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.ink),
+                  onPressed: () => _showToast(
+                      'WhatsApp Chat opened with ${tenant['name']} (+91 ${tenant['phone']}) ✓'),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded,
+                      size: 14, color: AppColors.ink),
                   label: Text(
                     'WhatsApp',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.ink,
                     side: const BorderSide(color: Color(0xFFE5E7EB)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
@@ -913,45 +1094,30 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           ),
           const SizedBox(height: 8),
 
-          // ROW 2: If Paid -> View Receipt & Change Pay Date
+          // ROW 2: If Paid -> Full-Width Change Date (Receipt Removed)
           //        If Not Paid -> View Proof, Reject, Accept
           if (isPaid)
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openReceiptModal(tenant),
-                    icon: const Icon(Icons.receipt_long_outlined, size: 14, color: AppColors.greenDark),
-                    label: Text(
-                      'View Receipt',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.greenDark),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.greenDark,
-                      side: BorderSide(color: AppColors.green.withValues(alpha: 0.3)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openChangePayDateModal(tenant),
+                icon: const Icon(Icons.calendar_today_outlined,
+                    size: 13, color: AppColors.muted),
+                label: Text(
+                  'Change Date',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.muted),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openChangePayDateModal(tenant),
-                    icon: const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.muted),
-                    label: Text(
-                      'Change Date',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.muted),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.muted,
-                      side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.muted,
+                  side: const BorderSide(color: Color(0xFFE5E7EB)),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                 ),
-              ],
+              ),
             )
           else ...[
             // Verification Bar: View Proof, Reject, and Accept
@@ -961,16 +1127,21 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   flex: 3,
                   child: OutlinedButton.icon(
                     onPressed: () => _openViewProofModal(tenant),
-                    icon: const Icon(Icons.remove_red_eye_outlined, size: 13, color: AppColors.ink),
+                    icon: const Icon(Icons.remove_red_eye_outlined,
+                        size: 13, color: AppColors.ink),
                     label: Text(
                       'View Proof',
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.ink,
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -979,16 +1150,21 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   flex: 3,
                   child: OutlinedButton.icon(
                     onPressed: () => _openRejectPaymentModal(tenant),
-                    icon: const Icon(Icons.close_rounded, size: 13, color: Color(0xFFDC2626)),
+                    icon: const Icon(Icons.close_rounded,
+                        size: 13, color: Color(0xFFDC2626)),
                     label: Text(
                       'Reject',
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: const Color(0xFFDC2626)),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626)),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFDC2626),
                       side: const BorderSide(color: Color(0xFFFCA5A5)),
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -999,8 +1175,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     onPressed: () {
                       setState(() {
                         tenant['status'] = 'paid';
-                        tenant['paidLabel'] = 'Paid on ${_selectedDay} Aug (Verified by $_selectedStaffActor)';
-                        tenant['ref'] = 'UTR-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
+                        tenant['paidLabel'] =
+                            'Paid on ${_selectedDay} Aug (Verified by $_selectedStaffActor)';
+                        tenant['ref'] =
+                            'UTR-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
                         tenant['paidDate'] = '${_selectedDay} Aug 2026';
                         tenant['approvedBy'] = _selectedStaffActor;
 
@@ -1015,19 +1193,25 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                           'badge': 'Paid on Time',
                         });
                       });
-                      _showToast('Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
+                      _showToast(
+                          'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
                     },
-                    icon: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                    icon: const Icon(Icons.check_rounded,
+                        size: 14, color: Colors.white),
                     label: Text(
                       'Accept',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -1051,7 +1235,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       ),
                       child: Text(
                         'Record Cash Instead',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.muted),
                       ),
                     ),
                   ),
@@ -1070,7 +1257,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       ),
                       child: Text(
                         'Change Pay Date',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.muted),
                       ),
                     ),
                   ),
@@ -1088,7 +1278,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   // ===========================================================================
   Widget _buildHistoryContent() {
     final filtered = _historyLogs.where((log) {
-      if (_historyFilter == 'payments') return log['type'] == 'payment_verified';
+      if (_historyFilter == 'payments')
+        return log['type'] == 'payment_verified';
       if (_historyFilter == 'rescheduled') return log['type'] == 'rescheduled';
       if (_historyFilter == 'rejected') return log['type'] == 'rejected';
       return true;
@@ -1106,7 +1297,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             physics: const BouncingScrollPhysics(),
             child: Row(
               children: [
-                _buildHistoryFilterChip('all', 'All Audit Logs (${_historyLogs.length})'),
+                _buildHistoryFilterChip(
+                    'all', 'All Audit Logs (${_historyLogs.length})'),
                 _buildHistoryFilterChip('payments', 'Payments Verified'),
                 _buildHistoryFilterChip('rescheduled', 'Date Changes'),
                 _buildHistoryFilterChip('rejected', 'Rejected'),
@@ -1124,7 +1316,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 border: Border.all(color: const Color(0xFFEEF0F2)),
               ),
               child: Center(
-                child: Text('No audit records found.', style: GoogleFonts.outfit(color: AppColors.muted)),
+                child: Text('No audit records found.',
+                    style: GoogleFonts.outfit(color: AppColors.muted)),
               ),
             )
           else
@@ -1146,7 +1339,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           decoration: BoxDecoration(
             color: isSel ? AppColors.ink : Colors.white,
             borderRadius: BorderRadius.circular(99),
-            border: Border.all(color: isSel ? AppColors.ink : const Color(0xFFE5E7EB)),
+            border: Border.all(
+                color: isSel ? AppColors.ink : const Color(0xFFE5E7EB)),
           ),
           child: Text(
             label,
@@ -1217,7 +1411,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   const SizedBox(width: 8),
                   Text(
                     log['title'],
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink),
                   ),
                 ],
               ),
@@ -1247,25 +1444,27 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             ],
           ),
           const SizedBox(height: 8),
-
           Text(
             log['tenant'],
-            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+            style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink),
           ),
           const SizedBox(height: 2),
-
           if (log['ref'] != null)
             Text(
               'Reference: ${log['ref']}',
-              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+              style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted),
             ),
-
           if (log['reason'] != null)
             Text(
               'Note: ${log['reason']}',
               style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
             ),
-
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1278,14 +1477,64 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               children: [
                 Text(
                   'Action By: ${log['actor']}',
-                  style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.ink),
+                  style: GoogleFonts.outfit(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink),
                 ),
                 Text(
                   log['time'],
-                  style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted),
+                  style: GoogleFonts.outfit(
+                      fontSize: 10.5, color: AppColors.muted),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 10),
+
+          // Mandatory Call & WhatsApp buttons for Audit Log
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final phone = log['phone'] ?? '9876543210';
+                    _showToast('Calling +91 $phone...');
+                  },
+                  icon: const Icon(Icons.phone_outlined, size: 13, color: AppColors.ink),
+                  label: Text(
+                    'Call',
+                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.ink,
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    padding: const EdgeInsets.symmetric(vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    final phone = log['phone'] ?? '9876543210';
+                    _showToast('WhatsApp Chat opened (+91 $phone) ✓');
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: AppColors.ink),
+                  label: Text(
+                    'WhatsApp',
+                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.ink,
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    padding: const EdgeInsets.symmetric(vertical: 7),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1318,20 +1567,24 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildRow('Resident:', '${tenant['name']} (${tenant['bed']})', isBold: true),
+                    _buildRow(
+                        'Resident:', '${tenant['name']} (${tenant['bed']})',
+                        isBold: true),
                     const SizedBox(height: 8),
-                    _buildRow('Amount Claimed:', '₹${tenant['amount']}', isBold: true, valueColor: AppColors.greenDark),
+                    _buildRow('Amount Claimed:', '₹${tenant['amount']}',
+                        isBold: true, valueColor: AppColors.greenDark),
                     const SizedBox(height: 8),
                     _buildRow('Payment Mode:', 'Direct UPI / PhonePe'),
                     const SizedBox(height: 8),
-                    _buildRow('Submitted UTR / Ref:', tenant['ref'] ?? 'UTR-423189765412', isMonospace: true),
+                    _buildRow('Submitted UTR / Ref:',
+                        tenant['ref'] ?? 'UTR-423189765412',
+                        isMonospace: true),
                     const SizedBox(height: 8),
                     _buildRow('Submission Time:', '1 Aug 2026, 09:30 AM'),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -1341,19 +1594,22 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFB45309)),
+                    const Icon(Icons.info_outline_rounded,
+                        size: 16, color: Color(0xFFB45309)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Please verify that ₹${tenant['amount']} was credited to your HDFC/SBI bank account before accepting.',
-                        style: GoogleFonts.outfit(fontSize: 11.5, color: const Color(0xFF92400E), fontWeight: FontWeight.w600),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            color: const Color(0xFF92400E),
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-
               Row(
                 children: [
                   Expanded(
@@ -1366,11 +1622,15 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         foregroundColor: const Color(0xFFDC2626),
                         side: const BorderSide(color: Color(0xFFFCA5A5)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       child: Text(
                         'Reject Payment',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFFDC2626)),
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFDC2626)),
                       ),
                     ),
                   ),
@@ -1381,7 +1641,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         Navigator.of(ctx).pop();
                         setState(() {
                           tenant['status'] = 'paid';
-                          tenant['paidLabel'] = 'Paid on ${_selectedDay} Aug (Verified by $_selectedStaffActor)';
+                          tenant['paidLabel'] =
+                              'Paid on ${_selectedDay} Aug (Verified by $_selectedStaffActor)';
                           tenant['ref'] = 'UTR-423189765412';
                           tenant['paidDate'] = '${_selectedDay} Aug 2026';
                           tenant['approvedBy'] = _selectedStaffActor;
@@ -1397,18 +1658,23 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                             'badge': 'Paid on Time',
                           });
                         });
-                        _showToast('Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
+                        _showToast(
+                            'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.green,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
                       child: Text(
                         'Accept & Mark Paid',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white),
                       ),
                     ),
                   ),
@@ -1461,36 +1727,45 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                           children: [
                             Text(
                               '${tenant['name']} (${tenant['bed']})',
-                              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: const Color(0xFF991B1B)),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF991B1B)),
                             ),
                             Text(
                               'Claimed Amount: ₹${tenant['amount']} • ${tenant['ref'] ?? 'UTR-Pending'}',
-                              style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFFB91C1C)),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 11, color: const Color(0xFFB91C1C)),
                             ),
                           ],
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: const Color(0xFFDC2626),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             'UNVERIFIED',
-                            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white),
+                            style: GoogleFonts.outfit(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white),
                           ),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 14),
-
                   Text(
                     'Select Rejection Reason (Sent to Resident):',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(height: 8),
-
                   ...reasons.map((r) {
                     final isSel = selectedReason == r;
                     return Padding(
@@ -1499,21 +1774,30 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         onTap: () => setModalState(() => selectedReason = r),
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isSel ? const Color(0xFFFEF2F2) : const Color(0xFFF9FAFB),
+                            color: isSel
+                                ? const Color(0xFFFEF2F2)
+                                : const Color(0xFFF9FAFB),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: isSel ? const Color(0xFFDC2626) : const Color(0xFFE5E7EB),
+                              color: isSel
+                                  ? const Color(0xFFDC2626)
+                                  : const Color(0xFFE5E7EB),
                               width: isSel ? 1.5 : 1.0,
                             ),
                           ),
                           child: Row(
                             children: [
                               Icon(
-                                isSel ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                                isSel
+                                    ? Icons.radio_button_checked
+                                    : Icons.radio_button_unchecked,
                                 size: 16,
-                                color: isSel ? const Color(0xFFDC2626) : AppColors.muted,
+                                color: isSel
+                                    ? const Color(0xFFDC2626)
+                                    : AppColors.muted,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -1521,8 +1805,12 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                                   r,
                                   style: GoogleFonts.outfit(
                                     fontSize: 12,
-                                    fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                                    color: isSel ? const Color(0xFF991B1B) : AppColors.ink,
+                                    fontWeight: isSel
+                                        ? FontWeight.w800
+                                        : FontWeight.w600,
+                                    color: isSel
+                                        ? const Color(0xFF991B1B)
+                                        : AppColors.ink,
                                   ),
                                 ),
                               ),
@@ -1533,10 +1821,12 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     );
                   }),
                   const SizedBox(height: 10),
-
                   Text(
                     'Additional Note (Optional):',
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted),
                   ),
                   const SizedBox(height: 4),
                   Container(
@@ -1548,16 +1838,17 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     ),
                     child: TextField(
                       controller: customNoteCtrl,
-                      style: GoogleFonts.outfit(fontSize: 12, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12, color: AppColors.ink),
                       decoration: const InputDecoration(
                         hintText: 'e.g. Please resend proof from bank passbook',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         border: InputBorder.none,
                       ),
                     ),
                   ),
                   const SizedBox(height: 18),
-
                   ElevatedButton(
                     onPressed: () {
                       final finalReason = customNoteCtrl.text.trim().isNotEmpty
@@ -1577,18 +1868,21 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         });
                       });
                       Navigator.of(ctx).pop();
-                      _showToast('Payment rejected: Alert sent to ${tenant['name']} on WhatsApp ✓');
+                      _showToast(
+                          'Payment rejected: Alert sent to ${tenant['name']} on WhatsApp ✓');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFDC2626),
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Confirm Rejection & Send Alert',
-                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13.5, fontWeight: FontWeight.w800),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1605,7 +1899,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   void _openChangePayDateModal(Map<String, dynamic> tenant) {
     int currentDay = (tenant['payDay'] as int?) ?? 1;
     int selectedDay = currentDay;
-    final reasonCtrl = TextEditingController(text: 'Salary credited on ${selectedDay}th');
+    final reasonCtrl =
+        TextEditingController(text: 'Salary credited on ${selectedDay}th');
     final List<int> quickDays = [1, 2, 3, 5, 7, 10, 15, 20, 25];
 
     showModalBottomSheet(
@@ -1623,11 +1918,15 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 children: [
                   Text(
                     '${tenant['bed']} • Current Agreed Pay Date: ${currentDay}th of month',
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted),
                   ),
                   const SizedBox(height: 14),
-
-                  Text('Select New Monthly Pay Date', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                  Text('Select New Monthly Pay Date',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 8,
@@ -1638,17 +1937,23 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         onTap: () {
                           setModalState(() {
                             selectedDay = d;
-                            reasonCtrl.text = 'Salary credited on ${d}th of every month';
+                            reasonCtrl.text =
+                                'Salary credited on ${d}th of every month';
                           });
                         },
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: isSel ? AppColors.greenLight : const Color(0xFFF9FAFB),
+                            color: isSel
+                                ? AppColors.greenLight
+                                : const Color(0xFFF9FAFB),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSel ? AppColors.green : const Color(0xFFE5E7EB),
+                              color: isSel
+                                  ? AppColors.green
+                                  : const Color(0xFFE5E7EB),
                               width: isSel ? 1.5 : 1.0,
                             ),
                           ),
@@ -1656,8 +1961,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                             '${d}th of Month',
                             style: GoogleFonts.outfit(
                               fontSize: 12,
-                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                              color: isSel ? AppColors.greenDark : AppColors.ink,
+                              fontWeight:
+                                  isSel ? FontWeight.w800 : FontWeight.w600,
+                              color:
+                                  isSel ? AppColors.greenDark : AppColors.ink,
                             ),
                           ),
                         ),
@@ -1665,31 +1972,42 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 14),
-
-                  Text('Reason / Notes', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                  Text('Reason / Notes',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: reasonCtrl,
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink),
                     decoration: InputDecoration(
                       hintText: 'e.g. Salary credited on 10th from employer',
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB))),
                     ),
                   ),
                   const SizedBox(height: 20),
-
                   ElevatedButton(
                     onPressed: () {
                       Navigator.of(ctx).pop();
                       setState(() {
                         tenant['payDay'] = selectedDay;
-                        _selectedDay = selectedDay; // Automatically move user to new scheduled date view!
+                        _selectedDay =
+                            selectedDay; // Automatically move user to new scheduled date view!
 
                         _historyLogs.insert(0, {
                           'id': 'h_${DateTime.now().millisecondsSinceEpoch}',
                           'type': 'rescheduled',
-                          'title': 'Salary Pay Date Changed: ${currentDay}th ➔ ${selectedDay}th',
+                          'title':
+                              'Salary Pay Date Changed: ${currentDay}th ➔ ${selectedDay}th',
                           'tenant': '${tenant['name']} (${tenant['bed']})',
                           'actor': _selectedStaffActor,
                           'time': 'Just now',
@@ -1697,18 +2015,21 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                           'badge': 'Re-Scheduled',
                         });
                       });
-                      _showToast('Moved ${tenant['name']} to ${selectedDay}th of month (Audit Logged) ✓');
+                      _showToast(
+                          'Moved ${tenant['name']} to ${selectedDay}th of month (Audit Logged) ✓');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save & Move to ${selectedDay}th of Month',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, fontWeight: FontWeight.w800),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -1724,7 +2045,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   // Modal: Record Cash Payment
   void _openRecordCashModal(Map<String, dynamic> tenant) {
     final amountCtrl = TextEditingController(text: tenant['amount'].toString());
-    final notesCtrl = TextEditingController(text: 'Paid cash at reception desk');
+    final notesCtrl =
+        TextEditingController(text: 'Paid cash at reception desk');
 
     showModalBottomSheet(
       context: context,
@@ -1737,22 +2059,38 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Amount Received (₹)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+              Text('Amount Received (₹)',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink)),
               const SizedBox(height: 6),
               TextField(
                 controller: amountCtrl,
                 keyboardType: TextInputType.number,
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink),
+                style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink),
                 decoration: InputDecoration(
                   prefixText: '₹ ',
-                  prefixStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  prefixStyle: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
                 ),
               ),
               const SizedBox(height: 14),
-
-              Text('Verified By', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+              Text('Verified By',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink)),
               const SizedBox(height: 6),
               Container(
                 height: 42,
@@ -1766,24 +2104,32 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   child: DropdownButton<String>(
                     value: _selectedStaffActor,
                     isExpanded: true,
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
-                    items: _staffActors.map((a) => DropdownMenuItem(value: a, child: Text(a))).toList(),
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
+                    items: _staffActors
+                        .map((a) => DropdownMenuItem(value: a, child: Text(a)))
+                        .toList(),
                     onChanged: (val) {
-                      if (val != null) setState(() => _selectedStaffActor = val);
+                      if (val != null)
+                        setState(() => _selectedStaffActor = val);
                     },
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-
               ElevatedButton(
                 onPressed: () {
-                  final amt = int.tryParse(amountCtrl.text.trim()) ?? (tenant['amount'] as int);
+                  final amt = int.tryParse(amountCtrl.text.trim()) ??
+                      (tenant['amount'] as int);
                   Navigator.of(ctx).pop();
                   setState(() {
                     tenant['status'] = 'paid';
-                    tenant['paidLabel'] = 'Paid in Cash (Verified by $_selectedStaffActor)';
-                    tenant['ref'] = 'CSH-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+                    tenant['paidLabel'] =
+                        'Paid in Cash (Verified by $_selectedStaffActor)';
+                    tenant['ref'] =
+                        'CSH-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
                     tenant['paidDate'] = '${_selectedDay} Aug 2026';
                     tenant['approvedBy'] = _selectedStaffActor;
 
@@ -1798,16 +2144,20 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       'badge': 'Cash Settled',
                     });
                   });
-                  _showToast('₹$amt Cash recorded for ${tenant['name']} by $_selectedStaffActor ✓');
+                  _showToast(
+                      '₹$amt Cash recorded for ${tenant['name']} by $_selectedStaffActor ✓');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.green,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
-                child: Text('Confirm & Mark Paid', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800)),
+                child: Text('Confirm & Mark Paid',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14, fontWeight: FontWeight.w800)),
               ),
               const SizedBox(height: 20),
             ],
@@ -1845,18 +2195,22 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     const SizedBox(height: 8),
                     _buildRow('Month / Period:', 'August 2026'),
                     const SizedBox(height: 8),
-                    _buildRow('Amount Paid:', '₹${tenant['amount']}', isBold: true, valueColor: AppColors.greenDark),
+                    _buildRow('Amount Paid:', '₹${tenant['amount']}',
+                        isBold: true, valueColor: AppColors.greenDark),
                     const SizedBox(height: 8),
-                    _buildRow('Transaction Ref:', tenant['ref'] ?? 'UTR-423189765412', isMonospace: true),
+                    _buildRow(
+                        'Transaction Ref:', tenant['ref'] ?? 'UTR-423189765412',
+                        isMonospace: true),
                     const SizedBox(height: 8),
-                    _buildRow('Date of Payment:', tenant['paidDate'] ?? '${_selectedDay} Aug 2026'),
+                    _buildRow('Date of Payment:',
+                        tenant['paidDate'] ?? '${_selectedDay} Aug 2026'),
                     const SizedBox(height: 8),
-                    _buildRow('Verified By:', tenant['approvedBy'] ?? _selectedStaffActor),
+                    _buildRow('Verified By:',
+                        tenant['approvedBy'] ?? _selectedStaffActor),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
@@ -1866,10 +2220,13 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   backgroundColor: AppColors.green,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
-                child: Text('Download PDF Receipt', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+                child: Text('Download PDF Receipt',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
               ),
               const SizedBox(height: 20),
             ],
@@ -1879,11 +2236,13 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
     );
   }
 
-  Widget _buildRow(String label, String value, {bool isBold = false, bool isMonospace = false, Color? valueColor}) {
+  Widget _buildRow(String label, String value,
+      {bool isBold = false, bool isMonospace = false, Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted)),
+        Text(label,
+            style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted)),
         Text(
           value,
           style: GoogleFonts.outfit(
@@ -1896,13 +2255,15 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
     );
   }
 
-  Widget _buildBottomSheetWrapper({required String title, required Widget child}) {
+  Widget _buildBottomSheetWrapper(
+      {required String title, required Widget child}) {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+          20, 16, 20, MediaQuery.of(context).viewInsets.bottom + 20),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1943,7 +2304,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       border: Border.all(color: const Color(0xFFE5E7EB)),
                     ),
                     child: const Center(
-                      child: Icon(Icons.close, size: 14, color: AppColors.muted),
+                      child:
+                          Icon(Icons.close, size: 14, color: AppColors.muted),
                     ),
                   ),
                 ),

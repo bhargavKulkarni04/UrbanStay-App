@@ -48,14 +48,16 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   final TextEditingController _assignNameController = TextEditingController();
   final TextEditingController _assignPhoneController = TextEditingController();
   final TextEditingController _assignRentController = TextEditingController();
-  final TextEditingController _assignDepositController = TextEditingController();
+  final TextEditingController _assignDepositController =
+      TextEditingController();
 
   // Native Device Contacts State
   List<Contact>? _deviceContacts;
   bool _isLoadingContacts = false;
   bool _contactsPermissionDenied = false;
 
-  Future<void> _fetchDeviceContacts([void Function(void Function())? setModalState]) async {
+  Future<void> _fetchDeviceContacts(
+      [void Function(void Function())? setModalState]) async {
     if (_deviceContacts != null && _deviceContacts!.isNotEmpty) return;
 
     if (setModalState != null) {
@@ -66,7 +68,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
     }
 
     try {
-      final status = await FlutterContacts.permissions.request(PermissionType.read);
+      final status =
+          await FlutterContacts.permissions.request(PermissionType.read);
       if (status == PermissionStatus.granted) {
         final contacts = await FlutterContacts.getAll(
           properties: {ContactProperty.name, ContactProperty.phone},
@@ -110,7 +113,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
     }
   }
 
-  Future<void> _pickNativeContact(void Function(void Function()) setModalState) async {
+  Future<void> _pickNativeContact(
+      void Function(void Function()) setModalState) async {
     try {
       final contact = await FlutterContacts.native.showPicker(
         properties: {ContactProperty.name, ContactProperty.phone},
@@ -365,7 +369,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         duration: const Duration(seconds: 2),
@@ -399,15 +404,22 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             children: [
               _buildFormField('Full Legal Name', _nameController),
               const SizedBox(height: 12),
-              _buildFormField('Phone Number / WhatsApp', _phoneController, keyboardType: TextInputType.phone),
+              _buildFormField('Phone Number / WhatsApp', _phoneController,
+                  keyboardType: TextInputType.phone),
               const SizedBox(height: 12),
               _buildFormField('Company / College', _workController),
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Expanded(child: _buildFormField('Monthly Rent (₹)', _rentController, keyboardType: TextInputType.number)),
+                  Expanded(
+                      child: _buildFormField(
+                          'Monthly Rent (₹)', _rentController,
+                          keyboardType: TextInputType.number)),
                   const SizedBox(width: 10),
-                  Expanded(child: _buildFormField('Security Deposit (₹)', _depositController, keyboardType: TextInputType.number)),
+                  Expanded(
+                      child: _buildFormField(
+                          'Security Deposit (₹)', _depositController,
+                          keyboardType: TextInputType.number)),
                 ],
               ),
               const SizedBox(height: 16),
@@ -422,12 +434,14 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   backgroundColor: AppColors.ink,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: Text(
                   'Save Changes',
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 16),
@@ -436,7 +450,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               Container(
                 padding: const EdgeInsets.only(top: 14),
                 decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFFEEF0F2), width: 1)),
+                  border: Border(
+                      top: BorderSide(color: Color(0xFFEEF0F2), width: 1)),
                 ),
                 child: Column(
                   children: [
@@ -446,7 +461,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       '+ Add Damage Charges (with Photo)',
                       textColor: const Color(0xFFB45309),
                       bgColor: const Color(0xFFFFFBEB),
-                      borderColor: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+                      borderColor:
+                          const Color(0xFFF59E0B).withValues(alpha: 0.3),
                       onTap: () {
                         Navigator.of(ctx).pop();
                         _openDamageModal(resident, roomName);
@@ -460,7 +476,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       'Change Room / Shift Bed',
                       onTap: () {
                         Navigator.of(ctx).pop();
-                        _showToast('Opening Room Shift Selector for ${resident['name']}');
+                        _showToast(
+                            'Opening Room Shift Selector for ${resident['name']}');
                       },
                     ),
                     const SizedBox(height: 10),
@@ -471,7 +488,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       'Call Parent / Guardian',
                       onTap: () {
                         Navigator.of(ctx).pop();
-                        _showToast('Calling Guardian of ${resident['name']}: 9811223344');
+                        _showToast(
+                            'Calling Guardian of ${resident['name']}: 9811223344');
                       },
                     ),
                     const SizedBox(height: 10),
@@ -482,7 +500,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       'Give Move-Out Notice (30 Days)',
                       onTap: () {
                         Navigator.of(ctx).pop();
-                        _showToast('Initiated 30-Day Move Out Notice for ${resident['name']} ✓');
+                        _showToast(
+                            'Initiated 30-Day Move Out Notice for ${resident['name']} ✓');
                       },
                     ),
                     const SizedBox(height: 10),
@@ -496,7 +515,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       borderColor: AppColors.danger.withValues(alpha: 0.2),
                       onTap: () {
                         Navigator.of(ctx).pop();
-                        _showToast('${resident['name']} evicted and record updated');
+                        _showToast(
+                            '${resident['name']} evicted and record updated');
                       },
                     ),
                     const SizedBox(height: 24),
@@ -549,7 +569,10 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   // Upload Photo Proof Box
                   Text(
                     'Upload Photo Proof (Required)',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted),
                   ),
                   const SizedBox(height: 6),
                   InkWell(
@@ -565,23 +588,29 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFFAFAFA),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                        border: Border.all(
+                            color: const Color(0xFFE5E7EB), width: 1.5),
                       ),
                       child: Column(
                         children: [
-                          const Icon(Icons.camera_alt_outlined, size: 26, color: AppColors.muted),
+                          const Icon(Icons.camera_alt_outlined,
+                              size: 26, color: AppColors.muted),
                           const SizedBox(height: 6),
                           Text(
-                            _damageAttachedPhoto ?? 'Click to Upload / Take Photo',
+                            _damageAttachedPhoto ??
+                                'Click to Upload / Take Photo',
                             style: GoogleFonts.outfit(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w700,
-                              color: _damageAttachedPhoto != null ? AppColors.greenDark : AppColors.ink,
+                              color: _damageAttachedPhoto != null
+                                  ? AppColors.greenDark
+                                  : AppColors.ink,
                             ),
                           ),
                           Text(
                             'JPEG, PNG or Camera capture',
-                            style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11, color: AppColors.muted),
                           ),
                         ],
                       ),
@@ -590,22 +619,30 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   if (_damageAttachedPhoto != null) ...[
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: AppColors.greenLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+                        border: Border.all(
+                            color: AppColors.green.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             _damageAttachedPhoto!,
-                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.greenDark),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.greenDark),
                           ),
                           Text(
                             'Attached ✓',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.greenDark),
                           ),
                         ],
                       ),
@@ -616,7 +653,10 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   // Deduction Option Dropdown
                   Text(
                     'Deduction Option',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted),
                   ),
                   const SizedBox(height: 6),
                   Container(
@@ -624,17 +664,22 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                      border: Border.all(
+                          color: const Color(0xFFE5E7EB), width: 1.5),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value: _damageDeductionMode,
                         isExpanded: true,
-                        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w600),
                         items: const [
                           DropdownMenuItem(
                             value: 'dues',
-                            child: Text("Add to Current Month's Dues (Immediate Pay)"),
+                            child: Text(
+                                "Add to Current Month's Dues (Immediate Pay)"),
                           ),
                           DropdownMenuItem(
                             value: 'deposit',
@@ -657,11 +702,13 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+                      border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.greenDark),
+                        const Icon(Icons.info_outline_rounded,
+                            size: 16, color: AppColors.greenDark),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -688,19 +735,24 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         return;
                       }
                       Navigator.of(ctx).pop();
-                      final modeText = _damageDeductionMode == 'dues' ? "Added to Dues" : "Deducted from Deposit";
-                      _showToast('₹$amount Damage for $item logged ($modeText) & sent on WhatsApp ✓');
+                      final modeText = _damageDeductionMode == 'dues'
+                          ? "Added to Dues"
+                          : "Deducted from Deposit";
+                      _showToast(
+                          '₹$amount Damage for $item logged ($modeText) & sent on WhatsApp ✓');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.ink,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save & Apply Damage Charge',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -716,7 +768,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   // ===========================================================================
   // PRODUCTION MODAL 3: ASSIGN RESIDENT MODAL (Phonebook Picker & Strict Validation)
   // ===========================================================================
-  void _openAssignModal(Map<String, dynamic> vacantBed, String roomName, String floorLabel) {
+  void _openAssignModal(
+      Map<String, dynamic> vacantBed, String roomName, String floorLabel) {
     _assignNameController.clear();
     _assignPhoneController.clear();
     _assignRentController.text = vacantBed['rent'] ?? '8500';
@@ -737,27 +790,35 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
             // Build dynamic list from real device contacts
-            final List<Map<String, String>> contactsList = (_deviceContacts ?? []).map<Map<String, String>>((c) {
-              final name = c.displayName ?? '';
-              String phone = '';
-              if (c.phones.isNotEmpty) {
-                phone = c.phones.first.number.replaceAll(RegExp(r'[^0-9]'), '');
-                if (phone.length > 10) {
-                  phone = phone.substring(phone.length - 10);
-                }
-              }
-              final initials = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '+';
-              return <String, String>{
-                'name': name,
-                'phone': phone,
-                'initials': initials,
-              };
-            }).where((c) => c['phone']!.isNotEmpty).toList();
+            final List<Map<String, String>> contactsList =
+                (_deviceContacts ?? [])
+                    .map<Map<String, String>>((c) {
+                      final name = c.displayName ?? '';
+                      String phone = '';
+                      if (c.phones.isNotEmpty) {
+                        phone = c.phones.first.number
+                            .replaceAll(RegExp(r'[^0-9]'), '');
+                        if (phone.length > 10) {
+                          phone = phone.substring(phone.length - 10);
+                        }
+                      }
+                      final initials = name.isNotEmpty
+                          ? name.substring(0, 1).toUpperCase()
+                          : '+';
+                      return <String, String>{
+                        'name': name,
+                        'phone': phone,
+                        'initials': initials,
+                      };
+                    })
+                    .where((c) => c['phone']!.isNotEmpty)
+                    .toList();
 
             final filteredContacts = contactsList.where((c) {
               if (contactSearch.isEmpty) return true;
               final q = contactSearch.toLowerCase();
-              return c['name']!.toLowerCase().contains(q) || c['phone']!.contains(q);
+              return c['name']!.toLowerCase().contains(q) ||
+                  c['phone']!.contains(q);
             }).toList();
 
             return _buildNativeBottomSheetWrapper(
@@ -778,7 +839,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       children: [
                         // Header Bar with Toggle & Native System Picker
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -786,7 +848,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                 onTap: () {
                                   setModalState(() {
                                     showPhonebookPicker = !showPhonebookPicker;
-                                    if (showPhonebookPicker && _deviceContacts == null) {
+                                    if (showPhonebookPicker &&
+                                        _deviceContacts == null) {
                                       _fetchDeviceContacts(setModalState);
                                     }
                                   });
@@ -797,19 +860,26 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                       width: 28,
                                       height: 28,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF2563EB).withValues(alpha: 0.1),
+                                        color: const Color(0xFF2563EB)
+                                            .withValues(alpha: 0.1),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: const Icon(Icons.contacts_rounded, size: 16, color: Color(0xFF2563EB)),
+                                      child: const Icon(Icons.contacts_rounded,
+                                          size: 16, color: Color(0xFF2563EB)),
                                     ),
                                     const SizedBox(width: 10),
                                     Text(
                                       'Pick from Phonebook',
-                                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                      style: GoogleFonts.outfit(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.ink),
                                     ),
                                     const SizedBox(width: 6),
                                     Icon(
-                                      showPhonebookPicker ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                                      showPhonebookPicker
+                                          ? Icons.keyboard_arrow_up_rounded
+                                          : Icons.keyboard_arrow_down_rounded,
                                       size: 18,
                                       color: const Color(0xFF2563EB),
                                     ),
@@ -822,19 +892,25 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                 onTap: () => _pickNativeContact(setModalState),
                                 borderRadius: BorderRadius.circular(8),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                                    border: Border.all(
+                                        color: const Color(0xFFE5E7EB)),
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.open_in_new_rounded, size: 13, color: Color(0xFF2563EB)),
+                                      const Icon(Icons.open_in_new_rounded,
+                                          size: 13, color: Color(0xFF2563EB)),
                                       const SizedBox(width: 4),
                                       Text(
                                         'System Contacts',
-                                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF2563EB)),
+                                        style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF2563EB)),
                                       ),
                                     ],
                                   ),
@@ -858,12 +934,15 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                     const SizedBox(
                                       width: 24,
                                       height: 24,
-                                      child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF2563EB)),
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2.5,
+                                          color: Color(0xFF2563EB)),
                                     ),
                                     const SizedBox(height: 10),
                                     Text(
                                       'Reading phone contacts from device...',
-                                      style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                                      style: GoogleFonts.outfit(
+                                          fontSize: 12, color: AppColors.muted),
                                     ),
                                   ],
                                 ),
@@ -875,24 +954,35 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                               padding: const EdgeInsets.all(16),
                               child: Column(
                                 children: [
-                                  const Icon(Icons.no_accounts_rounded, size: 28, color: AppColors.muted),
+                                  const Icon(Icons.no_accounts_rounded,
+                                      size: 28, color: AppColors.muted),
                                   const SizedBox(height: 6),
                                   Text(
                                     'Contacts permission needed to load phonebook',
-                                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.ink),
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.ink),
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 10),
                                   ElevatedButton(
-                                    onPressed: () => _fetchDeviceContacts(setModalState),
+                                    onPressed: () =>
+                                        _fetchDeviceContacts(setModalState),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF2563EB),
                                       foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8)),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 8),
                                       elevation: 0,
                                     ),
-                                    child: Text('Allow Contacts Permission', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700)),
+                                    child: Text('Allow Contacts Permission',
+                                        style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700)),
                                   ),
                                 ],
                               ),
@@ -905,17 +995,24 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                                  border: Border.all(
+                                      color: const Color(0xFFE5E7EB)),
                                 ),
                                 child: TextField(
-                                  onChanged: (v) => setModalState(() => contactSearch = v),
-                                  style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.ink),
+                                  onChanged: (v) =>
+                                      setModalState(() => contactSearch = v),
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 12.5, color: AppColors.ink),
                                   decoration: InputDecoration(
-                                    hintText: 'Search contacts by name or number...',
-                                    hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-                                    prefixIcon: const Icon(Icons.search, size: 16, color: AppColors.muted),
+                                    hintText:
+                                        'Search contacts by name or number...',
+                                    hintStyle: GoogleFonts.outfit(
+                                        fontSize: 12, color: AppColors.muted),
+                                    prefixIcon: const Icon(Icons.search,
+                                        size: 16, color: AppColors.muted),
                                     border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.symmetric(vertical: 9),
+                                    contentPadding:
+                                        const EdgeInsets.symmetric(vertical: 9),
                                   ),
                                 ),
                               ),
@@ -924,36 +1021,46 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                             // Contact List View
                             if (filteredContacts.isEmpty)
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                                 child: Center(
                                   child: Text(
                                     _deviceContacts == null
                                         ? 'Tap "System Contacts" above to load contacts'
                                         : 'No contacts found matching "$contactSearch"',
-                                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 12, color: AppColors.muted),
                                   ),
                                 ),
                               )
                             else
                               Container(
-                                constraints: const BoxConstraints(maxHeight: 180),
+                                constraints:
+                                    const BoxConstraints(maxHeight: 180),
                                 child: ListView.separated(
                                   shrinkWrap: true,
                                   itemCount: filteredContacts.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF3F4F6), indent: 48),
+                                  separatorBuilder: (_, __) => const Divider(
+                                      height: 1,
+                                      color: Color(0xFFF3F4F6),
+                                      indent: 48),
                                   itemBuilder: (context, idx) {
                                     final contact = filteredContacts[idx];
                                     return InkWell(
                                       onTap: () {
                                         setModalState(() {
-                                          _assignNameController.text = contact['name']!;
-                                          _assignPhoneController.text = contact['phone']!;
+                                          _assignNameController.text =
+                                              contact['name']!;
+                                          _assignPhoneController.text =
+                                              contact['phone']!;
                                           showPhonebookPicker = false;
                                         });
-                                        _showToast('Auto-filled from ${contact['name']}');
+                                        _showToast(
+                                            'Auto-filled from ${contact['name']}');
                                       },
                                       child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 8),
                                         child: Row(
                                           children: [
                                             Container(
@@ -966,27 +1073,41 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                               child: Center(
                                                 child: Text(
                                                   contact['initials']!,
-                                                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
+                                                  style: GoogleFonts.outfit(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: Colors.white),
                                                 ),
                                               ),
                                             ),
                                             const SizedBox(width: 10),
                                             Expanded(
                                               child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
                                                     contact['name']!,
-                                                    style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                                                    style: GoogleFonts.outfit(
+                                                        fontSize: 12.5,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                        color: AppColors.ink),
                                                   ),
                                                   Text(
                                                     '+91 ${contact['phone']}',
-                                                    style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                                                    style: GoogleFonts.outfit(
+                                                        fontSize: 11,
+                                                        color: AppColors.muted),
                                                   ),
                                                 ],
                                               ),
                                             ),
-                                            const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.muted),
+                                            const Icon(
+                                                Icons.chevron_right_rounded,
+                                                size: 16,
+                                                color: AppColors.muted),
                                           ],
                                         ),
                                       ),
@@ -1032,7 +1153,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                           _assignRentController,
                           prefixText: '₹ ',
                           keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -1042,7 +1165,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                           _assignDepositController,
                           prefixText: '₹ ',
                           keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
                         ),
                       ),
                     ],
@@ -1076,7 +1201,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
                       final depositNum = int.tryParse(deposit);
                       if (depositNum == null || depositNum < 0) {
-                        _showToast('Please enter valid security deposit amount');
+                        _showToast(
+                            'Please enter valid security deposit amount');
                         return;
                       }
 
@@ -1096,7 +1222,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                 b['work'] = 'Resident';
                                 b['docs'] = 'Aadhaar Verified';
                                 b['docsVerified'] = true;
-                                b['initials'] = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'US';
+                                b['initials'] = name.isNotEmpty
+                                    ? name.substring(0, 1).toUpperCase()
+                                    : 'US';
                                 break;
                               }
                             }
@@ -1107,18 +1235,21 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       });
 
                       Navigator.of(ctx).pop();
-                      _showToast('$name assigned to $roomName (${vacantBed['bed']}) ✓');
+                      _showToast(
+                          '$name assigned to $roomName (${vacantBed['bed']}) ✓');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Confirm Check-In & Assign Bed',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -1161,7 +1292,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       // 2. Search filter
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
-        final roomMatch = (room['room'] as String).toLowerCase().contains(query);
+        final roomMatch =
+            (room['room'] as String).toLowerCase().contains(query);
         final bedMatch = beds.any((b) {
           final name = (b['name'] ?? '').toString().toLowerCase();
           final work = (b['work'] ?? '').toString().toLowerCase();
@@ -1206,7 +1338,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         if (filteredRooms.isEmpty)
                           _buildEmptyState()
                         else
-                          ...filteredRooms.map((room) => _buildRoomGroupBlock(room)),
+                          ...filteredRooms
+                              .map((room) => _buildRoomGroupBlock(room)),
                       ],
                     ),
                   ),
@@ -1221,7 +1354,11 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               child: FloatingActionButton(
                 onPressed: () {
                   _openAssignModal(
-                    {'bed': 'Any Vacant Bed', 'rent': '8500', 'deposit': '15000'},
+                    {
+                      'bed': 'Any Vacant Bed',
+                      'rent': '8500',
+                      'deposit': '15000'
+                    },
                     'Auto-Assign Room',
                     '1st Floor',
                   );
@@ -1335,14 +1472,17 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       child: TextField(
         controller: _searchController,
         onChanged: (val) => setState(() => _searchQuery = val),
-        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w500),
+        style: GoogleFonts.outfit(
+            fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
           hintText: 'Search resident by name or room...',
           hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
-          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.muted),
+          prefixIcon: const Icon(Icons.search_rounded,
+              size: 18, color: AppColors.muted),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, size: 16, color: AppColors.muted),
+                  icon:
+                      const Icon(Icons.clear, size: 16, color: AppColors.muted),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
@@ -1383,7 +1523,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               },
               borderRadius: BorderRadius.circular(99),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.ink : Colors.white,
                   borderRadius: BorderRadius.circular(99),
@@ -1422,9 +1563,12 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             isSelected: _selectedFilter == 'tenants',
             onTap: () {
               setState(() {
-                _selectedFilter = _selectedFilter == 'tenants' ? 'all' : 'tenants';
+                _selectedFilter =
+                    _selectedFilter == 'tenants' ? 'all' : 'tenants';
               });
-              _showToast(_selectedFilter == 'tenants' ? 'Showing Active Tenants (31)' : 'Showing All Beds');
+              _showToast(_selectedFilter == 'tenants'
+                  ? 'Showing Active Tenants (31)'
+                  : 'Showing All Beds');
             },
           ),
         ),
@@ -1439,9 +1583,12 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             isSelected: _selectedFilter == 'vacant',
             onTap: () {
               setState(() {
-                _selectedFilter = _selectedFilter == 'vacant' ? 'all' : 'vacant';
+                _selectedFilter =
+                    _selectedFilter == 'vacant' ? 'all' : 'vacant';
               });
-              _showToast(_selectedFilter == 'vacant' ? 'Showing Vacant Beds (4)' : 'Showing All Beds');
+              _showToast(_selectedFilter == 'vacant'
+                  ? 'Showing Vacant Beds (4)'
+                  : 'Showing All Beds');
             },
           ),
         ),
@@ -1456,9 +1603,12 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             isSelected: _selectedFilter == 'notice',
             onTap: () {
               setState(() {
-                _selectedFilter = _selectedFilter == 'notice' ? 'all' : 'notice';
+                _selectedFilter =
+                    _selectedFilter == 'notice' ? 'all' : 'notice';
               });
-              _showToast(_selectedFilter == 'notice' ? 'Showing Notice Period Tenants (1)' : 'Showing All Beds');
+              _showToast(_selectedFilter == 'notice'
+                  ? 'Showing Notice Period Tenants (1)'
+                  : 'Showing All Beds');
             },
           ),
         ),
@@ -1487,7 +1637,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
           ),
           boxShadow: [
             BoxShadow(
-              color: isSelected ? const Color(0x0C000000) : const Color(0x03000000),
+              color: isSelected
+                  ? const Color(0x0C000000)
+                  : const Color(0x03000000),
               blurRadius: isSelected ? 6 : 4,
               offset: const Offset(0, 1),
             ),
@@ -1588,7 +1740,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
-                          color: isFullyOccupied ? AppColors.green : const Color(0xFFD97706),
+                          color: isFullyOccupied
+                              ? AppColors.green
+                              : const Color(0xFFD97706),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -1598,7 +1752,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         style: GoogleFonts.outfit(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
-                          color: isFullyOccupied ? AppColors.greenDark : const Color(0xFFD97706),
+                          color: isFullyOccupied
+                              ? AppColors.greenDark
+                              : const Color(0xFFD97706),
                         ),
                       ),
                     ],
@@ -1662,7 +1818,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.greenLight,
                         shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.green.withValues(alpha: 0.25), width: 1.5),
+                        border: Border.all(
+                            color: AppColors.green.withValues(alpha: 0.25),
+                            width: 1.5),
                       ),
                       child: Center(
                         child: Text(
@@ -1695,9 +1853,12 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         ),
                         const SizedBox(height: 2),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: isNotice ? const Color(0xFFFEF2F2) : AppColors.greenLight,
+                            color: isNotice
+                                ? const Color(0xFFFEF2F2)
+                                : AppColors.greenLight,
                             borderRadius: BorderRadius.circular(5),
                             border: Border.all(
                               color: isNotice
@@ -1710,7 +1871,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                             style: GoogleFonts.outfit(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: isNotice ? AppColors.danger : AppColors.greenDark,
+                              color: isNotice
+                                  ? AppColors.danger
+                                  : AppColors.greenDark,
                             ),
                           ),
                         ),
@@ -1725,7 +1888,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 onTap: () => _openEditModal(tenant, roomName),
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF9FAFB),
                     borderRadius: BorderRadius.circular(8),
@@ -1733,7 +1897,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.edit_outlined, size: 13, color: AppColors.ink),
+                      const Icon(Icons.edit_outlined,
+                          size: 13, color: AppColors.ink),
                       const SizedBox(width: 4),
                       Text(
                         'Edit',
@@ -1770,7 +1935,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.bed_outlined, size: 16, color: AppColors.green),
+                    const Icon(Icons.bed_outlined,
+                        size: 16, color: AppColors.green),
                     const SizedBox(width: 6),
                     Text(
                       tenant['bed'] ?? 'Bed A',
@@ -1815,7 +1981,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               // Call Button
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('Calling ${tenant['name']}: +91${tenant['phone']}'),
+                  onTap: () => _showToast(
+                      'Calling ${tenant['name']}: +91${tenant['phone']}'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 38,
@@ -1827,7 +1994,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.phone_outlined, size: 14, color: AppColors.ink),
+                        const Icon(Icons.phone_outlined,
+                            size: 14, color: AppColors.ink),
                         const SizedBox(width: 6),
                         Text(
                           'Call',
@@ -1847,19 +2015,22 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               // Direct WhatsApp Button
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('Opening WhatsApp chat with ${tenant['name']} (+91${tenant['phone']}) ✓'),
+                  onTap: () => _showToast(
+                      'Opening WhatsApp chat with ${tenant['name']} (+91${tenant['phone']}) ✓'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 38,
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
+                      border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.25)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.greenDark),
+                        const Icon(Icons.chat_bubble_outline_rounded,
+                            size: 14, color: AppColors.greenDark),
                         const SizedBox(width: 6),
                         Text(
                           'WhatsApp',
@@ -1894,7 +2065,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.badge_outlined, size: 14, color: AppColors.muted),
+                      const Icon(Icons.badge_outlined,
+                          size: 14, color: AppColors.muted),
                       const SizedBox(width: 6),
                       Text(
                         'View Details & Tenant Dossier',
@@ -1906,7 +2078,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       ),
                     ],
                   ),
-                  const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: AppColors.ink),
+                  const Icon(Icons.arrow_forward_ios_rounded,
+                      size: 11, color: AppColors.ink),
                 ],
               ),
             ),
@@ -1919,7 +2092,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   // ===========================================================================
   // 7. VACANT BED CARD (Dashed Green Border)
   // ===========================================================================
-  Widget _buildVacantBedCard(Map<String, dynamic> bed, String roomName, String floorLabel) {
+  Widget _buildVacantBedCard(
+      Map<String, dynamic> bed, String roomName, String floorLabel) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -1960,7 +2134,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             onTap: () => _openAssignModal(bed, roomName, floorLabel),
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
               decoration: BoxDecoration(
                 color: AppColors.green,
                 borderRadius: BorderRadius.circular(8),
@@ -1986,7 +2161,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       child: Center(
         child: Column(
           children: [
-            const Icon(Icons.search_off_rounded, size: 40, color: AppColors.muted),
+            const Icon(Icons.search_off_rounded,
+                size: 40, color: AppColors.muted),
             const SizedBox(height: 12),
             Text(
               'No rooms or residents match your search',
@@ -2100,7 +2276,10 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted),
+          style: GoogleFonts.outfit(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.muted),
         ),
         const SizedBox(height: 5),
         Container(
@@ -2114,13 +2293,21 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             controller: controller,
             keyboardType: keyboardType,
             inputFormatters: inputFormatters,
-            style: GoogleFonts.outfit(fontSize: 13.5, color: AppColors.ink, fontWeight: FontWeight.w600),
+            style: GoogleFonts.outfit(
+                fontSize: 13.5,
+                color: AppColors.ink,
+                fontWeight: FontWeight.w600),
             decoration: InputDecoration(
               prefixText: prefixText,
-              prefixStyle: GoogleFonts.outfit(fontSize: 13.5, color: AppColors.ink, fontWeight: FontWeight.w700),
+              prefixStyle: GoogleFonts.outfit(
+                  fontSize: 13.5,
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w700),
               hintText: hint,
-              hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              hintStyle:
+                  GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               border: InputBorder.none,
             ),
           ),

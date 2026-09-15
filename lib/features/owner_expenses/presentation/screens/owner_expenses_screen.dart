@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -32,7 +33,8 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _vendorController = TextEditingController();
-  final TextEditingController _dateController = TextEditingController(text: '28 Aug 2026');
+  final TextEditingController _dateController =
+      TextEditingController(text: '28 Aug 2026');
   String _selectedPayMode = 'UPI'; // 'UPI', 'Cash'
   String? _attachedBillName;
 
@@ -138,7 +140,8 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         duration: const Duration(seconds: 2),
@@ -149,32 +152,70 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
     );
   }
 
-  int get _totalSpent => _expenses.fold<int>(0, (sum, item) => sum + (item['amount'] as int));
+  int get _totalSpent =>
+      _expenses.fold<int>(0, (sum, item) => sum + (item['amount'] as int));
 
   IconData _getCategoryIcon(String cat) {
     final lower = cat.toLowerCase();
     if (lower.contains('elect')) return Icons.bolt_rounded;
-    if (lower.contains('kitch') || lower.contains('food') || lower.contains('ration')) return Icons.restaurant_rounded;
+    if (lower.contains('kitch') ||
+        lower.contains('food') ||
+        lower.contains('ration')) return Icons.restaurant_rounded;
     if (lower.contains('water')) return Icons.water_drop_rounded;
-    if (lower.contains('sal') || lower.contains('staff') || lower.contains('warden')) return Icons.badge_outlined;
-    if (lower.contains('repair') || lower.contains('plumb') || lower.contains('maint')) return Icons.handyman_rounded;
-    if (lower.contains('wifi') || lower.contains('internet')) return Icons.wifi_rounded;
+    if (lower.contains('sal') ||
+        lower.contains('staff') ||
+        lower.contains('warden')) return Icons.badge_outlined;
+    if (lower.contains('repair') ||
+        lower.contains('plumb') ||
+        lower.contains('maint')) return Icons.handyman_rounded;
+    if (lower.contains('wifi') || lower.contains('internet'))
+      return Icons.wifi_rounded;
     return Icons.receipt_rounded;
   }
 
   // ===========================================================================
   // MODAL: LOG NEW PG EXPENSE (With "+ Other" custom category text input)
   // ===========================================================================
-  void _openLogExpenseModal() {
-    _selectedModalCat = 'Electricity';
-    _isCustomCategory = false;
-    _customCatController.clear();
-    _titleController.clear();
-    _amountController.clear();
-    _vendorController.clear();
-    _dateController.text = '28 Aug 2026';
-    _selectedPayMode = 'UPI';
-    _attachedBillName = null;
+  // ===========================================================================
+  // MODAL: LOG / EDIT PG EXPENSE
+  // ===========================================================================
+  void _openExpenseModal({Map<String, dynamic>? expenseToEdit}) {
+    final isEditing = expenseToEdit != null;
+    if (isEditing) {
+      _selectedModalCat = expenseToEdit['category'] ?? 'Electricity';
+      _isCustomCategory = ![
+        'Electricity',
+        'Kitchen / Ration',
+        'Kitchen',
+        'Water Tanker',
+        'Water',
+        'Staff Salary',
+        'Salary',
+        'Repairs',
+        'Repair',
+        'WiFi / Misc',
+        'WiFi'
+      ].contains(_selectedModalCat);
+      if (_isCustomCategory) {
+        _customCatController.text = _selectedModalCat;
+      } else {
+        _customCatController.clear();
+      }
+      _titleController.text = expenseToEdit['title'] ?? '';
+      _amountController.text = (expenseToEdit['amount'] ?? '').toString();
+      _vendorController.text = expenseToEdit['vendor'] ?? '';
+      _attachedBillName = expenseToEdit['hasReceipt'] == true
+          ? (expenseToEdit['receiptFile'] ?? 'bill_receipt.jpg')
+          : null;
+    } else {
+      _selectedModalCat = 'Electricity';
+      _isCustomCategory = false;
+      _customCatController.clear();
+      _titleController.clear();
+      _amountController.clear();
+      _vendorController.clear();
+      _attachedBillName = null;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -185,33 +226,34 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
             return _buildNativeBottomSheetWrapper(
-              title: 'Log New PG Expense',
+              title: isEditing ? 'Edit PG Expense' : 'Log New PG Expense',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Category Selector Chips
+                  // Category Selector Chips (Without Icons)
                   _buildFormLabel('Expense Category'),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildModalCatChip('Electricity', Icons.bolt_rounded, setModalState),
-                      _buildModalCatChip('Kitchen / Ration', Icons.restaurant_rounded, setModalState),
-                      _buildModalCatChip('Water Tanker', Icons.water_drop_rounded, setModalState),
-                      _buildModalCatChip('Staff Salary', Icons.badge_outlined, setModalState),
-                      _buildModalCatChip('Repairs', Icons.handyman_rounded, setModalState),
-                      _buildModalCatChip('WiFi / Misc', Icons.wifi_rounded, setModalState),
-                      _buildModalCatChip('+ Other (Custom)', Icons.add_circle_outline_rounded, setModalState, isCustom: true),
+                      _buildModalCatChip('Electricity', setModalState),
+                      _buildModalCatChip('Kitchen / Ration', setModalState),
+                      _buildModalCatChip('Water Tanker', setModalState),
+                      _buildModalCatChip('Staff Salary', setModalState),
+                      _buildModalCatChip('Repairs', setModalState),
+                      _buildModalCatChip('WiFi / Misc', setModalState),
+                      _buildModalCatChip('+ Other (Custom)', setModalState,
+                          isCustom: true),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
                   // Inline Custom Category Input (If + Other selected)
                   if (_isCustomCategory) ...[
                     _buildFormLabel('Enter Custom Category Name'),
                     _buildTextInput(
                       _customCatController,
-                      hint: 'e.g. Diesel Generator, Pest Control, Waste Disposal',
+                      hint: 'Custom Category',
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -220,37 +262,17 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                   _buildFormLabel('Expense Title / Description'),
                   _buildTextInput(
                     _titleController,
-                    hint: 'e.g. Kaveri Water Tankers (2 Trips)',
+                    hint: 'Description',
                   ),
                   const SizedBox(height: 12),
 
-                  // Amount & Date Row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildFormLabel('Amount (₹)'),
-                            _buildTextInput(
-                              _amountController,
-                              hint: '₹ Amount',
-                              keyboardType: TextInputType.number,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildFormLabel('Date'),
-                            _buildTextInput(_dateController, hint: 'Date'),
-                          ],
-                        ),
-                      ),
-                    ],
+                  // Amount (Legit Numbers Only)
+                  _buildFormLabel('Amount (₹)'),
+                  _buildTextInput(
+                    _amountController,
+                    hint: 'Amount',
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
                   const SizedBox(height: 12),
 
@@ -258,127 +280,61 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                   _buildFormLabel('Paid To / Vendor Name'),
                   _buildTextInput(
                     _vendorController,
-                    hint: 'e.g. Kaveri Water Supplies / Annapurna Stores',
+                    hint: 'Vendor name',
                   ),
                   const SizedBox(height: 12),
 
-                  // Payment Mode Toggle: Direct UPI / Bank vs Cash
-                  _buildFormLabel('Payment Mode'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setModalState(() => _selectedPayMode = 'UPI'),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: _selectedPayMode == 'UPI' ? AppColors.greenLight : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _selectedPayMode == 'UPI' ? AppColors.green : const Color(0xFFE5E7EB),
-                                width: _selectedPayMode == 'UPI' ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.account_balance_outlined,
-                                  size: 15,
-                                  color: _selectedPayMode == 'UPI' ? AppColors.greenDark : AppColors.ink,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Direct UPI / Bank',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 12,
-                                    fontWeight: _selectedPayMode == 'UPI' ? FontWeight.w800 : FontWeight.w600,
-                                    color: _selectedPayMode == 'UPI' ? AppColors.greenDark : AppColors.ink,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setModalState(() => _selectedPayMode = 'Cash'),
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: _selectedPayMode == 'Cash' ? AppColors.greenLight : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _selectedPayMode == 'Cash' ? AppColors.green : const Color(0xFFE5E7EB),
-                                width: _selectedPayMode == 'Cash' ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.payments_outlined,
-                                  size: 15,
-                                  color: _selectedPayMode == 'Cash' ? AppColors.greenDark : AppColors.ink,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  'Cash / Petty Cash',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 12,
-                                    fontWeight: _selectedPayMode == 'Cash' ? FontWeight.w800 : FontWeight.w600,
-                                    color: _selectedPayMode == 'Cash' ? AppColors.greenDark : AppColors.ink,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Bill Slip Photo Attachment
-                  _buildFormLabel('Bill / Invoice Slip Photo'),
+                  // Bill Slip Photo Attachment (Optional)
+                  _buildFormLabel('Bill / Invoice Slip (Optional)'),
                   InkWell(
                     onTap: () {
                       setModalState(() {
-                        _attachedBillName = 'bill_receipt_${DateTime.now().millisecondsSinceEpoch % 1000}.jpg';
+                        if (_attachedBillName != null) {
+                          _attachedBillName = null;
+                        } else {
+                          _attachedBillName =
+                              'bill_receipt_${DateTime.now().millisecondsSinceEpoch % 1000}.jpg';
+                        }
                       });
-                      _showToast('Bill photo receipt attached ✓');
+                      _showToast(_attachedBillName != null
+                          ? 'Bill receipt attached ✓'
+                          : 'Bill receipt removed');
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: _attachedBillName != null ? AppColors.green : const Color(0xFFE5E7EB),
-                          style: BorderStyle.solid,
+                          color: _attachedBillName != null
+                              ? AppColors.green
+                              : const Color(0xFFE5E7EB),
                         ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
-                            _attachedBillName != null ? Icons.check_circle_outline_rounded : Icons.camera_alt_outlined,
+                            _attachedBillName != null
+                                ? Icons.check_circle_outline_rounded
+                                : Icons.attach_file_rounded,
                             size: 16,
-                            color: _attachedBillName != null ? AppColors.greenDark : AppColors.muted,
+                            color: _attachedBillName != null
+                                ? AppColors.greenDark
+                                : AppColors.muted,
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            _attachedBillName ?? 'Tap to Attach Bill Photo / Camera',
+                            _attachedBillName ??
+                                'Tap to Attach Bill Photo (Optional)',
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: _attachedBillName != null ? AppColors.greenDark : AppColors.muted,
+                              color: _attachedBillName != null
+                                  ? AppColors.greenDark
+                                  : AppColors.muted,
                             ),
                           ),
                         ],
@@ -387,7 +343,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Submit Button
+                  // Submit Button - GREEN BACKGROUND WITH WHITE TEXT
                   ElevatedButton(
                     onPressed: () {
                       final title = _titleController.text.trim();
@@ -399,39 +355,67 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                         return;
                       }
 
-                      final amount = int.tryParse(amountStr.replaceAll(',', '').replaceAll('₹', '')) ?? 0;
-                      final finalCat = _isCustomCategory && _customCatController.text.trim().isNotEmpty
+                      final amount = int.tryParse(amountStr
+                              .replaceAll(',', '')
+                              .replaceAll('₹', '')) ??
+                          0;
+                      if (amount <= 0) {
+                        _showToast('Please enter a valid amount');
+                        return;
+                      }
+
+                      final finalCat = _isCustomCategory &&
+                              _customCatController.text.trim().isNotEmpty
                           ? _customCatController.text.trim()
                           : _selectedModalCat.split(' / ')[0];
 
                       Navigator.of(ctx).pop();
                       setState(() {
-                        _expenses.insert(0, {
-                          'id': 'EXP-${DateTime.now().millisecondsSinceEpoch % 1000}',
-                          'title': title,
-                          'category': finalCat,
-                          'icon': _getCategoryIcon(finalCat),
-                          'vendor': vendor.isNotEmpty ? vendor : 'Direct Expense',
-                          'amount': amount,
-                          'date': _dateController.text.trim(),
-                          'mode': _selectedPayMode == 'UPI' ? 'Direct UPI / Bank' : 'Cash (Petty Cash)',
-                          'ref': 'Saved to Ledger',
-                          'receiptFile': _attachedBillName ?? 'invoice_receipt.pdf',
-                          'hasReceipt': _attachedBillName != null,
-                        });
+                        if (isEditing) {
+                          expenseToEdit['title'] = title;
+                          expenseToEdit['category'] = finalCat;
+                          expenseToEdit['vendor'] =
+                              vendor.isNotEmpty ? vendor : 'Direct Expense';
+                          expenseToEdit['amount'] = amount;
+                          expenseToEdit['receiptFile'] =
+                              _attachedBillName ?? 'invoice_receipt.pdf';
+                          expenseToEdit['hasReceipt'] =
+                              _attachedBillName != null;
+                          _showToast('Updated $title ✓');
+                        } else {
+                          _expenses.insert(0, {
+                            'id':
+                                'EXP-${DateTime.now().millisecondsSinceEpoch % 1000}',
+                            'title': title,
+                            'category': finalCat,
+                            'vendor':
+                                vendor.isNotEmpty ? vendor : 'Direct Expense',
+                            'amount': amount,
+                            'date': 'Today',
+                            'ref': 'Saved to Ledger',
+                            'receiptFile':
+                                _attachedBillName ?? 'invoice_receipt.pdf',
+                            'hasReceipt': _attachedBillName != null,
+                          });
+                          _showToast(
+                              '₹${amount.toString()} logged under $finalCat ✓');
+                        }
                       });
-                      _showToast('₹${amount.toString()} logged under $finalCat ✓');
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.ink,
+                      backgroundColor: AppColors.green,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
-                      'Save Expense to Ledger',
-                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700),
+                      isEditing ? 'Update Expense' : 'Save Expense to Ledger',
+                      style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -444,8 +428,11 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
     );
   }
 
-  Widget _buildModalCatChip(String label, IconData icon, StateSetter setModalState, {bool isCustom = false}) {
-    final isSelected = isCustom ? _isCustomCategory : (!_isCustomCategory && _selectedModalCat == label);
+  Widget _buildModalCatChip(String label, StateSetter setModalState,
+      {bool isCustom = false}) {
+    final isSelected = isCustom
+        ? _isCustomCategory
+        : (!_isCustomCategory && _selectedModalCat == label);
 
     return InkWell(
       onTap: () {
@@ -460,28 +447,21 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       },
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.ink : const Color(0xFFF3F4F6),
+          color: isSelected ? AppColors.green : const Color(0xFFF3F4F6),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppColors.ink : const Color(0xFFE5E7EB),
+            color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.inkSecondary),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: GoogleFonts.outfit(
-                fontSize: 11.5,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? Colors.white : AppColors.inkSecondary,
-              ),
-            ),
-          ],
+        child: Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+            color: isSelected ? Colors.white : AppColors.inkSecondary,
+          ),
         ),
       ),
     );
@@ -514,45 +494,56 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(expense['icon'] as IconData, size: 48, color: AppColors.muted),
+                    const Icon(Icons.receipt_long_outlined,
+                        size: 48, color: AppColors.muted),
                     const SizedBox(height: 10),
                     Text(
                       expense['receiptFile'] ?? 'bill_receipt.pdf',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '₹${(expense['amount'] as int).toString()} • Verified in Expense Ledger',
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11, color: AppColors.muted),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
-
               Text(
                 'Expense Item',
-                style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                style: GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted),
               ),
               const SizedBox(height: 2),
               Text(
                 '${expense['title']} — ${expense['vendor']}',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, height: 1.4),
+                style: GoogleFonts.outfit(
+                    fontSize: 13, color: AppColors.ink, height: 1.4),
               ),
               const SizedBox(height: 18),
-
               ElevatedButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.ink,
+                  backgroundColor: AppColors.green,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
                 child: Text(
                   'Close Preview',
-                  style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
                 ),
               ),
               const SizedBox(height: 24),
@@ -581,13 +572,22 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openLogExpenseModal,
-        backgroundColor: AppColors.green,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add_rounded, size: 28),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 84),
+        child: FloatingActionButton.extended(
+          onPressed: () => _openExpenseModal(),
+          backgroundColor: AppColors.green,
+          foregroundColor: Colors.white,
+          elevation: 4,
+          icon: const Icon(Icons.add_rounded, size: 20),
+          label: Text(
+            'Add Expense',
+            style:
+                GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700),
+          ),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+        ),
       ),
       body: SafeArea(
         child: Column(
@@ -621,7 +621,8 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
 
                     // Expense Cards Stack
                     if (filtered.isEmpty)
-                      _buildEmptyState('No expenses found matching your filter.')
+                      _buildEmptyState(
+                          'No expenses found matching your filter.')
                     else
                       ...filtered.map((e) => _buildExpenseCard(e)).toList(),
                   ],
@@ -642,7 +643,8 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -673,11 +675,11 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+                  child: const Icon(Icons.arrow_back_rounded,
+                      size: 18, color: AppColors.ink),
                 ),
               ),
               const SizedBox(width: 12),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -707,7 +709,9 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
           InkWell(
             onTap: () {
               setState(() {
-                _selectedMonth = _selectedMonth == 'August 2026' ? 'July 2026' : 'August 2026';
+                _selectedMonth = _selectedMonth == 'August 2026'
+                    ? 'July 2026'
+                    : 'August 2026';
               });
               _showToast('Switched ledger cycle to $_selectedMonth');
             },
@@ -723,10 +727,14 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                 children: [
                   Text(
                     _selectedMonth,
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppColors.ink),
+                  const Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 14, color: AppColors.ink),
                 ],
               ),
             ),
@@ -768,7 +776,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.6,
-                  color: AppColors.ink,
+                  color: AppColors.greenDark,
                 ),
               ),
             ],
@@ -819,26 +827,31 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.description_outlined, size: 16, color: AppColors.muted),
+              const Icon(Icons.description_outlined,
+                  size: 16, color: AppColors.muted),
               const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Monthly Expense Statement',
-                    style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   Text(
                     'Itemized GST invoices ready for audit',
-                    style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 10.5, color: AppColors.muted),
                   ),
                 ],
               ),
             ],
           ),
-
           InkWell(
-            onTap: () => _showToast('Generating CA Tax & Expense Statement (Excel & PDF)... Downloaded ✓'),
+            onTap: () => _showToast(
+                'Generating CA Tax & Expense Statement (Excel & PDF)... Downloaded ✓'),
             borderRadius: BorderRadius.circular(8),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -849,11 +862,15 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.download_rounded, size: 13, color: AppColors.ink),
+                  const Icon(Icons.download_rounded,
+                      size: 13, color: AppColors.ink),
                   const SizedBox(width: 4),
                   Text(
                     'Export CA',
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink),
                   ),
                 ],
               ),
@@ -869,7 +886,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   // ===========================================================================
   Widget _buildCategoryFilterChips() {
     final categories = [
-      {'id': 'all', 'label': 'All (6)'},
+      {'id': 'all', 'label': 'All'},
       {'id': 'elect', 'label': 'Electricity'},
       {'id': 'kitch', 'label': 'Kitchen & Ration'},
       {'id': 'water', 'label': 'Water Tankers'},
@@ -884,6 +901,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       child: Row(
         children: categories.map((c) {
           final isSelected = _selectedCategoryFilter == c['id'];
+
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: InkWell(
@@ -893,12 +911,15 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
               },
               borderRadius: BorderRadius.circular(99),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.ink : Colors.white,
+                  color: isSelected ? AppColors.green : Colors.white,
                   borderRadius: BorderRadius.circular(99),
                   border: Border.all(
-                    color: isSelected ? AppColors.ink : const Color(0xFFE5E7EB),
+                    color:
+                        isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                    width: isSelected ? 1.5 : 1.0,
                   ),
                 ),
                 child: Text(
@@ -906,7 +927,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 11.5,
                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? Colors.white : AppColors.muted,
+                    color: isSelected ? Colors.white : AppColors.ink,
                   ),
                 ),
               ),
@@ -931,18 +952,21 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       child: TextField(
         controller: _searchController,
         onChanged: (_) => setState(() {}),
-        style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.ink, fontWeight: FontWeight.w600),
+        style: GoogleFonts.outfit(
+            fontSize: 12.5, color: AppColors.ink, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           hintText: 'Search by vendor, bill or item...',
           hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.muted),
+          prefixIcon: const Icon(Icons.search_rounded,
+              size: 18, color: AppColors.muted),
           suffixIcon: _searchController.text.isNotEmpty
               ? InkWell(
                   onTap: () {
                     _searchController.clear();
                     setState(() {});
                   },
-                  child: const Icon(Icons.clear_rounded, size: 16, color: AppColors.muted),
+                  child: const Icon(Icons.clear_rounded,
+                      size: 16, color: AppColors.muted),
                 )
               : null,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -974,25 +998,10 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Top Row: 44px Icon + Title & Vendor + Amount & Date
+          // Top Row: Title & Vendor + Amount (No Icon Container)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon Container
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: Center(
-                  child: Icon(expense['icon'] as IconData, size: 22, color: AppColors.ink),
-                ),
-              ),
-              const SizedBox(width: 12),
-
               // Title & Vendor (Wrapped in Expanded)
               Expanded(
                 child: Column(
@@ -1006,102 +1015,71 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.3,
-                        color: AppColors.ink,
+                        color:
+                            AppColors.greenDark, // Green text instead of black!
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       expense['vendor'],
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 10),
 
-              // Amount & Date
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '₹${(expense['amount'] as int).toString()}',
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.4,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    expense['date'],
-                    style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted),
-                  ),
-                ],
+              // Amount (Just green text, no green bg)
+              Text(
+                '₹${(expense['amount'] as int).toString()}',
+                style: GoogleFonts.outfit(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                  color: AppColors.greenDark,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-
-          // Payment Mode & Audit Strip
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFAFBFC),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFEEF0F2)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Mode: ${expense['mode']}',
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.inkSecondary),
-                ),
-                Text(
-                  expense['ref'] ?? 'Verified',
-                  style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.greenDark),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           // Action Buttons: View Bill Slip + Edit
           Row(
             children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => _openReceiptModal(expense),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.receipt_outlined, size: 14, color: AppColors.ink),
-                        const SizedBox(width: 5),
-                        Text(
+              if (expense['hasReceipt'] == true) ...[
+                Expanded(
+                  child: InkWell(
+                    onTap: () => _openReceiptModal(expense),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Center(
+                        child: Text(
                           'View Bill Slip',
-                          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                          style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-
+                const SizedBox(width: 8),
+              ],
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('Editing ${expense['title']}'),
+                  onTap: () => _openExpenseModal(expenseToEdit: expense),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     height: 34,
@@ -1113,7 +1091,10 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                     child: Center(
                       child: Text(
                         'Edit Expense',
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.inkSecondary),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.inkSecondary),
                       ),
                     ),
                   ),
@@ -1132,12 +1113,16 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       alignment: Alignment.center,
       child: Column(
         children: [
-          const Icon(Icons.receipt_long_outlined, size: 38, color: AppColors.muted),
+          const Icon(Icons.receipt_long_outlined,
+              size: 38, color: AppColors.muted),
           const SizedBox(height: 10),
           Text(
             msg,
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.muted),
+            style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.muted),
           ),
         ],
       ),
@@ -1147,9 +1132,11 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   // ===========================================================================
   // REUSABLE NATIVE BOTTOM SHEET WRAPPER
   // ===========================================================================
-  Widget _buildNativeBottomSheetWrapper({required String title, required Widget child}) {
+  Widget _buildNativeBottomSheetWrapper(
+      {required String title, required Widget child}) {
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1224,12 +1211,20 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       padding: const EdgeInsets.only(bottom: 5),
       child: Text(
         label,
-        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+        style: GoogleFonts.outfit(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.muted),
       ),
     );
   }
 
-  Widget _buildTextInput(TextEditingController controller, {String? hint, TextInputType? keyboardType}) {
+  Widget _buildTextInput(
+    TextEditingController controller, {
+    String? hint,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return Container(
       height: 44,
       decoration: BoxDecoration(
@@ -1240,11 +1235,14 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
-        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
+        inputFormatters: inputFormatters,
+        style: GoogleFonts.outfit(
+            fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           border: InputBorder.none,
         ),
       ),
