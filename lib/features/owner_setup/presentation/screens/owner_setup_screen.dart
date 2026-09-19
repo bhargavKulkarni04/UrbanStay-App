@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_responsive.dart';
 import '../../../owner_dashboard/presentation/screens/owner_dashboard_screen.dart';
 
 /// Screen 4: 4-Step PG Owner Onboarding & Property Setup Wizard.
@@ -467,6 +468,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      bottomNavigationBar: _buildBottomBar(),
       body: SafeArea(
         child: Stack(
           children: [
@@ -478,8 +480,13 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                 // Scrollable Step Content
                 Expanded(
                   child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20.0, 4.0, 20.0, 20.0),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(
+                      context.responsiveHorizontalPadding,
+                      4.0,
+                      context.responsiveHorizontalPadding,
+                      20.0,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -491,9 +498,6 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                     ),
                   ),
                 ),
-
-                // Bottom Action Bar
-                _buildBottomBar(),
               ],
             ),
 
@@ -810,7 +814,12 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
   /// Top Navigation Bar with Step Number and 4 Segmented Progress Capsules
   Widget _buildTopNav() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20.0, 16.0, 20.0, 14.0),
+      padding: EdgeInsets.fromLTRB(
+        context.responsiveHorizontalPadding,
+        16.0,
+        context.responsiveHorizontalPadding,
+        14.0,
+      ),
       child: Column(
         children: [
           Row(
@@ -2538,63 +2547,79 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     final continueLabel =
         _currentStep == 4 ? 'Complete Setup & Launch Dashboard' : 'Continue';
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20.0, 10.0, 20.0, 16.0),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFF4F4F5))),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            height: 54,
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _handleContinue,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
-                foregroundColor: Colors.white,
-                elevation: 3,
-                shadowColor: AppColors.green.withValues(alpha: 0.35),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: Text(
-                continueLabel,
-                style: AppTypography.bodySemiBold.copyWith(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 48,
-            width: double.infinity,
-            child: TextButton(
-              onPressed: _handleSkip,
-              style: TextButton.styleFrom(
-                backgroundColor: const Color(0xFFF4F4F5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: Text(
-                'Skip for now',
-                style: AppTypography.bodySemiBold.copyWith(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.muted,
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(
+          context.responsiveHorizontalPadding,
+          10.0,
+          context.responsiveHorizontalPadding,
+          16.0,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFF4F4F5))),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 52),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _handleContinue,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.green,
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    shadowColor: AppColors.green.withValues(alpha: 0.35),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    continueLabel,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.bodySemiBold.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 46),
+              child: SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: _handleSkip,
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFFF4F4F5),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Text(
+                    'Skip for now',
+                    textAlign: TextAlign.center,
+                    style: AppTypography.bodySemiBold.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2668,8 +2693,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
           borderRadius: BorderRadius.circular(12),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            height: 50,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            constraints: const BoxConstraints(minHeight: 50),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             decoration: BoxDecoration(
               color: isSelected
                   ? AppColors.green.withValues(alpha: 0.06)
@@ -2852,7 +2877,8 @@ class _UploadPill extends StatelessWidget {
         splashFactory: NoSplash.splashFactory,
         borderRadius: BorderRadius.circular(14),
         child: Container(
-          height: 48,
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color:
                 isDone ? AppColors.green.withValues(alpha: 0.08) : Colors.white,
@@ -2870,12 +2896,15 @@ class _UploadPill extends StatelessWidget {
                 color: isDone ? AppColors.green : AppColors.muted,
               ),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: AppTypography.bodySemiBold.copyWith(
-                  fontSize: 13,
-                  fontWeight: isDone ? FontWeight.w700 : FontWeight.w600,
-                  color: isDone ? AppColors.green : AppColors.muted,
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodySemiBold.copyWith(
+                    fontSize: 13,
+                    fontWeight: isDone ? FontWeight.w700 : FontWeight.w600,
+                    color: isDone ? AppColors.green : AppColors.muted,
+                  ),
                 ),
               ),
             ],

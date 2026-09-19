@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_responsive.dart';
 import '../../../owner_rooms/presentation/screens/owner_rooms_screen.dart';
 import '../../../owner_rent/presentation/screens/owner_rent_collection_screen.dart';
 import '../../../owner_approvals/presentation/screens/owner_approvals_screen.dart';
@@ -88,6 +91,42 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       'staffCount': 3,
     },
   ];
+
+  // Team Management: Co-Owners & PG Managers State
+  final List<Map<String, dynamic>> _teamMembers = [
+    {
+      'id': 'tm_1',
+      'name': 'Arun Kumar',
+      'phone': '9845199201',
+      'role': 'co_owner',
+      'assignedPropertyIds': ['prop_1', 'prop_2', 'prop_3'], // Co-Owners: Unlimited multi-building access
+      'status': 'Active',
+    },
+    {
+      'id': 'tm_2',
+      'name': 'Suresh Gowda',
+      'phone': '9880123456',
+      'role': 'manager',
+      'assignedPropertyIds': ['prop_1'], // PG Managers: Max 3 per property, max 3 properties assigned
+      'status': 'Active',
+    },
+  ];
+
+  int _getManagerCountForProperty(String propId) {
+    return _teamMembers.where((m) {
+      if (m['role'] != 'manager') return false;
+      final assigned = m['assignedPropertyIds'] as List?;
+      return assigned != null && assigned.contains(propId);
+    }).length;
+  }
+
+  int _getCoOwnerCountForProperty(String propId) {
+    return _teamMembers.where((m) {
+      if (m['role'] != 'co_owner') return false;
+      final assigned = m['assignedPropertyIds'] as List?;
+      return assigned != null && assigned.contains(propId);
+    }).length;
+  }
 
   // Active Approvals State
   final List<Map<String, String>> _approvalItems = [
@@ -289,8 +328,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   // Scrollable Dashboard Body
                   Expanded(
                     child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16.0, 14.0, 16.0, 96.0),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.fromLTRB(
+                        context.responsiveHorizontalPadding,
+                        14.0,
+                        context.responsiveHorizontalPadding,
+                        96.0,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -745,23 +789,31 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.muted),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${prop['vacantBeds']} Vacant Beds Ready to Book',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.muted,
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.muted),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        '${prop['vacantBeds']} Vacant Beds Ready to Book',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.muted,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 6),
               InkWell(
                 onTap: () => setState(() => _activeNavIndex = 1),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       '+ Add Room / Bed',
@@ -973,7 +1025,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // ===========================================================================
   void _showInviteManagerModal() {
     String selectedRole = 'manager'; // 'manager', 'co_owner'
-    int selectedPropIdx = _activePropertyIndex;
+    // Default selected property IDs (initialized to active property)
+    Set<String> selectedPropertyIds = {
+      _properties.isNotEmpty ? (_properties[_activePropertyIndex]['id'] as String) : 'prop_1'
+    };
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
 
@@ -1010,23 +1065,25 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Invite Co-Owner / Manager',
-                              style: GoogleFonts.outfit(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.4,
-                                color: AppColors.ink,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Property Team Access',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.4,
+                                  color: AppColors.ink,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Assign property-level operational access',
-                              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-                            ),
-                          ],
+                              Text(
+                                'Manage active managers and co-owners',
+                                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                              ),
+                            ],
+                          ),
                         ),
                         InkWell(
                           onTap: () => Navigator.of(ctx).pop(),
@@ -1048,6 +1105,104 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     ),
                     const SizedBox(height: 18),
 
+                    // =========================================================
+                    // 1. ACTIVE CO-OWNERS & MANAGERS LIST (End-to-End Functional)
+                    // =========================================================
+                    if (_teamMembers.isNotEmpty) ...[
+                      Text(
+                        'Active Co-Owners & Managers (${_teamMembers.length})',
+                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      ),
+                      const SizedBox(height: 8),
+                      ..._teamMembers.map((member) {
+                        final assignedIds = (member['assignedPropertyIds'] as List?)?.cast<String>() ?? [];
+                        final assignedNames = _properties
+                            .where((p) => assignedIds.contains(p['id']))
+                            .map((p) => p['name'] as String)
+                            .toList();
+                        final isCoOwner = member['role'] == 'co_owner';
+                        final roleLabel = isCoOwner ? 'Co-Owner' : 'PG Manager';
+                        final scopeText = assignedNames.isEmpty
+                            ? 'All Buildings'
+                            : (assignedNames.length == _properties.length
+                                ? 'All Buildings'
+                                : assignedNames.join(', '));
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9FAFB),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      member['name'] as String,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.ink,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    // Clean green text under name, strictly NO box
+                                    Text(
+                                      '$roleLabel • $scopeText • +91 ${member['phone']}',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.greenDark,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () {
+                                  setModalState(() {
+                                    _teamMembers.removeWhere((m) => m['id'] == member['id']);
+                                  });
+                                  setState(() {});
+                                  _showToast('${member['name']} removed from team');
+                                },
+                                borderRadius: BorderRadius.circular(6),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  child: Text(
+                                    'Remove',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.muted,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 8),
+                      const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // =========================================================
+                    // 2. INVITE FORM (Clean, Minimal, Zero Faltu Boxes)
+                    // =========================================================
+                    Text(
+                      'Invite New Co-Owner / Manager',
+                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    ),
+                    const SizedBox(height: 12),
+
                     // Full Name Field
                     Text('Full Name', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
                     const SizedBox(height: 6),
@@ -1065,12 +1220,16 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Phone Number Field
+                    // Mobile Number Field (Numbers only, 10 digits, clean title)
                     Text('Mobile Number (WhatsApp Enabled)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: phoneCtrl,
-                      keyboardType: TextInputType.phone,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
                       style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink),
                       decoration: InputDecoration(
                         prefixText: '+91 ',
@@ -1085,14 +1244,18 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Role Selector Cards
+                    // Role Selector Cards (Pure Clean Cards, No Extra Badges)
                     Text('Select Access Level', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
                     const SizedBox(height: 8),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // PG Manager Card
                         Expanded(
                           child: InkWell(
-                            onTap: () => setModalState(() => selectedRole = 'manager'),
+                            onTap: () => setModalState(() {
+                              selectedRole = 'manager';
+                            }),
                             borderRadius: BorderRadius.circular(12),
                             child: Container(
                               padding: const EdgeInsets.all(12),
@@ -1110,9 +1273,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        'PG Manager',
-                                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink),
+                                      Flexible(
+                                        child: Text(
+                                          'PG Manager',
+                                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink),
+                                        ),
                                       ),
                                       if (selectedRole == 'manager')
                                         const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.green),
@@ -1129,6 +1294,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           ),
                         ),
                         const SizedBox(width: 10),
+
+                        // Co-Owner Card
                         Expanded(
                           child: InkWell(
                             onTap: () => setModalState(() => selectedRole = 'co_owner'),
@@ -1149,9 +1316,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        'Co-Owner',
-                                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink),
+                                      Flexible(
+                                        child: Text(
+                                          'Co-Owner',
+                                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink),
+                                        ),
                                       ),
                                       if (selectedRole == 'co_owner')
                                         const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.green),
@@ -1171,66 +1340,193 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Property Scope Selector
-                    Text('Assigned Building', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<int>(
-                          value: selectedPropIdx,
-                          isExpanded: true,
-                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.ink, size: 18),
-                          items: List.generate(_properties.length, (idx) {
-                            return DropdownMenuItem<int>(
-                              value: idx,
-                              child: Text(
-                                '${_properties[idx]['name']} (${_properties[idx]['location']})',
-                                style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.ink),
-                              ),
-                            );
-                          }),
-                          onChanged: (val) {
-                            if (val != null) setModalState(() => selectedPropIdx = val);
+                    // Multi-Building Scope Selector Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Assigned Building(s)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                        InkWell(
+                          onTap: () {
+                            setModalState(() {
+                              if (selectedPropertyIds.length == _properties.length) {
+                                selectedPropertyIds = {_properties.first['id'] as String};
+                              } else {
+                                selectedPropertyIds = _properties.map((p) => p['id'] as String).toSet();
+                              }
+                            });
                           },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                            ),
+                            child: Text(
+                              selectedPropertyIds.length == _properties.length ? 'Deselect Others' : 'Select All Buildings',
+                              style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 8),
+
+                    // Interactive Multi-Select Properties List (Clean, No Faltu Pills)
+                    ...List.generate(_properties.length, (idx) {
+                      final prop = _properties[idx];
+                      final propId = prop['id'] as String;
+                      final isSelected = selectedPropertyIds.contains(propId);
+
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: () {
+                            setModalState(() {
+                              if (isSelected) {
+                                if (selectedPropertyIds.length == 1) {
+                                  _showToast('At least one building must be assigned.');
+                                  return;
+                                }
+                                selectedPropertyIds.remove(propId);
+                              } else {
+                                selectedPropertyIds.add(propId);
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isSelected ? const Color(0xFFF3FAF5) : const Color(0xFFF9FAFB),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                                width: isSelected ? 1.4 : 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                                  size: 19,
+                                  color: isSelected ? AppColors.green : AppColors.muted,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        prop['name'] as String,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.ink,
+                                        ),
+                                      ),
+                                      Text(
+                                        prop['location'] as String,
+                                        style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 16),
 
                     // CTA: Send WhatsApp Invite
                     ElevatedButton(
                       onPressed: () {
                         final name = nameCtrl.text.trim();
                         final phone = phoneCtrl.text.trim();
-                        if (name.isEmpty || phone.isEmpty) {
-                          _showToast('Please enter both Name and Mobile Number');
+
+                        if (name.isEmpty) {
+                          _showToast('Please enter full name');
                           return;
                         }
-                        Navigator.of(ctx).pop();
-                        final propName = _properties[selectedPropIdx]['name'];
-                        _showToast('WhatsApp Invitation sent to $name (+91 $phone) for $propName ✓');
+                        if (phone.length != 10) {
+                          _showToast('Please enter a valid 10-digit mobile number');
+                          return;
+                        }
+                        if (selectedPropertyIds.isEmpty) {
+                          _showToast('Please assign at least one building');
+                          return;
+                        }
+
+                        // Enforce real-world limits: Max 3 managers per building, Max 6 co-owners per building
+                        if (selectedRole == 'manager') {
+                          for (final pId in selectedPropertyIds) {
+                            if (_getManagerCountForProperty(pId) >= 3) {
+                              final pName = _properties.firstWhere((p) => p['id'] == pId)['name'];
+                              _showToast('$pName already has 3 managers (maximum limit reached).');
+                              return;
+                            }
+                          }
+                        } else {
+                          for (final pId in selectedPropertyIds) {
+                            if (_getCoOwnerCountForProperty(pId) >= 6) {
+                              final pName = _properties.firstWhere((p) => p['id'] == pId)['name'];
+                              _showToast('$pName already has 6 co-owners (maximum limit reached).');
+                              return;
+                            }
+                          }
+                        }
+
+                        // Save functional state immediately
+                        final newMember = {
+                          'id': 'tm_${DateTime.now().millisecondsSinceEpoch}',
+                          'name': name,
+                          'phone': phone,
+                          'role': selectedRole,
+                          'assignedPropertyIds': selectedPropertyIds.toList(),
+                          'status': 'Active',
+                        };
+
+                        setModalState(() {
+                          _teamMembers.insert(0, newMember);
+                        });
+                        setState(() {});
+
+                        // Clear inputs for adding next manager/co-owner
+                        nameCtrl.clear();
+                        phoneCtrl.clear();
+
+                        _showToast('WhatsApp Invitation sent to $name (+91 $phone) ✓');
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.ink,
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.greenLight,
+                        foregroundColor: AppColors.greenDark,
                         minimumSize: const Size.fromHeight(48),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color(0xFFB8ECC8), width: 1.2),
+                        ),
                         elevation: 0,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: Colors.white),
+                          SvgPicture.asset(
+                            'assets/images/whatsapp.svg',
+                            width: 18,
+                            height: 18,
+                            colorFilter: const ColorFilter.mode(AppColors.greenDark, BlendMode.srcIn),
+                          ),
                           const SizedBox(width: 8),
                           Text(
-                            'Send WhatsApp Invitation Link',
-                            style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: Colors.white),
+                            'Send WhatsApp Invitation',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.greenDark,
+                            ),
                           ),
                         ],
                       ),
@@ -1362,7 +1658,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               // Block 1: Paid Beds
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1371,51 +1667,60 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.check_circle_outline_rounded, size: 13, color: AppColors.green),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Paid Beds',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.greenDark,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.check_circle_outline_rounded, size: 13, color: AppColors.green),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Paid Beds',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.greenDark,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '25',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: AppColors.green,
+                          ],
                         ),
                       ),
-                      Text(
-                        'of 31 Occupied',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '25',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'of 31 Occupied',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Block 2: Pending Dues
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1424,51 +1729,60 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.schedule_rounded, size: 13, color: AppColors.muted),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Pending',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.schedule_rounded, size: 13, color: AppColors.muted),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Pending',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '6',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: AppColors.green,
+                          ],
                         ),
                       ),
-                      Text(
-                        'This Month',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '6',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'This Month',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Block 3: Defaulters
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1477,39 +1791,48 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.verified_user_outlined, size: 13, color: AppColors.muted),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Defaulters',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.verified_user_outlined, size: 13, color: AppColors.muted),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Defaulters',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '0',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: AppColors.green,
+                          ],
                         ),
                       ),
-                      Text(
-                        'Zero Overdue',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '0',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Zero Overdue',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ),
                     ],
@@ -1534,20 +1857,27 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.green),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Send WhatsApp Payment Links to 6 Pending',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.green),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Send WhatsApp Payment Links to 6 Pending',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 6),
                   const Icon(Icons.arrow_forward_rounded, size: 13, color: AppColors.green),
                 ],
               ),
@@ -1626,7 +1956,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               // Block 1: Submitted
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1635,51 +1965,60 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.receipt_long_outlined, size: 13, color: AppColors.muted),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Submitted',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.receipt_long_outlined, size: 13, color: AppColors.muted),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Submitted',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '25',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: AppColors.green,
+                          ],
                         ),
                       ),
-                      Text(
-                        'Payment Forms',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '25',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Payment Forms',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Block 2: Approved
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1688,51 +2027,60 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.task_alt_rounded, size: 13, color: AppColors.green),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Approved',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.greenDark,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.task_alt_rounded, size: 13, color: AppColors.green),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Approved',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.greenDark,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '23',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: AppColors.green,
+                          ],
                         ),
                       ),
-                      Text(
-                        'Receipts Sent',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '23',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Receipts Sent',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
               // Block 3: Pending
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1741,39 +2089,48 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.pending_actions_outlined, size: 13, color: AppColors.green),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Pending',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.pending_actions_outlined, size: 13, color: AppColors.green),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Pending',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${_approvalItems.length}',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: AppColors.green,
+                          ],
                         ),
                       ),
-                      Text(
-                        'Action Needed',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '${_approvalItems.length}',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.8,
+                            color: AppColors.green,
+                          ),
+                        ),
+                      ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'Action Needed',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.outfit(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
                         ),
                       ),
                     ],
@@ -1798,20 +2155,27 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.verified_outlined, size: 14, color: AppColors.green),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Review & Approve ${_approvalItems.length} Payments (UTR Queue)',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified_outlined, size: 14, color: AppColors.green),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Review & Approve ${_approvalItems.length} Payments (UTR Queue)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 6),
                   const Icon(Icons.arrow_forward_rounded, size: 13, color: AppColors.green),
                 ],
               ),
@@ -1853,71 +2217,78 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         ),
         const SizedBox(height: 10),
 
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.98,
-          ),
-          itemCount: actions.length,
-          itemBuilder: (context, index) {
-            final a = actions[index];
-            return Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: a['onTap'],
-                splashColor: Colors.transparent,
-                highlightColor: Colors.transparent,
-                splashFactory: NoSplash.splashFactory,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFEEF0F2)),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x04000000),
-                        blurRadius: 6,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        alignment: Alignment.center,
-                        child: Icon(
-                          a['icon'],
-                          size: 22,
-                          color: AppColors.green,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        a['title'],
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
-                          height: 1.2,
-                          letterSpacing: -0.1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final int crossCount = constraints.maxWidth < 310 ? 3 : 4;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossCount,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                mainAxisExtent: 84,
               ),
+              itemCount: actions.length,
+              itemBuilder: (context, index) {
+                final a = actions[index];
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: a['onTap'],
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    splashFactory: NoSplash.splashFactory,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFEEF0F2)),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x04000000),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 28,
+                            height: 28,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              a['icon'],
+                              size: 20,
+                              color: AppColors.green,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              a['title'],
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              style: GoogleFonts.outfit(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                                height: 1.15,
+                                letterSpacing: -0.1,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
             );
           },
         ),
@@ -2682,7 +3053,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           Text('Target Audience', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted)),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
-            value: _annTarget,
+            initialValue: _annTarget,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white,

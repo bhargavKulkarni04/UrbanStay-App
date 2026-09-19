@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -14,7 +16,8 @@ class OwnerRentCollectionScreen extends StatefulWidget {
   const OwnerRentCollectionScreen({super.key, this.onBack});
 
   @override
-  State<OwnerRentCollectionScreen> createState() => _OwnerRentCollectionScreenState();
+  State<OwnerRentCollectionScreen> createState() =>
+      _OwnerRentCollectionScreenState();
 }
 
 class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
@@ -31,7 +34,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
 
   // Form Controllers for Grant Extension Modal
   String _selectedExtensionDate = '15 Aug 2026';
-  final TextEditingController _extensionReasonController = TextEditingController();
+  final TextEditingController _extensionReasonController =
+      TextEditingController();
 
   // Active Target for Modals
   Map<String, dynamic> _activeCashTarget = {
@@ -54,7 +58,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
     'date': '1 Aug 2026',
   };
 
-  String _activeViewMode = 'calendar'; // 'calendar' (Day-Wise Salary Calendar) or 'floor' (By Floor & Rooms)
+  String _activeViewMode =
+      'calendar'; // 'calendar' (Day-Wise Salary Calendar) or 'floor' (By Floor & Rooms)
   int _selectedCalendarDay = 5; // Default 5th of month
   String _selectedStaffActor = 'Ramesh Gowda (Manager)';
   final List<String> _staffActors = [
@@ -325,7 +330,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               'status': 'extension_requested',
               'requestedDate': '15 Aug 2026',
               'dueLabel': 'Extension Requested till 15 Aug',
-              'extensionReason': 'Salary delay from Oracle. Will pay full amount on 15th.',
+              'extensionReason':
+                  'Salary delay from Oracle. Will pay full amount on 15th.',
             },
             {
               'id': '13',
@@ -478,7 +484,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         duration: const Duration(seconds: 2),
@@ -509,9 +516,11 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
     setState(() {
       tenant['status'] = 'extension_approved';
       tenant['extensionDate'] = tenant['requestedDate'] ?? '15 Aug 2026';
-      tenant['dueLabel'] = 'Extension Approved • Due ${tenant['extensionDate']}';
+      tenant['dueLabel'] =
+          'Extension Approved • Due ${tenant['extensionDate']}';
     });
-    _showToast('Extension Approved for ${tenant['name']} till ${tenant['extensionDate']} • Reminders paused ✓');
+    _showToast(
+        'Extension Approved for ${tenant['name']} till ${tenant['extensionDate']} • Reminders paused ✓');
   }
 
   void _declineExtension(Map<String, dynamic> tenant) {
@@ -519,7 +528,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       tenant['status'] = 'overdue';
       tenant['dueLabel'] = 'Extension Declined • Due Immediately';
     });
-    _showToast('Extension Declined for ${tenant['name']}. Reminder sent on WhatsApp.');
+    _showToast(
+        'Extension Declined for ${tenant['name']}. Reminder sent on WhatsApp.');
   }
 
   // ===========================================================================
@@ -546,118 +556,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
             return _buildNativeBottomSheetWrapper(
-              title: 'Record Payment: ${tenant['name']} (${tenant['bed']})',
+              title: 'Record Cash',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildFormLabel('Payment Mode'),
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => setModalState(() => paymentMode = 'cash'),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: paymentMode == 'cash' ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                                boxShadow: paymentMode == 'cash'
-                                    ? const [BoxShadow(color: Color(0x06000000), blurRadius: 4, offset: Offset(0, 1))]
-                                    : null,
-                              ),
-                              child: Text(
-                                'Cash Payment',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  fontWeight: paymentMode == 'cash' ? FontWeight.w800 : FontWeight.w600,
-                                  color: paymentMode == 'cash' ? AppColors.ink : AppColors.muted,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => setModalState(() => paymentMode = 'online'),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: paymentMode == 'online' ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(8),
-                                boxShadow: paymentMode == 'online'
-                                    ? const [BoxShadow(color: Color(0x06000000), blurRadius: 4, offset: Offset(0, 1))]
-                                    : null,
-                              ),
-                              child: Text(
-                                'Paid Online (Direct UPI)',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  fontWeight: paymentMode == 'online' ? FontWeight.w800 : FontWeight.w600,
-                                  color: paymentMode == 'online' ? AppColors.greenDark : AppColors.muted,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  _buildFormLabel('Amount Received (₹)'),
+                  _buildTextInput(
+                    _cashAmountController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
-                  const SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildFormLabel('Amount Received (₹)'),
-                            _buildTextInput(_cashAmountController, keyboardType: TextInputType.number),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildFormLabel('Total Due (₹)'),
-                            Container(
-                              height: 44,
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              alignment: Alignment.centerLeft,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF9FAFB),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: const Color(0xFFE5E7EB)),
-                              ),
-                              child: Text(
-                                '₹${tenant['amount']}',
-                                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  if (paymentMode == 'online') ...[
-                    _buildFormLabel('UPI Ref / UTR (Optional)'),
-                    _buildTextInput(utrController, hint: 'e.g. 423189765412 or GPay tick shown'),
-                    const SizedBox(height: 12),
-                  ],
-
+                  const SizedBox(height: 14),
                   _buildFormLabel('Verified / Recorded By'),
                   Container(
                     height: 44,
@@ -671,8 +580,12 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       child: DropdownButton<String>(
                         value: currentStaff,
                         isExpanded: true,
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.ink),
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 18, color: AppColors.ink),
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink),
                         items: _staffActors.map((actor) {
                           return DropdownMenuItem<String>(
                             value: actor,
@@ -688,10 +601,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-
                   ElevatedButton(
                     onPressed: () {
-                      final amountReceived = int.tryParse(_cashAmountController.text.trim()) ?? 0;
+                      final amountReceived =
+                          int.tryParse(_cashAmountController.text.trim()) ?? 0;
                       if (amountReceived <= 0) {
                         _showToast('Please enter a valid amount');
                         return;
@@ -699,30 +612,25 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       Navigator.of(ctx).pop();
                       setState(() {
                         tenant['status'] = 'paid';
-                        tenant['paidLabel'] = paymentMode == 'cash'
-                            ? 'Paid in Cash (Verified by $currentStaff)'
-                            : 'Paid Online via Direct UPI (Verified by $currentStaff)';
-                        tenant['tag'] = paymentMode == 'cash' ? 'Cash Verified' : 'Direct UPI';
-                        tenant['ref'] = paymentMode == 'cash'
-                            ? 'CSH-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}'
-                            : (utrController.text.trim().isNotEmpty
-                                ? utrController.text.trim()
-                                : 'UPI-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}');
+                        tenant['paidLabel'] = 'Paid in Cash';
                         tenant['paidDate'] = '18 Aug 2026';
                         tenant['approvedBy'] = currentStaff;
                       });
-                      _showToast('₹$amountReceived marked Paid for ${tenant['name']} (Verified by $currentStaff) ✓');
+                      _showToast(
+                          '₹$amountReceived marked Paid for ${tenant['name']} (Verified by $currentStaff) ✓');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Confirm & Mark Paid',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -740,7 +648,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   void _openChangePayDateModal(Map<String, dynamic> tenant) {
     int currentDay = (tenant['payDay'] as int?) ?? 5;
     int selectedDay = currentDay;
-    final reasonCtrl = TextEditingController(text: 'Salary credited on ${selectedDay}th');
+    final reasonCtrl =
+        TextEditingController(text: 'Salary credited on ${selectedDay}th');
 
     final List<int> quickDays = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25];
 
@@ -759,10 +668,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 children: [
                   Text(
                     '${tenant['bed']} • Current Agreed Pay Date: ${currentDay}th of month',
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted),
                   ),
                   const SizedBox(height: 14),
-
                   _buildFormLabel('Select New Monthly Pay Date'),
                   const SizedBox(height: 6),
                   Wrap(
@@ -774,17 +683,23 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                         onTap: () {
                           setModalState(() {
                             selectedDay = d;
-                            reasonCtrl.text = 'Salary credited on ${d}th of every month';
+                            reasonCtrl.text =
+                                'Salary credited on ${d}th of every month';
                           });
                         },
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
-                            color: isSel ? AppColors.greenLight : const Color(0xFFF9FAFB),
+                            color: isSel
+                                ? AppColors.greenLight
+                                : const Color(0xFFF9FAFB),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: isSel ? AppColors.green : const Color(0xFFE5E7EB),
+                              color: isSel
+                                  ? AppColors.green
+                                  : const Color(0xFFE5E7EB),
                               width: isSel ? 1.5 : 1.0,
                             ),
                           ),
@@ -792,8 +707,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                             '${d}th of Month',
                             style: GoogleFonts.outfit(
                               fontSize: 12,
-                              fontWeight: isSel ? FontWeight.w800 : FontWeight.w600,
-                              color: isSel ? AppColors.greenDark : AppColors.ink,
+                              fontWeight:
+                                  isSel ? FontWeight.w800 : FontWeight.w600,
+                              color:
+                                  isSel ? AppColors.greenDark : AppColors.ink,
                             ),
                           ),
                         ),
@@ -801,11 +718,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 14),
-
                   _buildFormLabel('Reason / Notes'),
-                  _buildTextInput(reasonCtrl, hint: 'e.g. Salary credited on 10th from employer'),
+                  _buildTextInput(reasonCtrl,
+                      hint: 'e.g. Salary credited on 10th from employer'),
                   const SizedBox(height: 20),
-
                   ElevatedButton(
                     onPressed: () {
                       Navigator.of(ctx).pop();
@@ -813,18 +729,21 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                         tenant['payDay'] = selectedDay;
                         tenant['payDayReason'] = reasonCtrl.text.trim();
                       });
-                      _showToast('Pay Date updated to ${selectedDay}th of month for ${tenant['name']} ✓');
+                      _showToast(
+                          'Pay Date updated to ${selectedDay}th of month for ${tenant['name']} ✓');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save & Move to ${selectedDay}th of Month',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ],
@@ -870,33 +789,44 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   children: [
                     Text(
                       'Greenview Luxury PG',
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '#42, 5th Cross, 4th Block, Koramangala, Bengaluru',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11, color: AppColors.muted),
                     ),
                     const SizedBox(height: 12),
                     const Divider(color: Color(0xFFE5E7EB), height: 1),
                     const SizedBox(height: 12),
-
-                    _buildReceiptRow('Tenant Name:', _activeReceiptTarget['name'], isBold: true),
+                    _buildReceiptRow(
+                        'Tenant Name:', _activeReceiptTarget['name'],
+                        isBold: true),
                     const SizedBox(height: 8),
-                    _buildReceiptRow('Room / Bed:', 'Room ${_activeReceiptTarget['room']}'),
+                    _buildReceiptRow(
+                        'Room / Bed:', 'Room ${_activeReceiptTarget['room']}'),
                     const SizedBox(height: 8),
                     _buildReceiptRow('Month / Period:', 'August 2026'),
                     const SizedBox(height: 8),
-                    _buildReceiptRow('Amount Paid:', _activeReceiptTarget['amount'], isBold: true, valueColor: AppColors.greenDark),
+                    _buildReceiptRow(
+                        'Amount Paid:', _activeReceiptTarget['amount'],
+                        isBold: true, valueColor: AppColors.greenDark),
                     const SizedBox(height: 8),
-                    _buildReceiptRow('Transaction Ref:', _activeReceiptTarget['ref'], isMonospace: true),
+                    _buildReceiptRow(
+                        'Transaction Ref:', _activeReceiptTarget['ref'],
+                        isMonospace: true),
                     const SizedBox(height: 8),
-                    _buildReceiptRow('Date of Payment:', _activeReceiptTarget['date']),
+                    _buildReceiptRow(
+                        'Date of Payment:', _activeReceiptTarget['date']),
                     const SizedBox(height: 14),
-
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 5),
                       decoration: BoxDecoration(
                         color: AppColors.greenLight,
                         borderRadius: BorderRadius.circular(6),
@@ -916,22 +846,24 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  _showToast('PDF Rent Receipt Downloaded & Shared on WhatsApp ✓');
+                  _showToast(
+                      'PDF Rent Receipt Downloaded & Shared on WhatsApp ✓');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.green,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: Text(
                   'Download PDF Receipt',
-                  style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 24),
@@ -966,20 +898,25 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildReceiptRow('Resident:', '${tenant['name']} (${tenant['bed']})', isBold: true),
+                    _buildReceiptRow(
+                        'Resident:', '${tenant['name']} (${tenant['bed']})',
+                        isBold: true),
                     const SizedBox(height: 8),
-                    _buildReceiptRow('Amount Claimed:', '₹${tenant['amount']}', isBold: true, valueColor: AppColors.greenDark),
+                    _buildReceiptRow('Amount Claimed:', '₹${tenant['amount']}',
+                        isBold: true, valueColor: AppColors.greenDark),
                     const SizedBox(height: 8),
                     _buildReceiptRow('Payment Mode:', 'Direct UPI / PhonePe'),
                     const SizedBox(height: 8),
-                    _buildReceiptRow('Submitted UTR / Ref:', tenant['ref'] ?? '423189765412', isMonospace: true),
+                    _buildReceiptRow(
+                        'Submitted UTR / Ref:', tenant['ref'] ?? '423189765412',
+                        isMonospace: true),
                     const SizedBox(height: 8),
-                    _buildReceiptRow('Submission Time:', '1 Aug 2026, 09:30 AM'),
+                    _buildReceiptRow(
+                        'Submission Time:', '1 Aug 2026, 09:30 AM'),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -989,36 +926,44 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded, size: 16, color: Color(0xFFB45309)),
+                    const Icon(Icons.info_outline_rounded,
+                        size: 16, color: Color(0xFFB45309)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Please verify that ₹${tenant['amount']} was credited to your HDFC/SBI bank account before accepting.',
-                        style: GoogleFonts.outfit(fontSize: 11.5, color: const Color(0xFF92400E), fontWeight: FontWeight.w600),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            color: const Color(0xFF92400E),
+                            fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
                         Navigator.of(ctx).pop();
-                        _showToast('Payment marked as Not Received. WhatsApp notification sent to ${tenant['name']}');
+                        _showToast(
+                            'Payment marked as Not Received. WhatsApp notification sent to ${tenant['name']}');
                       },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFDC2626),
                         side: const BorderSide(color: Color(0xFFFCA5A5)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       child: Text(
                         'Reject (Not in Bank)',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFFDC2626)),
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFDC2626)),
                       ),
                     ),
                   ),
@@ -1029,24 +974,30 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                         Navigator.of(ctx).pop();
                         setState(() {
                           tenant['status'] = 'paid';
-                          tenant['paidLabel'] = 'Paid Early on 1 Aug (Verified by $_selectedStaffActor)';
+                          tenant['paidLabel'] =
+                              'Paid Early on 1 Aug (Verified by $_selectedStaffActor)';
                           tenant['tag'] = 'Direct UPI';
                           tenant['ref'] = 'UTR-423189765412';
                           tenant['paidDate'] = '1 Aug 2026';
                           tenant['approvedBy'] = _selectedStaffActor;
                         });
-                        _showToast('Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
+                        _showToast(
+                            'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.green,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
                       child: Text(
                         'Accept & Mark Paid',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white),
                       ),
                     ),
                   ),
@@ -1063,11 +1014,19 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   @override
   Widget build(BuildContext context) {
     final allOccupied = _getAllOccupiedTenants();
-    final overdueCount = allOccupied.where((t) => t['status'] == 'overdue').length;
-    final extensionCount = allOccupied.where((t) => t['status'] == 'extension_requested' || t['status'] == 'extension_approved').length;
+    final overdueCount =
+        allOccupied.where((t) => t['status'] == 'overdue').length;
+    final extensionCount = allOccupied
+        .where((t) =>
+            t['status'] == 'extension_requested' ||
+            t['status'] == 'extension_approved')
+        .length;
     final paidCount = allOccupied.where((t) => t['status'] == 'paid').length;
     final overdueSum = allOccupied
-        .where((t) => t['status'] == 'overdue' || t['status'] == 'extension_requested' || t['status'] == 'extension_approved')
+        .where((t) =>
+            t['status'] == 'overdue' ||
+            t['status'] == 'extension_requested' ||
+            t['status'] == 'extension_approved')
         .fold<int>(0, (sum, item) => sum + (item['amount'] as int));
 
     return Scaffold(
@@ -1099,7 +1058,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     const SizedBox(height: 10),
 
                     // Filter Chips Bar (All, Overdue, ⏳ Extension, Paid)
-                    _buildStatusFilterChips(overdueCount, extensionCount, paidCount),
+                    _buildStatusFilterChips(
+                        overdueCount, extensionCount, paidCount),
                     const SizedBox(height: 12),
 
                     // Search Box
@@ -1108,7 +1068,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
 
                     // 3-TIER HIERARCHY: Floor -> Room (Sharing Type) -> Bed Cards
                     ..._floorsData
-                        .where((f) => _selectedFloor == 'all' || _selectedFloor == f['id'])
+                        .where((f) =>
+                            _selectedFloor == 'all' ||
+                            _selectedFloor == f['id'])
                         .map((floor) => _buildFloorSection(floor))
                         .toList(),
                   ],
@@ -1129,7 +1091,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -1160,11 +1123,11 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+                  child: const Icon(Icons.arrow_back_rounded,
+                      size: 18, color: AppColors.ink),
                 ),
               ),
               const SizedBox(width: 12),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1202,11 +1165,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _selectedCycle,
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink),
                 items: const [
-                  DropdownMenuItem(value: 'August 2026', child: Text('August 2026')),
-                  DropdownMenuItem(value: 'July 2026', child: Text('July 2026')),
-                  DropdownMenuItem(value: 'June 2026', child: Text('June 2026')),
+                  DropdownMenuItem(
+                      value: 'August 2026', child: Text('August 2026')),
+                  DropdownMenuItem(
+                      value: 'July 2026', child: Text('July 2026')),
+                  DropdownMenuItem(
+                      value: 'June 2026', child: Text('June 2026')),
                 ],
                 onChanged: (val) {
                   if (val != null) {
@@ -1228,11 +1197,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   Widget _buildStatsStrip(int totalPendingCount, int overdueSum) {
     return Row(
       children: [
-        Expanded(child: _buildStatTile('₹2,63,500', 'Total Expected', const Color(0xFF2563EB))),
+        Expanded(
+            child: _buildStatTile(
+                '₹2,63,500', 'Total Expected', AppColors.greenDark)),
         const SizedBox(width: 8),
-        Expanded(child: _buildStatTile('₹2,12,000', 'Collected (81%)', AppColors.greenDark)),
+        Expanded(
+            child: _buildStatTile(
+                '₹2,12,000', 'Collected', AppColors.greenDark)),
         const SizedBox(width: 8),
-        Expanded(child: _buildStatTile('₹$overdueSum', '$totalPendingCount Pending/Ext', AppColors.danger)),
+        Expanded(
+            child: _buildStatTile(
+                '₹$overdueSum', '$totalPendingCount Due', AppColors.greenDark)),
       ],
     );
   }
@@ -1301,46 +1276,35 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '$overdueCount Overdue (Extensions Paused)',
-                style: GoogleFonts.outfit(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.2,
-                  color: AppColors.ink,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Send 1-tap WhatsApp payment links',
-                style: GoogleFonts.outfit(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.muted,
-                ),
-              ),
-            ],
+          Text(
+            'Due: $overdueCount',
+            style: GoogleFonts.outfit(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+              color: AppColors.ink,
+            ),
           ),
           InkWell(
-            onTap: () => _showToast('WhatsApp Payment Reminders sent to $overdueCount Overdue Residents ✓'),
+            onTap: () => _showToast(
+                'Payment Reminders sent to $overdueCount Due Residents ✓'),
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7.5),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.green,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.white),
+                  const Icon(Icons.notifications_active_outlined,
+                      size: 14, color: Colors.white),
                   const SizedBox(width: 5),
                   Text(
-                    'Remind All',
+                    'Reminder',
                     style: GoogleFonts.outfit(
-                      fontSize: 11.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                     ),
@@ -1374,10 +1338,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 8.5),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _activeViewMode == 'calendar' ? Colors.white : Colors.transparent,
+                  color: _activeViewMode == 'calendar'
+                      ? Colors.white
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: _activeViewMode == 'calendar'
-                      ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1))]
+                      ? const [
+                          BoxShadow(
+                              color: Color(0x08000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 1))
+                        ]
                       : null,
                 ),
                 child: Row(
@@ -1386,15 +1357,21 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     Icon(
                       Icons.calendar_month_outlined,
                       size: 15,
-                      color: _activeViewMode == 'calendar' ? AppColors.greenDark : AppColors.muted,
+                      color: _activeViewMode == 'calendar'
+                          ? AppColors.greenDark
+                          : AppColors.muted,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       'Salary Date Calendar',
                       style: GoogleFonts.outfit(
                         fontSize: 12.5,
-                        fontWeight: _activeViewMode == 'calendar' ? FontWeight.w800 : FontWeight.w600,
-                        color: _activeViewMode == 'calendar' ? AppColors.greenDark : AppColors.muted,
+                        fontWeight: _activeViewMode == 'calendar'
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        color: _activeViewMode == 'calendar'
+                            ? AppColors.greenDark
+                            : AppColors.muted,
                       ),
                     ),
                   ],
@@ -1410,10 +1387,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 8.5),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: _activeViewMode == 'floor' ? Colors.white : Colors.transparent,
+                  color: _activeViewMode == 'floor'
+                      ? Colors.white
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: _activeViewMode == 'floor'
-                      ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1))]
+                      ? const [
+                          BoxShadow(
+                              color: Color(0x08000000),
+                              blurRadius: 4,
+                              offset: Offset(0, 1))
+                        ]
                       : null,
                 ),
                 child: Row(
@@ -1422,15 +1406,21 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     Icon(
                       Icons.apartment_outlined,
                       size: 15,
-                      color: _activeViewMode == 'floor' ? AppColors.ink : AppColors.muted,
+                      color: _activeViewMode == 'floor'
+                          ? AppColors.ink
+                          : AppColors.muted,
                     ),
                     const SizedBox(width: 6),
                     Text(
                       'By Floor & Rooms',
                       style: GoogleFonts.outfit(
                         fontSize: 12.5,
-                        fontWeight: _activeViewMode == 'floor' ? FontWeight.w800 : FontWeight.w600,
-                        color: _activeViewMode == 'floor' ? AppColors.ink : AppColors.muted,
+                        fontWeight: _activeViewMode == 'floor'
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        color: _activeViewMode == 'floor'
+                            ? AppColors.ink
+                            : AppColors.muted,
                       ),
                     ),
                   ],
@@ -1455,8 +1445,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       return day == _selectedCalendarDay;
     }).toList();
 
-    final dayTotalExpected = selectedTenants.fold<int>(0, (sum, t) => sum + (t['amount'] as int));
-    final dayPaidCount = selectedTenants.where((t) => t['status'] == 'paid').length;
+    final dayTotalExpected =
+        selectedTenants.fold<int>(0, (sum, t) => sum + (t['amount'] as int));
+    final dayPaidCount =
+        selectedTenants.where((t) => t['status'] == 'paid').length;
     final dayPendingCount = selectedTenants.length - dayPaidCount;
 
     return Column(
@@ -1468,7 +1460,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           physics: const BouncingScrollPhysics(),
           child: Row(
             children: availableDays.map((d) {
-              final count = allOccupied.where((t) => ((t['payDay'] as int?) ?? 5) == d).length;
+              final count = allOccupied
+                  .where((t) => ((t['payDay'] as int?) ?? 5) == d)
+                  .length;
               final isSel = _selectedCalendarDay == d;
 
               return Padding(
@@ -1477,16 +1471,23 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   onTap: () => setState(() => _selectedCalendarDay = d),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: isSel ? AppColors.green : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSel ? AppColors.green : const Color(0xFFE5E7EB),
+                        color:
+                            isSel ? AppColors.green : const Color(0xFFE5E7EB),
                         width: isSel ? 1.5 : 1.0,
                       ),
                       boxShadow: isSel
-                          ? const [BoxShadow(color: Color(0x1808A63F), blurRadius: 6, offset: Offset(0, 2))]
+                          ? const [
+                              BoxShadow(
+                                  color: Color(0x1808A63F),
+                                  blurRadius: 6,
+                                  offset: Offset(0, 2))
+                            ]
                           : null,
                     ),
                     child: Column(
@@ -1501,9 +1502,12 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                         ),
                         const SizedBox(height: 2),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
                           decoration: BoxDecoration(
-                            color: isSel ? Colors.white.withValues(alpha: 0.25) : const Color(0xFFF3F4F6),
+                            color: isSel
+                                ? Colors.white.withValues(alpha: 0.25)
+                                : const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(99),
                           ),
                           child: Text(
@@ -1541,18 +1545,27 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 children: [
                   Text(
                     '${_selectedCalendarDay}th of the Month (Salary Cycle)',
-                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                    style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.greenDark),
                   ),
                   Text(
                     '₹$dayTotalExpected Expected',
-                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.greenDark),
+                    style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.greenDark),
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
                 '${selectedTenants.length} Tenants • $dayPaidCount Paid • $dayPendingCount Pending for today',
-                style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.muted),
+                style: GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.muted),
               ),
             ],
           ),
@@ -1571,17 +1584,23 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             ),
             child: Column(
               children: [
-                const Icon(Icons.event_available_outlined, size: 32, color: AppColors.muted),
+                const Icon(Icons.event_available_outlined,
+                    size: 32, color: AppColors.muted),
                 const SizedBox(height: 8),
                 Text(
                   'No tenants scheduled for ${_selectedCalendarDay}th',
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.muted),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted),
                 ),
               ],
             ),
           )
         else
-          ...selectedTenants.map((tenant) => _buildCalendarTenantCard(tenant)).toList(),
+          ...selectedTenants
+              .map((tenant) => _buildCalendarTenantCard(tenant))
+              .toList(),
       ],
     );
   }
@@ -1592,7 +1611,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   Widget _buildCalendarTenantCard(Map<String, dynamic> tenant) {
     final isPaid = tenant['status'] == 'paid';
     final isOverdue = tenant['status'] == 'overdue';
-    final isExt = tenant['status'] == 'extension_requested' || tenant['status'] == 'extension_approved';
+    final isExt = tenant['status'] == 'extension_requested' ||
+        tenant['status'] == 'extension_approved';
     final String approvedBy = tenant['approvedBy'] ?? 'Ramesh Gowda (Manager)';
 
     return Container(
@@ -1630,7 +1650,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: isPaid ? AppColors.greenLight : const Color(0xFFF3F4F6),
+                      color: isPaid
+                          ? AppColors.greenLight
+                          : const Color(0xFFF3F4F6),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Center(
@@ -1681,7 +1703,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: isPaid
                           ? AppColors.greenLight
@@ -1724,7 +1747,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             child: Row(
               children: [
                 Icon(
-                  isPaid ? Icons.verified_user_outlined : Icons.schedule_rounded,
+                  isPaid
+                      ? Icons.verified_user_outlined
+                      : Icons.schedule_rounded,
                   size: 13,
                   color: isPaid ? AppColors.greenDark : AppColors.muted,
                 ),
@@ -1753,35 +1778,47 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showToast('Dialing +91 ${tenant['phone'] ?? '9876543210'}...'),
-                  icon: const Icon(Icons.phone_outlined, size: 14, color: AppColors.ink),
+                  onPressed: () => _showToast(
+                      'Dialing +91 ${tenant['phone'] ?? '9876543210'}...'),
+                  icon: const Icon(Icons.phone_outlined,
+                      size: 14, color: AppColors.ink),
                   label: Text(
                     'Call',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.ink,
                     side: const BorderSide(color: Color(0xFFE5E7EB)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _showToast('WhatsApp Chat opened with ${tenant['name']} (+91 ${tenant['phone'] ?? '9876543210'}) ✓'),
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: Colors.white),
+                  onPressed: () => _showToast(
+                      'WhatsApp Chat opened with ${tenant['name']} (+91 ${tenant['phone'] ?? '9876543210'}) ✓'),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded,
+                      size: 14, color: Colors.white),
                   label: Text(
                     'WhatsApp',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.green,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
@@ -1797,16 +1834,22 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _openReceiptModal(tenant),
-                    icon: const Icon(Icons.receipt_long_outlined, size: 14, color: AppColors.greenDark),
+                    icon: const Icon(Icons.receipt_long_outlined,
+                        size: 14, color: AppColors.greenDark),
                     label: Text(
                       'View Receipt',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.greenDark),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.greenDark,
-                      side: BorderSide(color: AppColors.green.withValues(alpha: 0.3)),
+                      side: BorderSide(
+                          color: AppColors.green.withValues(alpha: 0.3)),
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -1814,16 +1857,21 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => _openChangePayDateModal(tenant),
-                    icon: const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.muted),
+                    icon: const Icon(Icons.calendar_today_outlined,
+                        size: 13, color: AppColors.muted),
                     label: Text(
                       'Change Date',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.muted),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.muted,
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -1837,16 +1885,21 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   flex: 3,
                   child: OutlinedButton.icon(
                     onPressed: () => _openViewProofModal(tenant),
-                    icon: const Icon(Icons.remove_red_eye_outlined, size: 13, color: AppColors.ink),
+                    icon: const Icon(Icons.remove_red_eye_outlined,
+                        size: 13, color: AppColors.ink),
                     label: Text(
                       'View Proof',
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.ink,
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -1855,18 +1908,24 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   flex: 3,
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      _showToast('Payment rejected: Not received in owner bank account. Alert sent to ${tenant['name']}');
+                      _showToast(
+                          'Payment rejected: Not received in owner bank account. Alert sent to ${tenant['name']}');
                     },
-                    icon: const Icon(Icons.close_rounded, size: 13, color: Color(0xFFDC2626)),
+                    icon: const Icon(Icons.close_rounded,
+                        size: 13, color: Color(0xFFDC2626)),
                     label: Text(
                       'Reject',
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: const Color(0xFFDC2626)),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626)),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFDC2626),
                       side: const BorderSide(color: Color(0xFFFCA5A5)),
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -1877,25 +1936,32 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     onPressed: () {
                       setState(() {
                         tenant['status'] = 'paid';
-                        tenant['paidLabel'] = 'Paid Early on 1 Aug (Verified by $_selectedStaffActor)';
+                        tenant['paidLabel'] =
+                            'Paid Early on 1 Aug (Verified by $_selectedStaffActor)';
                         tenant['tag'] = 'Direct UPI';
                         tenant['ref'] = 'UTR-423189765412';
                         tenant['paidDate'] = '1 Aug 2026';
                         tenant['approvedBy'] = _selectedStaffActor;
                       });
-                      _showToast('Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
+                      _showToast(
+                          'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
                     },
-                    icon: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                    icon: const Icon(Icons.check_rounded,
+                        size: 14, color: Colors.white),
                     label: Text(
                       'Accept',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -1919,7 +1985,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       ),
                       child: Text(
                         'Record Cash Instead',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.muted),
                       ),
                     ),
                   ),
@@ -1938,7 +2007,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       ),
                       child: Text(
                         'Change Pay Date',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.muted),
                       ),
                     ),
                   ),
@@ -1978,7 +2050,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               },
               borderRadius: BorderRadius.circular(99),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7.5),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.ink : Colors.white,
                   borderRadius: BorderRadius.circular(99),
@@ -2005,7 +2078,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   // ===========================================================================
   // 5. STATUS FILTER CHIPS BAR
   // ===========================================================================
-  Widget _buildStatusFilterChips(int overdueCount, int extensionCount, int paidCount) {
+  Widget _buildStatusFilterChips(
+      int overdueCount, int extensionCount, int paidCount) {
     final filters = [
       {'id': 'all', 'label': 'All Status (17)'},
       {'id': 'overdue', 'label': 'Overdue ($overdueCount)'},
@@ -2028,12 +2102,14 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               },
               borderRadius: BorderRadius.circular(99),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.green : Colors.white,
                   borderRadius: BorderRadius.circular(99),
                   border: Border.all(
-                    color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                    color:
+                        isSelected ? AppColors.green : const Color(0xFFE5E7EB),
                   ),
                 ),
                 child: Text(
@@ -2073,14 +2149,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       child: TextField(
         controller: _searchController,
         onChanged: (val) => setState(() => _searchQuery = val),
-        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w500),
+        style: GoogleFonts.outfit(
+            fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w500),
         decoration: InputDecoration(
-          hintText: 'Search resident by name, room 101, or workplace...',
+          hintText: '',
           hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.muted),
+          prefixIcon: const Icon(Icons.search_rounded,
+              size: 18, color: AppColors.muted),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, size: 16, color: AppColors.muted),
+                  icon:
+                      const Icon(Icons.clear, size: 16, color: AppColors.muted),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
@@ -2178,8 +2257,11 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
         return true;
       }
 
-      if (_selectedStatus == 'overdue' && b['status'] != 'overdue') return false;
-      if (_selectedStatus == 'extension' && (b['status'] != 'extension_requested' && b['status'] != 'extension_approved')) return false;
+      if (_selectedStatus == 'overdue' && b['status'] != 'overdue')
+        return false;
+      if (_selectedStatus == 'extension' &&
+          (b['status'] != 'extension_requested' &&
+              b['status'] != 'extension_approved')) return false;
       if (_selectedStatus == 'paid' && b['status'] != 'paid') return false;
 
       if (_searchQuery.isNotEmpty) {
@@ -2216,53 +2298,41 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Room Header Row: Room 101 • 2-Sharing • Status Badge
+          // Room Header Row: Room 101 [Box] + 2-Sharing [Box]
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                    ),
-                    child: Text(
-                      roomData['room'],
-                      style: GoogleFonts.outfit(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${roomData['type']} • ₹${roomData['monthlyExpected']}/mo',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-
-              // Occupancy / Payment Progress Pill
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3.5),
                 decoration: BoxDecoration(
-                  color: totalOverdue > 0 ? const Color(0xFFFEF2F2) : AppColors.greenLight,
-                  borderRadius: BorderRadius.circular(99),
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: Text(
-                  totalOverdue > 0 ? '$totalOverdue Overdue' : '$totalPaid/$totalOccupied Paid',
+                  roomData['room'],
                   style: GoogleFonts.outfit(
-                    fontSize: 10,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w800,
-                    color: totalOverdue > 0 ? AppColors.danger : AppColors.greenDark,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3.5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Text(
+                  roomData['type'],
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
                   ),
                 ),
               ),
@@ -2273,7 +2343,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           const SizedBox(height: 10),
 
           // Level 3: Bed & Resident Cards inside this Room
-          ...filteredBeds.map((b) => b['isVacant'] == true ? _buildVacantBedCard(b) : _buildBedResidentCard(b)),
+          ...filteredBeds.map((b) => b['isVacant'] == true
+              ? _buildVacantBedCard(b)
+              : _buildBedResidentCard(b)),
         ],
       ),
     );
@@ -2298,7 +2370,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
         border: Border.all(
           color: isExtRequested
               ? const Color(0xFFFDE68A)
-              : (isExtApproved ? const Color(0xFFE5E7EB) : const Color(0xFFEEF0F2)),
+              : (isExtApproved
+                  ? const Color(0xFFE5E7EB)
+                  : const Color(0xFFEEF0F2)),
           width: 1,
         ),
       ),
@@ -2318,12 +2392,16 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     decoration: BoxDecoration(
                       color: isPaid
                           ? AppColors.greenLight
-                          : (isExtRequested || isExtApproved ? const Color(0xFFFFFBEB) : const Color(0xFFFFFFFF)),
+                          : (isExtRequested || isExtApproved
+                              ? const Color(0xFFFFFBEB)
+                              : const Color(0xFFFFFFFF)),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: isPaid
                             ? AppColors.green.withValues(alpha: 0.25)
-                            : (isExtRequested ? const Color(0xFFF59E0B) : const Color(0xFFE5E7EB)),
+                            : (isExtRequested
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFFE5E7EB)),
                         width: 1.2,
                       ),
                     ),
@@ -2335,100 +2413,54 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                           fontWeight: FontWeight.w800,
                           color: isPaid
                               ? AppColors.greenDark
-                              : (isExtRequested || isExtApproved ? const Color(0xFF92400E) : AppColors.ink),
+                              : (isExtRequested || isExtApproved
+                                  ? const Color(0xFF92400E)
+                                  : AppColors.ink),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
 
-                  // Name & Bed Tag
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        tenant['name'],
-                        style: GoogleFonts.outfit(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                          color: AppColors.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Text(
-                            tenant['bed'],
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '• ${tenant['work']}',
-                            style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
-                          ),
-                        ],
-                      ),
-                    ],
+                  // Resident Name Only
+                  Text(
+                    tenant['name'],
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: AppColors.ink,
+                    ),
                   ),
                 ],
               ),
-
-              // Status Pill on Top-Right (Clean Family Colors)
-              _buildStatusPillBadge(status, tenant),
             ],
           ),
           const SizedBox(height: 10),
 
-          // 2. Rent Amount & Due Subtitle
+          // 2. Rent Amount Only (Clean)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: isPaid ? const Color(0xFFFFFFFF) : const Color(0xFFFFFDFD),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isPaid ? const Color(0xFFE5E7EB) : const Color(0xFFFEE2E2),
+                color: const Color(0xFFE5E7EB),
                 width: 1,
               ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '₹${tenant['amount']} / month',
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.3,
-                        color: isPaid ? AppColors.greenDark : (isExtRequested || isExtApproved ? const Color(0xFF92400E) : AppColors.danger),
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      tenant['dueLabel'] ?? tenant['paidLabel'] ?? 'Due on 15 Aug',
-                      style: GoogleFonts.outfit(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w500,
-                        color: isPaid ? AppColors.muted : (isExtRequested || isExtApproved ? const Color(0xFF92400E) : AppColors.danger),
-                      ),
-                    ),
-                  ],
-                ),
-                if (tenant['tag'] != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.greenLight,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      tenant['tag'],
-                      style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.greenDark),
-                    ),
+                Text(
+                  '₹${tenant['amount']}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                    color: AppColors.greenDark,
                   ),
+                ),
               ],
             ),
           ),
@@ -2446,12 +2478,16 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFFD97706)),
+                  const Icon(Icons.schedule_rounded,
+                      size: 13, color: Color(0xFFD97706)),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       '${tenant['extensionReason'] ?? 'Requested payment extension till 15th.'}',
-                      style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                      style: GoogleFonts.outfit(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF92400E)),
                     ),
                   ),
                 ],
@@ -2463,64 +2499,56 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           // 3. ACTION BUTTONS: SIDE-BY-SIDE [ 📞 Call ] AND [ 💬 WhatsApp ] FOR ALL!
           Row(
             children: [
-              // [ 📞 Call ]
+              // [ 📞 Phone SVG Icon Only - Light Green Background ]
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('Calling ${tenant['name']}: +91${tenant['phone']}'),
+                  onTap: () => _showToast(
+                      'Calling ${tenant['name']}: +91${tenant['phone']}'),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    height: 38,
+                    height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.greenLight,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.25)),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.phone_outlined, size: 14, color: AppColors.ink),
-                        const SizedBox(width: 5),
-                        Text(
-                          'Call',
-                          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
-                        ),
-                      ],
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'assets/images/phone.svg',
+                        width: 18,
+                        height: 18,
+                        colorFilter: const ColorFilter.mode(
+                            AppColors.greenDark, BlendMode.srcIn),
+                      ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
 
-              // [ 💬 WhatsApp ]
+              // [ 💬 WhatsApp SVG Icon Only - Light Green Background ]
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('WhatsApp opened with ${tenant['name']} (+91${tenant['phone']})'),
+                  onTap: () => _showToast(
+                      'WhatsApp opened with ${tenant['name']} (+91${tenant['phone']})'),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    height: 38,
+                    height: 40,
                     decoration: BoxDecoration(
-                      color: isPaid ? AppColors.greenLight : AppColors.green,
+                      color: AppColors.greenLight,
                       borderRadius: BorderRadius.circular(8),
-                      border: isPaid ? Border.all(color: AppColors.green.withValues(alpha: 0.25)) : null,
+                      border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.25)),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 14,
-                          color: isPaid ? AppColors.greenDark : Colors.white,
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          isPaid ? 'WhatsApp' : 'Send Link',
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            color: isPaid ? AppColors.greenDark : Colors.white,
-                          ),
-                        ),
-                      ],
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'assets/images/whatsapp.svg',
+                        width: 20,
+                        height: 20,
+                        colorFilter: const ColorFilter.mode(
+                            AppColors.greenDark, BlendMode.srcIn),
+                      ),
                     ),
                   ),
                 ),
@@ -2547,7 +2575,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       child: Center(
                         child: Text(
                           '✕ Decline',
-                          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.danger),
+                          style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.danger),
                         ),
                       ),
                     ),
@@ -2568,7 +2599,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       child: Center(
                         child: Text(
                           '✓ Approve (${tenant['requestedDate'] ?? '15 Aug'})',
-                          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w800, color: Colors.white),
+                          style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white),
                         ),
                       ),
                     ),
@@ -2590,10 +2624,43 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    '+ Record Cash / Partial Payment',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    'Record Cash',
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDC2626),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'DUE',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    tenant['overdueDays'] ?? '3 Days Due',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ),
           ] else if (isExtApproved) ...[
@@ -2610,35 +2677,74 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    '+ Record Cash / Partial Payment',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    'Record Cash',
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                 ),
               ),
             ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDC2626),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'DUE',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    tenant['dueLabel'] ?? 'Due on 15 Aug',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ] else if (isPaid) ...[
             const SizedBox(height: 6),
-            InkWell(
-              onTap: () => _openReceiptModal(tenant),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFE5E7EB)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.description_outlined, size: 14, color: AppColors.ink),
-                    const SizedBox(width: 5),
-                    Text(
-                      'View Stamped PDF Receipt',
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: AppColors.green,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'PAID',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.5,
+                      color: Colors.white,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Paid on ${tenant['paidDate'] ?? '1 Aug 2026'}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -2657,10 +2763,11 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFFAFAFA),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE5E7EB), style: BorderStyle.solid),
+        border: Border.all(
+            color: const Color(0xFFE5E7EB), style: BorderStyle.solid),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -2672,37 +2779,45 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
-                child: const Icon(Icons.single_bed_outlined, size: 16, color: AppColors.muted),
+                child: const Icon(Icons.single_bed_outlined,
+                    size: 16, color: AppColors.muted),
               ),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bed['title'] ?? 'Vacant Bed',
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
-                  ),
-                  Text(
-                    '₹${bed['amount']}/mo • Ready for Walk-In',
-                    style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      bed['title'] ?? 'Vacant Bed — Available',
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
+          const SizedBox(height: 10),
           InkWell(
             onTap: () => _showToast('Opening Bed ${bed['room']} Onboarding'),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 9),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+                color: AppColors.green,
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                '+ Assign',
-                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.ink),
+              child: Center(
+                child: Text(
+                  '+ Assign',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white),
+                ),
               ),
             ),
           ),
@@ -2721,14 +2836,23 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
         decoration: BoxDecoration(
           color: AppColors.greenLight,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: AppColors.green.withValues(alpha: 0.2), width: 0.8),
+          border: Border.all(
+              color: AppColors.green.withValues(alpha: 0.2), width: 0.8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 4.5, height: 4.5, decoration: const BoxDecoration(color: AppColors.green, shape: BoxShape.circle)),
+            Container(
+                width: 4.5,
+                height: 4.5,
+                decoration: const BoxDecoration(
+                    color: AppColors.green, shape: BoxShape.circle)),
             const SizedBox(width: 4),
-            Text('Paid', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.greenDark)),
+            Text('Paid',
+                style: GoogleFonts.outfit(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.greenDark)),
           ],
         ),
       );
@@ -2743,9 +2867,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 4.5, height: 4.5, decoration: const BoxDecoration(color: Color(0xFFD97706), shape: BoxShape.circle)),
+            Container(
+                width: 4.5,
+                height: 4.5,
+                decoration: const BoxDecoration(
+                    color: Color(0xFFD97706), shape: BoxShape.circle)),
             const SizedBox(width: 4),
-            Text('Requested 15 Aug', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w800, color: const Color(0xFF92400E))),
+            Text('Requested 15 Aug',
+                style: GoogleFonts.outfit(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF92400E))),
           ],
         ),
       );
@@ -2760,9 +2892,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 4.5, height: 4.5, decoration: const BoxDecoration(color: Color(0xFF92400E), shape: BoxShape.circle)),
+            Container(
+                width: 4.5,
+                height: 4.5,
+                decoration: const BoxDecoration(
+                    color: Color(0xFF92400E), shape: BoxShape.circle)),
             const SizedBox(width: 4),
-            Text('Extended (15 Aug)', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+            Text('Extended (15 Aug)',
+                style: GoogleFonts.outfit(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink)),
           ],
         ),
       );
@@ -2777,9 +2917,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 4.5, height: 4.5, decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle)),
+            Container(
+                width: 4.5,
+                height: 4.5,
+                decoration: const BoxDecoration(
+                    color: AppColors.danger, shape: BoxShape.circle)),
             const SizedBox(width: 4),
-            Text(tenant['overdueDays'] ?? 'Overdue', style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.danger)),
+            Text(tenant['overdueDays'] ?? 'Overdue',
+                style: GoogleFonts.outfit(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.danger)),
           ],
         ),
       );
@@ -2789,9 +2937,11 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   // ===========================================================================
   // REUSABLE NATIVE MODAL WRAPPER
   // ===========================================================================
-  Widget _buildNativeBottomSheetWrapper({required String title, required Widget child}) {
+  Widget _buildNativeBottomSheetWrapper(
+      {required String title, required Widget child}) {
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -2800,7 +2950,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
         left: 20,
         right: 20,
         top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom > 0
+            ? MediaQuery.of(context).viewInsets.bottom + 16
+            : MediaQuery.of(context).padding.bottom + 32,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -2866,12 +3018,18 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       padding: const EdgeInsets.only(bottom: 5),
       child: Text(
         label,
-        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+        style: GoogleFonts.outfit(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.muted),
       ),
     );
   }
 
-  Widget _buildTextInput(TextEditingController controller, {String? hint, TextInputType? keyboardType}) {
+  Widget _buildTextInput(TextEditingController controller,
+      {String? hint,
+      TextInputType? keyboardType,
+      List<TextInputFormatter>? inputFormatters}) {
     return Container(
       height: 44,
       decoration: BoxDecoration(
@@ -2882,26 +3040,35 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
-        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
+        inputFormatters: inputFormatters,
+        style: GoogleFonts.outfit(
+            fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           border: InputBorder.none,
         ),
       ),
     );
   }
 
-  Widget _buildReceiptRow(String label, String value, {bool isBold = false, bool isMonospace = false, Color? valueColor}) {
+  Widget _buildReceiptRow(String label, String value,
+      {bool isBold = false, bool isMonospace = false, Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted)),
+        Text(label,
+            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted)),
         Text(
           value,
           style: isMonospace
-              ? const TextStyle(fontFamily: 'monospace', fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink)
+              ? const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink)
               : GoogleFonts.outfit(
                   fontSize: 12.5,
                   fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,

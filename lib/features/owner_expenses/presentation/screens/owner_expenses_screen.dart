@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_responsive.dart';
 
 /// Screen 10: Operating Costs, Grocery Rations & Monthly Expense Ledger.
 /// Strict Design System:
@@ -598,8 +599,13 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
             // 2. Scrollable Body
             Expanded(
               child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16.0, 14.0, 16.0, 96.0),
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  context.responsiveHorizontalPadding,
+                  14.0,
+                  context.responsiveHorizontalPadding,
+                  96.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_responsive.dart';
 
 /// Screen 7: 0% Direct UPI Payment Approvals & Verification Hub with Audit History.
 /// Design System: Pure enterprise UrbanStay aesthetic (Stripe/Linear precision),
@@ -25,7 +27,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       'id': 'appr_1',
       'name': 'Rahul Sharma',
       'initials': 'RS',
-      'room': 'Room 101 (Bed A)',
+      'room': 'Room 101',
       'floor': '1st',
       'amount': 8500,
       'phone': '9876543210',
@@ -38,7 +40,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       'id': 'appr_2',
       'name': 'Amit Verma',
       'initials': 'AV',
-      'room': 'Room 101 (Bed B)',
+      'room': 'Room 101',
       'floor': '1st',
       'amount': 8500,
       'phone': '9988776655',
@@ -51,7 +53,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       'id': 'appr_3',
       'name': 'Priya Nair',
       'initials': 'PN',
-      'room': 'Room 201 (Bed B)',
+      'room': 'Room 201',
       'floor': '2nd',
       'amount': 9000,
       'phone': '9819876543',
@@ -68,7 +70,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       'id': 'hist_1',
       'name': 'Karthik Raja',
       'initials': 'KR',
-      'room': 'Room 201 (Bed A)',
+      'room': 'Room 201',
       'floor': '2nd',
       'amount': 9000,
       'phone': '9741234567',
@@ -81,7 +83,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       'id': 'hist_2',
       'name': 'Suresh Gowda',
       'initials': 'SG',
-      'room': 'Room G-01 (Bed A)',
+      'room': 'Room G-01',
       'floor': 'ground',
       'amount': 8000,
       'phone': '9844001122',
@@ -94,7 +96,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       'id': 'hist_3',
       'name': 'Tanmay Bhat',
       'initials': 'TB',
-      'room': 'Room G-01 (Bed B)',
+      'room': 'Room G-01',
       'floor': 'ground',
       'amount': 8000,
       'phone': '9855112233',
@@ -105,16 +107,14 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
     },
   ];
 
-  // Active Proof Target for Modal
-  Map<String, dynamic>? _activeProofTarget;
-
   void _showToast(String msg) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         duration: const Duration(seconds: 2),
@@ -142,10 +142,122 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
         'utr': item['utr'],
         'settledTime': 'Just now',
         'status': 'approved',
-        'receiptNo': 'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        'receiptNo':
+            'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
       });
     });
-    _showToast('₹${item['amount']} Approved for ${item['name']}. Logged to History & Receipt sent via WhatsApp.');
+    _showToast(
+        '₹${item['amount']} Approved for ${item['name']}. Logged to History & Receipt sent via WhatsApp.');
+  }
+
+  void _showApproveConfirmationDialog(Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.greenLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFB8ECC8)),
+                ),
+                child: const Center(
+                  child: Icon(Icons.verified_outlined,
+                      size: 24, color: AppColors.greenDark),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Confirm Payment Approval',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Approve ₹${item['amount']} from ${item['name']} for ${item['room']}?\nUTR: ${item['utr']}',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  color: AppColors.muted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => Navigator.of(dialogCtx).pop(),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(dialogCtx).pop();
+                        _approvePayment(item);
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.green,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Yes, Approve',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _rejectPayment(Map<String, dynamic> item) {
@@ -165,14 +277,14 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
         'rejectReason': 'Declined by owner',
       });
     });
-    _showToast('Payment rejected for ${item['name']}. Logged to History & Alert sent to resident.');
+    _showToast(
+        'Payment rejected for ${item['name']}. Logged to History & Alert sent to resident.');
   }
 
   // ===========================================================================
   // MODAL: PROOF SCREENSHOT VIEWER (Native Bottom Sheet)
   // ===========================================================================
   void _openProofModal(Map<String, dynamic> item) {
-    _activeProofTarget = item;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -241,7 +353,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
                       child: const Center(
-                        child: Icon(Icons.close, size: 15, color: AppColors.muted),
+                        child:
+                            Icon(Icons.close, size: 15, color: AppColors.muted),
                       ),
                     ),
                   ),
@@ -269,18 +382,23 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         border: Border.all(color: AppColors.green, width: 1.5),
                       ),
                       child: const Center(
-                        child: Icon(Icons.check_rounded, size: 30, color: AppColors.greenDark),
+                        child: Icon(Icons.check_rounded,
+                            size: 30, color: AppColors.greenDark),
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'Paid to Arun Kumar',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'HDFC Bank Account ending in 8902',
-                      style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12, color: AppColors.muted),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -294,7 +412,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     ),
                     const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(6),
@@ -322,12 +441,14 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   backgroundColor: AppColors.ink,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: Text(
                   'Close Preview',
-                  style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13.5, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -370,7 +491,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -402,33 +524,21 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+                  child: const Icon(Icons.arrow_back_rounded,
+                      size: 18, color: AppColors.ink),
                 ),
               ),
               const SizedBox(width: 12),
 
-              // Title & Subtitle Block
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Payment Approvals',
-                    style: GoogleFonts.outfit(
-                      fontSize: 17.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  Text(
-                    '0% Fee Direct Bank Settlements',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
+              // Title Block
+              Text(
+                'Payment Approvals',
+                style: GoogleFonts.outfit(
+                  fontSize: 17.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                  color: AppColors.ink,
+                ),
               ),
             ],
           ),
@@ -474,7 +584,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
+                  color: _selectedTabIndex == 0
+                      ? Colors.white
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: _selectedTabIndex == 0
                       ? const [
@@ -491,8 +603,12 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     'Pending Approvals (${_pendingApprovals.length})',
                     style: GoogleFonts.outfit(
                       fontSize: 12.5,
-                      fontWeight: _selectedTabIndex == 0 ? FontWeight.w800 : FontWeight.w600,
-                      color: _selectedTabIndex == 0 ? AppColors.ink : AppColors.muted,
+                      fontWeight: _selectedTabIndex == 0
+                          ? FontWeight.w800
+                          : FontWeight.w600,
+                      color: _selectedTabIndex == 0
+                          ? AppColors.greenDark
+                          : AppColors.muted,
                     ),
                   ),
                 ),
@@ -506,7 +622,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
+                  color: _selectedTabIndex == 1
+                      ? Colors.white
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: _selectedTabIndex == 1
                       ? const [
@@ -523,8 +641,12 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     'Approval History (${_approvalHistory.length})',
                     style: GoogleFonts.outfit(
                       fontSize: 12.5,
-                      fontWeight: _selectedTabIndex == 1 ? FontWeight.w800 : FontWeight.w600,
-                      color: _selectedTabIndex == 1 ? AppColors.ink : AppColors.muted,
+                      fontWeight: _selectedTabIndex == 1
+                          ? FontWeight.w800
+                          : FontWeight.w600,
+                      color: _selectedTabIndex == 1
+                          ? AppColors.greenDark
+                          : AppColors.muted,
                     ),
                   ),
                 ),
@@ -546,8 +668,13 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
     }).toList();
 
     return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 96.0),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        context.responsiveHorizontalPadding,
+        12.0,
+        context.responsiveHorizontalPadding,
+        96.0,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -574,8 +701,13 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ===========================================================================
   Widget _buildApprovalHistoryView() {
     return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16.0, 12.0, 16.0, 96.0),
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(
+        context.responsiveHorizontalPadding,
+        12.0,
+        context.responsiveHorizontalPadding,
+        96.0,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -592,11 +724,17 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               children: [
                 Text(
                   'Master Settlement Audit Log',
-                  style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink),
                 ),
                 Text(
                   '${_approvalHistory.length} Total Records',
-                  style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                  style: GoogleFonts.outfit(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted),
                 ),
               ],
             ),
@@ -637,12 +775,14 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               onTap: () => setState(() => _selectedFloor = f['id']!),
               borderRadius: BorderRadius.circular(99),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.ink : Colors.white,
+                  color: isSelected ? AppColors.green : Colors.white,
                   borderRadius: BorderRadius.circular(99),
                   border: Border.all(
-                    color: isSelected ? AppColors.ink : const Color(0xFFE5E7EB),
+                    color:
+                        isSelected ? AppColors.green : const Color(0xFFE5E7EB),
                   ),
                 ),
                 child: Text(
@@ -663,11 +803,11 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
 
   Widget _buildTrustStrip() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F2)),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x02000000),
@@ -677,23 +817,74 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
         ],
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'Destination: ',
-                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-              ),
-              Text(
-                'Arun Kumar (HDFC Bank)',
-                style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
-              ),
-            ],
+          Container(
+            width: 34,
+            height: 34,
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              color: AppColors.greenLight,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.account_balance_rounded,
+                size: 17, color: AppColors.greenDark),
           ),
-          Text(
-            '0% Gateway Fee',
-            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'DESTINATION ACCOUNT',
+                      style: GoogleFonts.outfit(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.greenLight,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Direct Settlement',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.greenDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Arun Kumar • HDFC Bank',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'UPI ID: arunkumar@hdfcbank  •  A/C: ******8902',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -722,91 +913,51 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Top Row: Avatar + Name + Room + Quick Phone/WhatsApp Contact Actions
+          // Top Row: Avatar + Name & Room
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  // 44px Avatar Initial Circle
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                    ),
-                    child: Center(
-                      child: Text(
-                        item['initials'] ?? 'RS',
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
-                        ),
-                      ),
+              // 44px Avatar Initial Circle
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F4F6),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Center(
+                  child: Text(
+                    item['initials'] ?? 'RS',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
                     ),
                   ),
-                  const SizedBox(width: 12),
-
-                  // Name & Room
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item['name'],
-                        style: GoogleFonts.outfit(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                          color: AppColors.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${item['room']} • ${item['floor']} Floor',
-                        style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
+              const SizedBox(width: 12),
 
-              // Contact Actions (Call & WhatsApp)
-              Row(
+              // Name & Room
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  InkWell(
-                    onTap: () => _showToast('Calling ${item['name']}: +91${item['phone']}'),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: const Icon(Icons.phone_outlined, size: 16, color: AppColors.ink),
+                  Text(
+                    item['name'],
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                      color: AppColors.ink,
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  InkWell(
-                    onTap: () => _showToast('WhatsApp opened with ${item['name']}'),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.ink),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${item['room']} • ${item['floor']} Floor',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.muted,
                     ),
                   ),
                 ],
@@ -855,7 +1006,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(6),
@@ -863,7 +1015,10 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                       ),
                       child: Text(
                         item['time'],
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.muted),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted),
                       ),
                     ),
                   ],
@@ -878,7 +1033,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   children: [
                     Text(
                       'UPI Reference (UTR)',
-                      style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12, color: AppColors.muted),
                     ),
                     Text(
                       item['utr'],
@@ -896,7 +1052,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
 
                 // Screenshot Proof Row with View Proof Trigger
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
@@ -905,34 +1062,46 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: AppColors.greenLight,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'IMG',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: AppColors.greenLight,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'IMG',
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.greenDark),
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            item['proofFile'],
-                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.ink),
-                          ),
-                        ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                item['proofFile'],
+                                style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.ink),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       InkWell(
                         onTap: () => _openProofModal(item),
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF4F4F5),
                             borderRadius: BorderRadius.circular(6),
@@ -940,7 +1109,10 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                           ),
                           child: Text(
                             'View Proof',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink),
                           ),
                         ),
                       ),
@@ -950,9 +1122,82 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Action Buttons: [ Reject ] and [ Approve & Send Receipt ]
+          // Contact Actions: Call & WhatsApp
+          Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () => _showToast(
+                      'Calling ${item['name']}: +91${item['phone']}'),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.phone_outlined,
+                            size: 15, color: AppColors.ink),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Call',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: InkWell(
+                  onTap: () =>
+                      _showToast('WhatsApp opened with ${item['name']}'),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.greenLight,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFB8ECC8)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SvgPicture.asset(
+                          'assets/images/whatsapp.svg',
+                          width: 15,
+                          height: 15,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'WhatsApp',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.greenDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Action Buttons: [ Reject ] and [ Approve ]
           Row(
             children: [
               // Reject Button
@@ -966,7 +1211,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
+                      border: Border.all(
+                          color: const Color(0xFFFCA5A5), width: 1.5),
                     ),
                     child: Center(
                       child: Text(
@@ -983,11 +1229,11 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               ),
               const SizedBox(width: 10),
 
-              // Approve & Send Receipt Button
+              // Approve Button
               Expanded(
                 flex: 2,
                 child: InkWell(
-                  onTap: () => _approvePayment(item),
+                  onTap: () => _showApproveConfirmationDialog(item),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     height: 44,
@@ -997,7 +1243,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        'Approve & Send Receipt',
+                        'Approve',
                         style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
@@ -1048,10 +1294,14 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      color: isApproved ? AppColors.greenLight : const Color(0xFFFEF2F2),
+                      color: isApproved
+                          ? AppColors.greenLight
+                          : const Color(0xFFFEF2F2),
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isApproved ? AppColors.green.withValues(alpha: 0.25) : const Color(0xFFFCA5A5),
+                        color: isApproved
+                            ? AppColors.green.withValues(alpha: 0.25)
+                            : const Color(0xFFFCA5A5),
                       ),
                     ),
                     child: Center(
@@ -1060,7 +1310,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
-                          color: isApproved ? AppColors.greenDark : AppColors.danger,
+                          color: isApproved
+                              ? AppColors.greenDark
+                              : AppColors.danger,
                         ),
                       ),
                     ),
@@ -1096,13 +1348,17 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
-                      color: isApproved ? AppColors.greenDark : AppColors.danger,
+                      color:
+                          isApproved ? AppColors.greenDark : AppColors.danger,
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 1.5),
                     decoration: BoxDecoration(
-                      color: isApproved ? AppColors.greenLight : const Color(0xFFFEF2F2),
+                      color: isApproved
+                          ? AppColors.greenLight
+                          : const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -1110,7 +1366,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                       style: GoogleFonts.outfit(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w800,
-                        color: isApproved ? AppColors.greenDark : AppColors.danger,
+                        color:
+                            isApproved ? AppColors.greenDark : AppColors.danger,
                       ),
                     ),
                   ),
@@ -1130,12 +1387,21 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  isApproved ? 'Receipt #${item['receiptNo']}' : '${item['rejectReason']}',
-                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                  isApproved
+                      ? 'Receipt #${item['receiptNo']}'
+                      : '${item['rejectReason']}',
+                  style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted),
                 ),
                 Text(
                   'UTR: ${item['utr']}',
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
+                  style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink),
                 ),
               ],
             ),
@@ -1153,11 +1419,15 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
       child: Column(
         children: [
-          const Icon(Icons.check_circle_outline_rounded, size: 44, color: AppColors.muted),
+          const Icon(Icons.check_circle_outline_rounded,
+              size: 44, color: AppColors.muted),
           const SizedBox(height: 12),
           Text(
             'All Payments Approved',
-            style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.ink),
+            style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink),
           ),
           const SizedBox(height: 4),
           Text(

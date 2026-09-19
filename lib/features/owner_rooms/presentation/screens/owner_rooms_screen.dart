@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_responsive.dart';
+import 'shift_bed_screen.dart';
 
 /// Screen 6: Tenants & Rooms Matrix.
 /// Production-Grade Responsive Flutter Implementation of `ProductionCode/owner_rooms.html`.
@@ -404,34 +407,49 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             children: [
               _buildFormField('Full Legal Name', _nameController),
               const SizedBox(height: 12),
-              _buildFormField('Phone Number / WhatsApp', _phoneController,
-                  keyboardType: TextInputType.phone),
+              _buildFormField(
+                'Phone Number / WhatsApp',
+                _phoneController,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
+              ),
               const SizedBox(height: 12),
               _buildFormField('Company / College', _workController),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                      child: _buildFormField(
-                          'Monthly Rent (₹)', _rentController,
-                          keyboardType: TextInputType.number)),
+                    child: _buildFormField(
+                      'Monthly Rent (₹)',
+                      _rentController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
-                      child: _buildFormField(
-                          'Security Deposit (₹)', _depositController,
-                          keyboardType: TextInputType.number)),
+                    child: _buildFormField(
+                      'Security Deposit (₹)',
+                      _depositController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
 
-              // Save Changes Primary Button
+              // Save Changes Primary Button (Iconic Green + White Text)
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   _showToast('Resident Details Saved ✓');
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.ink,
+                  backgroundColor: AppColors.green,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
@@ -441,7 +459,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 child: Text(
                   'Save Changes',
                   style: GoogleFonts.outfit(
-                      fontSize: 14, fontWeight: FontWeight.w700),
+                      fontSize: 14, fontWeight: FontWeight.w800),
                 ),
               ),
               const SizedBox(height: 16),
@@ -476,8 +494,18 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       'Change Room / Shift Bed',
                       onTap: () {
                         Navigator.of(ctx).pop();
-                        _showToast(
-                            'Opening Room Shift Selector for ${resident['name']}');
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (c) => ShiftBedScreen(
+                              resident: resident,
+                              roomName: roomName,
+                              rooms: _rooms,
+                              onShiftSuccess: () {
+                                setState(() {});
+                              },
+                            ),
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 10),
@@ -563,6 +591,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     _damageAmountController,
                     hint: 'e.g. 1200',
                     keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
                   const SizedBox(height: 14),
 
@@ -742,7 +771,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                           '₹$amount Damage for $item logged ($modeText) & sent on WhatsApp ✓');
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.ink,
+                      backgroundColor: AppColors.green,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
                       shape: RoundedRectangleBorder(
@@ -752,7 +781,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     child: Text(
                       'Save & Apply Damage Charge',
                       style: GoogleFonts.outfit(
-                          fontSize: 14, fontWeight: FontWeight.w700),
+                          fontSize: 14, fontWeight: FontWeight.w800),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -1318,7 +1347,11 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 140.0),
+                    padding: EdgeInsets.fromLTRB(
+                        context.responsiveHorizontalPadding,
+                        16.0,
+                        context.responsiveHorizontalPadding,
+                        140.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -1380,7 +1413,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   // ===========================================================================
   Widget _buildTopHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+          horizontal: context.responsiveHorizontalPadding, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
@@ -1559,7 +1593,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
           child: _buildStatTile(
             '31',
             'Total Tenants',
-            AppColors.green,
+            AppColors.greenDark,
             isSelected: _selectedFilter == 'tenants',
             onTap: () {
               setState(() {
@@ -1574,12 +1608,12 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
         ),
         const SizedBox(width: 8),
 
-        // Vacant Beds (Black)
+        // Vacant Beds (Green)
         Expanded(
           child: _buildStatTile(
             '4',
             'Vacant Beds',
-            AppColors.ink,
+            AppColors.greenDark,
             isSelected: _selectedFilter == 'vacant',
             onTap: () {
               setState(() {
@@ -1594,12 +1628,12 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
         ),
         const SizedBox(width: 8),
 
-        // Notice Period (Yellow / Amber)
+        // Notice Period (Green)
         Expanded(
           child: _buildStatTile(
             '1',
             'Notice Period',
-            const Color(0xFFD97706),
+            AppColors.greenDark,
             isSelected: _selectedFilter == 'notice',
             onTap: () {
               setState(() {
@@ -1836,48 +1870,17 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   ),
                   const SizedBox(width: 10),
 
-                  // Name & Status Pill
+                  // Name
                   InkWell(
                     onTap: () => _openEditModal(tenant, roomName),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tenant['name'],
-                          style: GoogleFonts.outfit(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.4,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isNotice
-                                ? const Color(0xFFFEF2F2)
-                                : AppColors.greenLight,
-                            borderRadius: BorderRadius.circular(5),
-                            border: Border.all(
-                              color: isNotice
-                                  ? AppColors.danger.withValues(alpha: 0.2)
-                                  : AppColors.green.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Text(
-                            isNotice ? 'Notice Period' : '● Active Resident',
-                            style: GoogleFonts.outfit(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: isNotice
-                                  ? AppColors.danger
-                                  : AppColors.greenDark,
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      tenant['name'],
+                      style: GoogleFonts.outfit(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        color: AppColors.ink,
+                      ),
                     ),
                   ),
                 ],
@@ -1922,7 +1925,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             margin: const EdgeInsets.symmetric(vertical: 10),
           ),
 
-          // 2. Dedicated Prominent Bed & Amount Row (No College/Company Clutter)
+          // 2. Dedicated Status (Active / Notice Period) & Rent Row
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
@@ -1933,41 +1936,53 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.bed_outlined,
-                        size: 16, color: AppColors.green),
-                    const SizedBox(width: 6),
-                    Text(
-                      tenant['bed'] ?? 'Bed A',
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                        color: AppColors.ink,
-                      ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isNotice
+                        ? const Color(0xFFFEF2F2)
+                        : AppColors.greenLight,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isNotice
+                          ? const Color(0xFFFCA5A5)
+                          : AppColors.green.withValues(alpha: 0.25),
                     ),
-                  ],
-                ),
-                RichText(
-                  text: TextSpan(
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.4,
-                      color: AppColors.greenDark,
-                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextSpan(text: '₹${tenant['rent']}'),
-                      TextSpan(
-                        text: ' / month',
+                      Icon(
+                        isNotice
+                            ? Icons.info_outline_rounded
+                            : Icons.check_circle_outline_rounded,
+                        size: 13,
+                        color: isNotice
+                            ? const Color(0xFFDC2626)
+                            : AppColors.greenDark,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        isNotice ? 'Notice Period' : 'Active',
                         style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: isNotice
+                              ? const Color(0xFFDC2626)
+                              : AppColors.greenDark,
                         ),
                       ),
                     ],
+                  ),
+                ),
+                Text(
+                  '₹${tenant['rent']}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.4,
+                    color: AppColors.greenDark,
                   ),
                 ),
               ],
@@ -1975,72 +1990,53 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
           ),
           const SizedBox(height: 10),
 
-          // 3. Spacious 2-Button Action Row: [ 📞 Call ] and [ 💬 WhatsApp ]
+          // 3. Spacious 2-Button Action Row: Icon-Only [ 📞 Call ] and [ 💬 WhatsApp ]
           Row(
             children: [
-              // Call Button
+              // Call Button (Phone SVG Icon Only)
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast(
                       'Calling ${tenant['name']}: +91${tenant['phone']}'),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   child: Container(
                     height: 38,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      color: AppColors.greenLight,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.3)),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.phone_outlined,
-                            size: 14, color: AppColors.ink),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Call',
-                          style: GoogleFonts.outfit(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
-                          ),
-                        ),
-                      ],
+                    child: SvgPicture.asset(
+                      'assets/images/phone.svg',
+                      width: 18,
+                      height: 18,
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
 
-              // Direct WhatsApp Button
+              // WhatsApp Button (WhatsApp SVG Icon Only)
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast(
                       'Opening WhatsApp chat with ${tenant['name']} (+91${tenant['phone']}) ✓'),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   child: Container(
                     height: 38,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                          color: AppColors.green.withValues(alpha: 0.25)),
+                          color: AppColors.green.withValues(alpha: 0.3)),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.chat_bubble_outline_rounded,
-                            size: 14, color: AppColors.greenDark),
-                        const SizedBox(width: 6),
-                        Text(
-                          'WhatsApp',
-                          style: GoogleFonts.outfit(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.greenDark,
-                          ),
-                        ),
-                      ],
+                    child: SvgPicture.asset(
+                      'assets/images/whatsapp.svg',
+                      width: 18,
+                      height: 18,
                     ),
                   ),
                 ),
