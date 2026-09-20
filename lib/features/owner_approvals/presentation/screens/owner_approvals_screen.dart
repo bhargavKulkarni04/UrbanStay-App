@@ -260,6 +260,116 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
     );
   }
 
+  void _showRejectConfirmationDialog(Map<String, dynamic> item) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: const Center(
+                  child: Icon(Icons.cancel_outlined,
+                      size: 24, color: AppColors.danger),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Confirm Payment Rejection',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Are you sure you want to reject ₹${item['amount']} from ${item['name']} for ${item['room']}?\nUTR: ${item['utr']}',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  color: AppColors.muted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => Navigator.of(dialogCtx).pop(),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(dialogCtx).pop();
+                        _rejectPayment(item);
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.danger,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Yes, Reject',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _rejectPayment(Map<String, dynamic> item) {
     setState(() {
       _pendingApprovals.removeWhere((p) => p['id'] == item['id']);
@@ -835,35 +945,14 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'DESTINATION ACCOUNT',
-                      style: GoogleFonts.outfit(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.greenLight,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        'Direct Settlement',
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.greenDark,
-                        ),
-                      ),
-                    ),
-                  ],
+                Text(
+                  'DESTINATION ACCOUNT',
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: AppColors.muted,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -1065,23 +1154,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                       Expanded(
                         child: Row(
                           children: [
-                            Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: AppColors.greenLight,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Center(
-                                child: Text(
-                                  'IMG',
-                                  style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.greenDark),
-                                ),
-                              ),
-                            ),
+                            const Icon(Icons.description_outlined,
+                                size: 18, color: AppColors.muted),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -1142,8 +1216,13 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.phone_outlined,
-                            size: 15, color: AppColors.ink),
+                        SvgPicture.asset(
+                          'assets/images/phone.svg',
+                          width: 15,
+                          height: 15,
+                          colorFilter: const ColorFilter.mode(
+                              AppColors.ink, BlendMode.srcIn),
+                        ),
                         const SizedBox(width: 6),
                         Text(
                           'Call',
@@ -1204,7 +1283,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               Expanded(
                 flex: 1,
                 child: InkWell(
-                  onTap: () => _rejectPayment(item),
+                  onTap: () => _showRejectConfirmationDialog(item),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     height: 44,
@@ -1340,38 +1419,13 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   ),
                 ],
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '₹${item['amount']}',
-                    style: GoogleFonts.outfit(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                      color:
-                          isApproved ? AppColors.greenDark : AppColors.danger,
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: isApproved
-                          ? AppColors.greenLight
-                          : const Color(0xFFFEF2F2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      isApproved ? 'Settled (0% Cut)' : 'Rejected',
-                      style: GoogleFonts.outfit(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        color:
-                            isApproved ? AppColors.greenDark : AppColors.danger,
-                      ),
-                    ),
-                  ),
-                ],
+              Text(
+                '₹${item['amount']}',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.ink,
+                ),
               ),
             ],
           ),
@@ -1386,14 +1440,27 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  isApproved
-                      ? 'Receipt #${item['receiptNo']}'
-                      : '${item['rejectReason']}',
-                  style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.muted),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: isApproved ? AppColors.green : AppColors.danger,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isApproved ? 'Paid' : 'Rejected',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        color: isApproved ? AppColors.greenDark : AppColors.danger,
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   'UTR: ${item['utr']}',

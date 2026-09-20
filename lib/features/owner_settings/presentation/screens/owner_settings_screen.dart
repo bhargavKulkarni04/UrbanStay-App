@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import 'package:urbanstay/features/owner_setup/presentation/screens/owner_setup_screen.dart';
 
 /// Screen 12: Master Owner Settings & Configuration Hub.
 /// 1-to-1 exact translation of `ProductionCode/owner_settings.html`.
@@ -16,8 +17,9 @@ import '../../../../core/theme/app_colors.dart';
 /// - Apple App Store Guideline 5.1.1(v) compliant Account Deletion and Session Logout.
 class OwnerSettingsScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? initialView;
 
-  const OwnerSettingsScreen({super.key, this.onBack});
+  const OwnerSettingsScreen({super.key, this.onBack, this.initialView});
 
   @override
   State<OwnerSettingsScreen> createState() => _OwnerSettingsScreenState();
@@ -25,8 +27,9 @@ class OwnerSettingsScreen extends StatefulWidget {
 
 class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   // Navigation State
-  String _activeView = 'master'; // 'master', 'property', 'management', 'stay_rules', 'bank', 'checklist', 'account'
+  late String _activeView;
   final TextEditingController _searchController = TextEditingController();
+
 
   // ===========================================================================
   // LIVE SETTINGS DATA STATE
@@ -151,6 +154,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _activeView = widget.initialView ?? 'master';
     _fetchLiveGeoData();
   }
 
@@ -1388,6 +1392,23 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     );
   }
 
+  void _navigateToScaleCapacityScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => OwnerSetupScreen(
+          isScaleMode: true,
+          onCapacityUpdated: (newBeds, newRooms, newFloors) {
+            setState(() {
+              _scaleTotalBeds = newBeds;
+              _scaleTotalRooms = newRooms;
+              _scaleFloorCount = newFloors;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   // C3 Detail View
   Widget _buildC3BedCapacityView() {
     return Column(
@@ -1395,7 +1416,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       children: [
         _buildElevatedCard(
           title: 'Floors, Rooms & Bed Architecture',
-          onEdit: _openEditC3CapacityModal,
+          onEdit: _navigateToScaleCapacityScreen,
           rows: [
             _DetailRow('Ground Floor Rooms', '$_scaleGroundRooms Rooms (${_scaleGroundRooms * 2} Beds)'),
             _DetailRow('Total Building Floors', '$_scaleFloorCount Floors (Ground + ${_scaleFloorCount - 1} Floors)'),
@@ -1410,7 +1431,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
         ),
         const SizedBox(height: 14),
         OutlinedButton(
-          onPressed: _openScaleBedCapacityModal,
+          onPressed: _navigateToScaleCapacityScreen,
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: AppColors.green,

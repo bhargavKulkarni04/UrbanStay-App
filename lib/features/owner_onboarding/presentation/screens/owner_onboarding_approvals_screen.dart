@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 
 /// Screen: Tenant Move-In & Onboarding Approval Hub.
 /// Strict Design Rules:
-/// - Prominent High-Contrast Visual Block for Room Number, Sharing Type, and Bed Label.
-/// - Full Editable Controls in Accept Modal so owner can correct/modify room, bed, rent & deposit if entered wrong.
-/// - Zero Aadhaar Number (removed completely).
+/// - Clean Text Layout for Room Number and Sharing Type (no heavy black pills).
+/// - Full Editable Controls in Accept Modal so owner can correct room, sharing, rent & deposit if needed.
+/// - Zero Aadhaar Number & Zero Bed Labels.
 /// - Dual-Tab Architecture: `Pending Requests (2)` vs `Onboarding History (3)`.
-/// - Zero Summary Strip.
-/// - Side-by-Side [ 📞 Call Tenant ] and [ 💬 WhatsApp ] directly above the Decision Action Row.
-/// - 100% Zero Emojis (pure native material vector icons & Google Fonts Outfit typography).
-/// - 100% Zero Purple / Vibe-Coded Colors (Strict emerald green, ink, warm gold, and pure white cards).
+/// - Icon-only buttons for Call & WhatsApp in brand green style.
+/// - 100% Zero Emojis (pure native vector icons & Google Fonts Outfit typography).
+/// - 100% Zero Purple / Vibe-Coded Colors (Strict emerald green, ink, and pure white cards).
 class OwnerOnboardingApprovalsScreen extends StatefulWidget {
   final VoidCallback? onBack;
 
@@ -25,36 +25,30 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   int _activeTabIndex = 0; // 0: Pending Requests, 1: Onboarding History
   final TextEditingController _searchController = TextEditingController();
 
-  // Master Pending Onboarding Requests List (Zero Aadhaar numbers)
+  // Master Pending Onboarding Requests List
   final List<Map<String, dynamic>> _pendingList = [
     {
       'id': 'REQ-8821',
       'name': 'Rahul Verma',
       'initials': 'RV',
-      'workTitle': 'Software Engineer @ Swiggy',
       'phone': '9876543210',
       'roomNumber': '101',
-      'bedLabel': 'Bed B',
-      'sharingType': '2-Sharing',
-      'floor': '1st Floor',
+      'sharingType': '2 Sharing',
       'rent': 8500,
       'deposit': 15000,
-      'appliedTime': '15 mins ago',
+      'appliedTime': '11:15 AM',
       'moveInDate': '29 Aug 2026',
     },
     {
       'id': 'REQ-8822',
       'name': 'Priya Nair',
       'initials': 'PN',
-      'workTitle': 'Product Analyst @ Razorpay',
       'phone': '9845112233',
       'roomNumber': '203',
-      'bedLabel': 'Bed A',
-      'sharingType': '3-Sharing',
-      'floor': '2nd Floor',
+      'sharingType': '3 Sharing',
       'rent': 7500,
       'deposit': 12000,
-      'appliedTime': '1 hour ago',
+      'appliedTime': '02:34 PM',
       'moveInDate': '1 Sep 2026',
     },
   ];
@@ -65,49 +59,40 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
       'id': 'REQ-8790',
       'name': 'Kunal Sharma',
       'initials': 'KS',
-      'workTitle': 'Systems Engineer @ Infosys',
       'phone': '9880199221',
       'roomNumber': '101',
-      'bedLabel': 'Bed A',
-      'sharingType': '2-Sharing',
-      'floor': '1st Floor',
+      'sharingType': '2 Sharing',
       'rent': 8500,
       'deposit': 15000,
       'status': 'approved', // 'approved', 'rejected'
       'processedDate': '15 Aug 2026',
-      'auditNote': 'Approved & Assigned Bed 101-A by Bhargav (Owner)',
+      'auditNote': 'Approved & Assigned Room 101 by Bhargav (Owner)',
     },
     {
       'id': 'REQ-8785',
       'name': 'Ananya Deshmukh',
       'initials': 'AD',
-      'workTitle': 'UI Designer @ CRED',
       'phone': '9741200334',
       'roomNumber': '201',
-      'bedLabel': 'Bed A',
-      'sharingType': '2-Sharing',
-      'floor': '2nd Floor',
+      'sharingType': '2 Sharing',
       'rent': 8500,
       'deposit': 15000,
       'status': 'approved',
       'processedDate': '10 Aug 2026',
-      'auditNote': 'Approved & Assigned Bed 201-A by Bhargav (Owner)',
+      'auditNote': 'Approved & Assigned Room 201 by Bhargav (Owner)',
     },
     {
       'id': 'REQ-8772',
       'name': 'Vikas Gupta',
       'initials': 'VG',
-      'workTitle': 'Accountant @ Tally',
       'phone': '9611088771',
       'roomNumber': '102',
-      'bedLabel': 'Bed C',
-      'sharingType': '3-Sharing',
-      'floor': '1st Floor',
+      'sharingType': '3 Sharing',
       'rent': 7500,
       'deposit': 12000,
       'status': 'rejected',
       'processedDate': '04 Aug 2026',
-      'auditNote': 'Rejected: Bed already allotted to another resident',
+      'auditNote': 'Rejected: Room already allotted to another resident',
     },
   ];
 
@@ -138,19 +123,16 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   // ACCEPT ONBOARDING FLOW WITH INLINE EDIT CAPABILITY
   // ===========================================================================
   void _acceptOnboarding(Map<String, dynamic> req) {
-    // Editable state controllers so owner can modify wrong tenant entries
+    // Editable state controllers so owner can modify room, sharing, rent & deposit
     final roomController = TextEditingController(text: req['roomNumber']);
-    final bedController = TextEditingController(text: req['bedLabel']);
+    final sharingController = TextEditingController(text: req['sharingType'] ?? '2 Sharing');
     final rentController = TextEditingController(text: (req['rent'] as int).toString());
     final depositController = TextEditingController(text: (req['deposit'] as int).toString());
-    String selectedSharing = req['sharingType'] ?? '2-Sharing';
-    String depositMode = 'Direct UPI Paid';
     bool isEditing = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
@@ -160,7 +142,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 1. Tenant Summary Header
+                  // 1. Resident Summary Header (Zero job/company subtitle)
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -202,8 +184,9 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                                   color: AppColors.ink,
                                 ),
                               ),
+                              const SizedBox(height: 2),
                               Text(
-                                '${req['workTitle']}',
+                                'Applied at ${req['appliedTime'] ?? '11:15 AM'}',
                                 style: GoogleFonts.outfit(
                                   fontSize: 11.5,
                                   color: AppColors.muted,
@@ -218,7 +201,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                   ),
                   const SizedBox(height: 14),
 
-                  // 2. Section Header with "Edit Details" toggle
+                  // 2. Section Header with "Modify Details" toggle
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -256,7 +239,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
 
                   // If Editing Mode: Show Text Inputs
                   if (isEditing) ...[
@@ -276,8 +259,8 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildFormLabel('Bed Label'),
-                              _buildTextInput(bedController, hint: 'e.g. Bed B'),
+                              _buildFormLabel('Sharing Type'),
+                              _buildTextInput(sharingController, hint: 'e.g. 2 Sharing'),
                             ],
                           ),
                         ),
@@ -309,61 +292,56 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                       ],
                     ),
                   ] else ...[
-                    // Standard Display Mode: Prominent Visual Block
+                    // Standard Display Mode: Clean layout without black pills, no bed, plain green rent text
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Row(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.ink,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'ROOM ${roomController.text}',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.5,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
                                   Text(
-                                    '$selectedSharing • ${bedController.text}',
+                                    'Room - ${roomController.text}',
                                     style: GoogleFonts.outfit(
-                                      fontSize: 13.5,
+                                      fontSize: 14.5,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: -0.2,
                                       color: AppColors.ink,
                                     ),
                                   ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    'Sharing - ${sharingController.text}',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.muted,
+                                    ),
+                                  ),
                                 ],
                               ),
                               Text(
-                                '₹${rentController.text}/mo',
+                                '₹${rentController.text}',
                                 style: GoogleFonts.outfit(
-                                  fontSize: 14,
+                                  fontSize: 17,
                                   fontWeight: FontWeight.w900,
+                                  letterSpacing: -0.3,
                                   color: AppColors.greenDark,
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Text(
                             'Security Deposit: ₹${depositController.text}',
                             style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted, fontWeight: FontWeight.w600),
@@ -372,36 +350,13 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                       ),
                     ),
                   ],
-                  const SizedBox(height: 14),
-
-                  // 3. Deposit Payment Mode Selector
-                  _buildSectionHeader('Deposit Collection Mode'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDepositModeChip(
-                          'Direct UPI (Paid)',
-                          depositMode == 'Direct UPI Paid',
-                          () => setModalState(() => depositMode = 'Direct UPI Paid'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildDepositModeChip(
-                          'Collect at Check-In',
-                          depositMode == 'Collect at Check-In',
-                          () => setModalState(() => depositMode = 'Collect at Check-In'),
-                        ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 20),
 
-                  // 4. Big Action CTA
+                  // 3. Confirm Onboarding Action Button (Concise text, smoothly reachable)
                   ElevatedButton(
                     onPressed: () {
                       final assignedRoom = roomController.text.trim();
-                      final assignedBed = bedController.text.trim();
+                      final assignedSharing = sharingController.text.trim();
                       final finalRent = int.tryParse(rentController.text.replaceAll(',', '').replaceAll('₹', '')) ?? req['rent'];
                       final finalDeposit = int.tryParse(depositController.text.replaceAll(',', '').replaceAll('₹', '')) ?? req['deposit'];
 
@@ -412,20 +367,17 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                           'id': req['id'],
                           'name': req['name'],
                           'initials': req['initials'],
-                          'workTitle': req['workTitle'],
                           'phone': req['phone'],
                           'roomNumber': assignedRoom,
-                          'bedLabel': assignedBed,
-                          'sharingType': selectedSharing,
-                          'floor': req['floor'],
+                          'sharingType': assignedSharing,
                           'rent': finalRent,
                           'deposit': finalDeposit,
                           'status': 'approved',
                           'processedDate': 'Today',
-                          'auditNote': 'Approved & Assigned Room $assignedRoom ($assignedBed) by Bhargav (Owner)',
+                          'auditNote': 'Approved & Assigned Room $assignedRoom by Bhargav (Owner)',
                         });
                       });
-                      _showToast('✓ ${req['name']} Onboarded to Room $assignedRoom ($assignedBed) • App Access Unlocked');
+                      _showToast('✓ ${req['name']} Onboarded to Room $assignedRoom');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
@@ -435,8 +387,8 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                       elevation: 0,
                     ),
                     child: Text(
-                      'Confirm Onboarding & Unlock Resident App',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800),
+                      'Confirm Onboarding',
+                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -487,12 +439,9 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                           'id': req['id'],
                           'name': req['name'],
                           'initials': req['initials'],
-                          'workTitle': req['workTitle'],
                           'phone': req['phone'],
                           'roomNumber': req['roomNumber'],
-                          'bedLabel': req['bedLabel'],
                           'sharingType': req['sharingType'],
-                          'floor': req['floor'],
                           'rent': req['rent'],
                           'deposit': req['deposit'],
                           'status': 'rejected',
@@ -530,16 +479,15 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
 
     final filteredPending = _pendingList.where((item) {
       if (query.isEmpty) return true;
-      final name = (item['name'] as String).toLowerCase();
-      final room = (item['roomNumber'] as String).toLowerCase();
-      final work = (item['workTitle'] as String).toLowerCase();
-      return name.contains(query) || room.contains(query) || work.contains(query);
+      final name = (item['name'] as String? ?? '').toLowerCase();
+      final room = (item['roomNumber'] as String? ?? '').toLowerCase();
+      return name.contains(query) || room.contains(query);
     }).toList();
 
     final filteredHistory = _historyList.where((item) {
       if (query.isEmpty) return true;
-      final name = (item['name'] as String).toLowerCase();
-      final room = (item['roomNumber'] as String).toLowerCase();
+      final name = (item['name'] as String? ?? '').toLowerCase();
+      final room = (item['roomNumber'] as String? ?? '').toLowerCase();
       return name.contains(query) || room.contains(query);
     }).toList();
 
@@ -800,7 +748,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Top Row: Avatar + Name + Work Info
+          // 1. Top Row: Avatar + Name + Applied Time (No swiggy / software subtitle)
           Row(
             children: [
               Container(
@@ -840,7 +788,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      req['workTitle'],
+                      'Applied at ${req['appliedTime'] ?? '11:15 AM'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -856,83 +804,48 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
           ),
           const SizedBox(height: 12),
 
-          // 2. PROMINENT HIGH-CONTRAST ROOM & SHARING BLOCK (Visible & Bold)
+          // 2. ROOM & SHARING BLOCK (Clean text layout, no black pill, no bed, plain green text)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
               color: const Color(0xFFF9FAFB),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.ink,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'ROOM ${req['roomNumber']}',
-                              style: GoogleFonts.outfit(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
-                              '${req['sharingType']} • ${req['bedLabel']}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.outfit(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.2,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                          ),
-                        ],
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Room - ${req['roomNumber']}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                        color: AppColors.ink,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${req['floor']} • Applied ${req['appliedTime']}',
-                        style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.greenLight,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
-                  ),
-                  child: Text(
-                    '₹${(req['rent'] as int).toString()}/mo',
-                    style: GoogleFonts.outfit(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.greenDark,
                     ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Sharing - ${req['sharingType']}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '₹${(req['rent'] as int).toString()}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
+                    color: AppColors.greenDark,
                   ),
                 ),
               ],
@@ -964,56 +877,49 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
           ),
           const SizedBox(height: 12),
 
-          // 4. Contact Buttons (Placed DIRECTLY above Decision Row)
+          // 4. Contact Buttons (Icons only, no text)
           Row(
             children: [
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast('Calling ${req['name']}: +91${req['phone']}'),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    height: 38,
+                    height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                      color: AppColors.greenLight,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.phone_outlined, size: 14, color: AppColors.ink),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Call Tenant',
-                          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
-                        ),
-                      ],
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'assets/images/phone.svg',
+                        width: 17,
+                        height: 17,
+                        colorFilter: const ColorFilter.mode(AppColors.greenDark, BlendMode.srcIn),
+                      ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast('WhatsApp opened with ${req['name']}'),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    height: 38,
+                    height: 40,
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.greenDark),
-                        const SizedBox(width: 6),
-                        Text(
-                          'WhatsApp Chat',
-                          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.greenDark),
-                        ),
-                      ],
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'assets/images/whatsapp.svg',
+                        width: 17,
+                        height: 17,
+                      ),
                     ),
                   ),
                 ),
@@ -1151,7 +1057,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                         ),
                       ),
                       Text(
-                        'Room ${item['roomNumber']} (${item['bedLabel']}) • ${item['processedDate']}',
+                        'Room - ${item['roomNumber']} • ${item['sharingType'] ?? '2 Sharing'} • ${item['processedDate']}',
                         style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500),
                       ),
                     ],
@@ -1215,73 +1121,84 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   // REUSABLE BOTTOM SHEET HELPERS
   // ===========================================================================
   Widget _buildNativeBottomSheetWrapper({required String title, required Widget child}) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 38,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE5E7EB),
-                borderRadius: BorderRadius.circular(99),
-              ),
-            ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 14,
+            bottom: bottomInset > 0 ? bottomInset + 10 : (bottomPadding > 0 ? bottomPadding : 16),
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: GoogleFonts.outfit(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                    color: AppColors.ink,
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(99),
                   ),
                 ),
               ),
-              InkWell(
-                onTap: () => Navigator.of(context).pop(),
-                borderRadius: BorderRadius.circular(99),
-                child: Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                        color: AppColors.ink,
+                      ),
+                    ),
                   ),
-                  child: const Center(
-                    child: Icon(Icons.close, size: 15, color: AppColors.muted),
+                  InkWell(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(99),
+                    child: Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.close, size: 15, color: AppColors.muted),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Flexible(
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: child,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Flexible(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: child,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1320,31 +1237,6 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
           hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
           contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           border: InputBorder.none,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDepositModeChip(String label, bool isSelected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        height: 42,
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.ink : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isSelected ? AppColors.ink : const Color(0xFFE5E7EB)),
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: GoogleFonts.outfit(
-              fontSize: 11.5,
-              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-              color: isSelected ? Colors.white : AppColors.muted,
-            ),
-          ),
         ),
       ),
     );

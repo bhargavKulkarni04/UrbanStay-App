@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -20,10 +21,10 @@ class OwnerComplaintsScreen extends StatefulWidget {
   State<OwnerComplaintsScreen> createState() => _OwnerComplaintsScreenState();
 }
 
-class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  String _selectedCategory = 'all'; // 'all', 'electrical', 'plumbing', 'wifi', 'carpentry', 'cleaning'
-  String _selectedFloor = 'all'; // 'all', '1st', '2nd', '3rd', 'ground'
+class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
+  String _activeTab = 'active'; // 'active' | 'history'
+  String _selectedCategory = 'all';
+  String _selectedFloor = 'all';
 
   // Photo Viewer Modal Target
   Map<String, dynamic>? _activePhotoTarget;
@@ -148,12 +149,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with Sing
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -297,25 +296,12 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with Sing
       body: SafeArea(
         child: Column(
           children: [
-            // 1. Top Sticky Header
             _buildTopHeader(totalActive),
-
-            // 2. Dual Tab Selector (Active vs History)
             _buildTabBar(totalActive, resolvedCount),
-
-            // 3. Tab Views Body
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                physics: const BouncingScrollPhysics(),
-                children: [
-                  // TAB 1: ACTIVE TICKETS
-                  _buildActiveTicketsTab(pendingCount, inProgressCount),
-
-                  // TAB 2: RESOLUTION HISTORY LEDGER
-                  _buildHistoryTab(resolvedCount),
-                ],
-              ),
+              child: _activeTab == 'active'
+                  ? _buildActiveTicketsTab(pendingCount, inProgressCount)
+                  : _buildHistoryTab(resolvedCount),
             ),
           ],
         ),
@@ -417,12 +403,12 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with Sing
   }
 
   // ===========================================================================
-  // 2. DUAL TAB SELECTOR (Active vs History)
+  // 2. DUAL TAB SELECTOR — Icon + Text pill (matches rent/staff screen pattern)
   // ===========================================================================
   Widget _buildTabBar(int activeCount, int resolvedCount) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: Container(
         height: 42,
         padding: const EdgeInsets.all(3),
@@ -431,27 +417,90 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with Sing
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: const Color(0xFFE5E7EB)),
         ),
-        child: TabBar(
-          controller: _tabController,
-          indicator: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(9),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0A000000),
-                blurRadius: 4,
-                offset: Offset(0, 1),
+        child: Row(
+          children: [
+            // Active Tickets tab
+            Expanded(
+              child: InkWell(
+                onTap: () => setState(() => _activeTab = 'active'),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 7.5),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _activeTab == 'active' ? Colors.white : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: _activeTab == 'active'
+                        ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1))]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.build_outlined,
+                        size: 14,
+                        color: _activeTab == 'active' ? AppColors.greenDark : AppColors.muted,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Active Tickets ($activeCount)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: _activeTab == 'active' ? FontWeight.w800 : FontWeight.w600,
+                            color: _activeTab == 'active' ? AppColors.greenDark : AppColors.muted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
-          labelColor: AppColors.ink,
-          unselectedLabelColor: AppColors.muted,
-          labelStyle: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800),
-          unselectedLabelStyle: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600),
-          dividerColor: Colors.transparent,
-          tabs: [
-            Tab(text: 'Active Tickets ($activeCount)'),
-            Tab(text: 'Resolution History ($resolvedCount)'),
+            ),
+            // Resolution History tab
+            Expanded(
+              child: InkWell(
+                onTap: () => setState(() => _activeTab = 'history'),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 7.5),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _activeTab == 'history' ? Colors.white : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: _activeTab == 'history'
+                        ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1))]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.history_rounded,
+                        size: 14,
+                        color: _activeTab == 'history' ? AppColors.greenDark : AppColors.muted,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Resolution History ($resolvedCount)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: _activeTab == 'history' ? FontWeight.w800 : FontWeight.w600,
+                            color: _activeTab == 'history' ? AppColors.greenDark : AppColors.muted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -558,11 +607,11 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with Sing
     return Row(
       children: [
         Expanded(
-          child: _buildStatTile('$pendingCount', 'Pending Inspection', AppColors.danger),
+          child: _buildStatTile('$pendingCount', 'Pending Inspection', const Color(0xFFF97316)),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildStatTile('$inProgressCount', 'In Progress (Active)', const Color(0xFF92400E)),
+          child: _buildStatTile('$inProgressCount', 'In Progress (Active)', AppColors.green),
         ),
       ],
     );
@@ -803,9 +852,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with Sing
                       ],
                     ),
                     const SizedBox(height: 3),
-                    // Clear 3-Tier Hierarchy: Room 101 • 2-Sharing (Bed A) • 1st Floor • 2 hours ago
+                    // Room • Sharing • Floor • Time (bed removed)
                     Text(
-                      '${ticket['room']} • ${ticket['sharingType'] ?? '2-Sharing'} (${ticket['bed']}) • ${ticket['floor']} • ${ticket['reportedTime']}',
+                      '${ticket['room']} • ${ticket['sharingType'] ?? '2-Sharing'} • ${ticket['floor']} • ${ticket['reportedTime']}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted, fontWeight: FontWeight.w500),
@@ -918,28 +967,38 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with Sing
           ],
           const SizedBox(height: 12),
 
-          // Row 1: Side-by-Side [ 📞 Call ] and [ 💬 WhatsApp ]
+          // Row 1: Full-width SVG Call + WhatsApp buttons
           Row(
             children: [
+              // 📞 Call — full-width with SVG phone icon
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast('Calling ${ticket['residentName']}: +91${ticket['phone']}'),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    height: 38,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: const Color(0xFFE5E7EB)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.phone_outlined, size: 14, color: AppColors.ink),
-                        const SizedBox(width: 5),
+                        SvgPicture.asset(
+                          'assets/images/phone.svg',
+                          width: 18,
+                          height: 18,
+                          colorFilter: const ColorFilter.mode(AppColors.ink, BlendMode.srcIn),
+                        ),
+                        const SizedBox(width: 7),
                         Text(
-                          'Call Resident',
-                          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                          'Call',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
                         ),
                       ],
                     ),
@@ -947,26 +1006,35 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> with Sing
                 ),
               ),
               const SizedBox(width: 8),
-
+              // 💬 WhatsApp — full-width with SVG WhatsApp icon
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast('WhatsApp opened with ${ticket['residentName']} regarding ${ticket['category']}'),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    height: 38,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.greenDark),
-                        const SizedBox(width: 5),
+                        SvgPicture.asset(
+                          'assets/images/whatsapp.svg',
+                          width: 18,
+                          height: 18,
+                          colorFilter: const ColorFilter.mode(AppColors.greenDark, BlendMode.srcIn),
+                        ),
+                        const SizedBox(width: 7),
                         Text(
                           'WhatsApp',
-                          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.greenDark,
+                          ),
                         ),
                       ],
                     ),

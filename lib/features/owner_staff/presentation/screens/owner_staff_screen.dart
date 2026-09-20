@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 
@@ -123,6 +124,229 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
       staff['status'] = 'paid';
     });
     _showToast('₹${(staff['salary'] as int).toString()} Salary Approved for ${staff['name']} • Recorded in PG Expenses');
+  }
+
+  void _showSalaryApproveDialog(Map<String, dynamic> staff) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.greenLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFB8ECC8)),
+                ),
+                child: const Center(
+                  child: Icon(Icons.verified_outlined,
+                      size: 24, color: AppColors.greenDark),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Confirm Salary Approval',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Approve ₹${staff['salary']} salary payout for ${staff['name']} (${staff['workTitle']})?',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  color: AppColors.muted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => Navigator.of(dialogCtx).pop(),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(dialogCtx).pop();
+                        _approveSalary(staff);
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.green,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Yes, Confirm',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _revertToUnpaid(Map<String, dynamic> staff) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          contentPadding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.greenLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFB8ECC8)),
+                ),
+                child: const Center(
+                  child: Icon(Icons.edit_outlined,
+                      size: 24, color: AppColors.greenDark),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Revert to Unpaid?',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Mark ₹${staff['salary']} salary for ${staff['name']} back to Unpaid (Pending)?',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  color: AppColors.muted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => Navigator.of(dialogCtx).pop(),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(dialogCtx).pop();
+                        setState(() {
+                          staff['status'] = 'pending';
+                        });
+                        _showToast('${staff['name']}\'s salary reverted to Pending');
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.green,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'Yes, Revert',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   // ===========================================================================
@@ -377,7 +601,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     if (filtered.isEmpty)
                       _buildEmptyState('No staff members found matching your search.')
                     else
-                      ...filtered.map((s) => _buildStaffCard(s)).toList(),
+                      ...filtered.map((s) => _buildStaffCard(s)),
                   ],
                 ),
               ),
@@ -464,7 +688,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.ink,
+                color: AppColors.green,
                 borderRadius: BorderRadius.circular(99),
               ),
               child: Row(
@@ -491,15 +715,15 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     return Row(
       children: [
         Expanded(
-          child: _buildStatTile('${_staffList.length} Staff', 'Active Team', AppColors.ink),
+          child: _buildStatTile('${_staffList.length} Staff', 'Active Team', AppColors.greenDark),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildStatTile('₹${_totalPayroll.toString()}', 'Monthly Payroll', AppColors.ink),
+          child: _buildStatTile('₹${_totalPayroll.toString()}', 'Monthly Payroll', AppColors.greenDark),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildStatTile('₹${_pendingPayroll.toString()}', 'Pending Payout', const Color(0xFF92400E)),
+          child: _buildStatTile('₹${_pendingPayroll.toString()}', 'Pending Payout', AppColors.greenDark),
         ),
       ],
     );
@@ -577,10 +801,10 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.ink : Colors.white,
+                  color: isSelected ? AppColors.green : Colors.white,
                   borderRadius: BorderRadius.circular(99),
                   border: Border.all(
-                    color: isSelected ? AppColors.ink : const Color(0xFFE5E7EB),
+                    color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
                   ),
                 ),
                 child: Text(
@@ -726,11 +950,18 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.greenLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                        border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
                       ),
-                      child: const Icon(Icons.phone_outlined, size: 15, color: AppColors.ink),
+                      child: Center(
+                        child: SvgPicture.asset(
+                          'assets/images/phone.svg',
+                          width: 15,
+                          height: 15,
+                          colorFilter: const ColorFilter.mode(AppColors.greenDark, BlendMode.srcIn),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -745,7 +976,13 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
                       ),
-                      child: const Icon(Icons.chat_bubble_outline_rounded, size: 15, color: AppColors.greenDark),
+                      child: Center(
+                        child: SvgPicture.asset(
+                          'assets/images/whatsapp.svg',
+                          width: 15,
+                          height: 15,
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -754,7 +991,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Middle Salary Summary Box
+          // Middle Salary Summary Box (Amount in Green, No Month text)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
@@ -765,24 +1002,14 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      staff['month'] ?? 'August Salary',
-                      style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted, fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      '₹${(staff['salary'] as int).toString()}',
-                      style: GoogleFonts.outfit(
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.4,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                  ],
+                Text(
+                  '₹${(staff['salary'] as int).toString()}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.4,
+                    color: AppColors.greenDark,
+                  ),
                 ),
 
                 // Status Badge Pill
@@ -809,25 +1036,58 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
           ),
           const SizedBox(height: 10),
 
-          // Bottom Action Row
+          // Bottom Action Row (Approve with Confirmation Dialog & Revert to Unpaid Edit Action)
           if (isPaid)
             Container(
               height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
-              child: Center(
-                child: Text(
-                  'Salary Settled & Added to Expenses ✓',
-                  style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.greenDark),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Paid',
+                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                      ),
+                    ],
+                  ),
+                  InkWell(
+                    onTap: () => _revertToUnpaid(staff),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.edit_outlined, size: 12, color: AppColors.muted),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Revert to Unpaid',
+                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             )
           else
             InkWell(
-              onTap: () => _approveSalary(staff),
+              onTap: () => _showSalaryApproveDialog(staff),
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 height: 38,
@@ -835,16 +1095,11 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                   color: AppColors.green,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.check_circle_outline_rounded, size: 15, color: Colors.white),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Approve & Mark Paid (₹${(staff['salary'] as int).toString()})',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
-                    ),
-                  ],
+                child: Center(
+                  child: Text(
+                    'Approve',
+                    style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
+                  ),
                 ),
               ),
             ),

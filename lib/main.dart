@@ -12,6 +12,8 @@ import 'features/owner_rent/presentation/screens/owner_day_collection_screen.dar
 import 'features/tenant_dashboard/presentation/screens/tenant_dashboard_screen.dart';
 import 'features/tenant_payments/presentation/screens/rent_payment_screen.dart';
 
+import 'features/owner_billing/presentation/screens/owner_saas_billing_screen.dart';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -105,8 +107,8 @@ class UrbanStayApp extends StatelessWidget {
           child: content,
         );
       },
-      // 🏢 Owner Command Center Dashboard (Navigation Hub)
-      home: const OwnerDashboardScreen(),
+      // 🏢 Owner Details & Property Setup Wizard
+      home: const OwnerSetupScreen(),
     );
   }
 }
