@@ -32,7 +32,7 @@ class PaidViaCashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -76,43 +76,41 @@ class PaidViaCashScreen extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             children: [
-              // Notice Banner
+              // Clean White Notice Banner
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFFDE68A), width: 1),
+                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.security_rounded,
-                        size: 18, color: Color(0xFFD97706)),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Owner Cash Audit Reconciliation',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF92400E),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Submitting this form immediately flags the handover to $ownerName to verify notes and stamp your digital rent receipt.',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w400,
-                              color: const Color(0xFF78350F),
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'Cash Payment Verification',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Submit this form after handing cash at the reception desk. The owner will verify the amount and issue your digital rent receipt.',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.muted,
+                        height: 1.4,
                       ),
                     ),
                   ],

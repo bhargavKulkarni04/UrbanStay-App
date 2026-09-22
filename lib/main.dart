@@ -107,8 +107,8 @@ class UrbanStayApp extends StatelessWidget {
           child: content,
         );
       },
-      // 🏢 Owner Details & Property Setup Wizard
-      home: const OwnerSetupScreen(),
+      // 🏠 Tenant Dashboard (Resident Experience)
+      home: const TenantDashboardScreen(),
     );
   }
 }

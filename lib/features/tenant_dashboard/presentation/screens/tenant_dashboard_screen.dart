@@ -9,6 +9,9 @@ import '../../../tenant_payments/presentation/screens/security_deposit_screen.da
 import '../../../tenant_helpdesk/presentation/screens/raise_ticket_screen.dart';
 import '../../../tenant_helpdesk/presentation/screens/ticket_status_screen.dart';
 import '../../../tenant_helpdesk/presentation/screens/washing_machine_booking_screen.dart';
+import '../../../tenant_housekeeping/presentation/widgets/room_sweep_sheet.dart';
+import '../../../tenant_housekeeping/presentation/widgets/full_room_clean_sheet.dart';
+import '../../../tenant_housekeeping/presentation/widgets/bedsheet_change_sheet.dart';
 
 class TenantDashboardScreen extends StatefulWidget {
   final String tenantName;
@@ -37,7 +40,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   String _submittedScreenshot = 'gpay_receipt_room104.jpg';
   String _currentCycleMonth = 'September 2026';
   String _currentDueDate = '05 Sep';
-  double _currentRentAmount = 8500.0;
+  final double _currentRentAmount = 8500.0;
   Map<String, dynamic>? _activeTicket;
 
   void _simulateOwnerApproval() {
@@ -70,7 +73,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9), // Soft enterprise canvas
+      backgroundColor: Colors.white,
       bottomNavigationBar: _buildBottomNavigationBar(),
       body: Center(
         child: ConstrainedBox(
@@ -196,7 +199,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -223,7 +226,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                 ),
               ),
 
-              // Prominent & Clearly Visible Room & Bed Badge
+              // Prominent & Clearly Visible Room Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
@@ -234,24 +237,13 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                     width: 1,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.single_bed_rounded,
-                      size: 13,
-                      color: AppColors.greenDark,
-                    ),
-                    const SizedBox(width: 4.5),
-                    Text(
-                      'Room ${widget.roomNumber} - Bed ${widget.bedId}',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.greenDark,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Room ${widget.roomNumber}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.greenDark,
+                  ),
                 ),
               ),
             ],
@@ -733,28 +725,41 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       tabWidth: 155,
       title: 'Housekeeping',
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildItemButton(
-            icon: Icons.nightlight_round_outlined,
-            label: 'Cleaning\nDND Toggle',
-            onTap: () {},
-          ),
-          _buildItemButton(
             icon: Icons.cleaning_services_outlined,
             label: 'Room Sweep\nRequest',
-            onTap: () {},
+            onTap: () {
+              RoomSweepSheet.show(
+                context,
+                roomNumber: widget.roomNumber,
+                pgName: widget.pgName,
+              );
+            },
           ),
           _buildItemButton(
-            icon: Icons.sanitizer_outlined,
-            label: 'Deep\nSanitization',
-            onTap: () {},
+            icon: Icons.wash_outlined,
+            label: 'Full Room\nClean',
+            onTap: () {
+              FullRoomCleanSheet.show(
+                context,
+                roomNumber: widget.roomNumber,
+                pgName: widget.pgName,
+              );
+            },
           ),
           _buildItemButton(
             icon: Icons.bed_outlined,
-            label: 'Linen\nReplacement',
-            onTap: () {},
+            label: 'Bedsheet\nChange',
+            onTap: () {
+              BedsheetChangeSheet.show(
+                context,
+                roomNumber: widget.roomNumber,
+                pgName: widget.pgName,
+              );
+            },
           ),
         ],
       ),
@@ -1194,15 +1199,12 @@ class _FolderTabCard extends StatelessWidget {
 /// 📐 Custom Painter for the Stepped Folder Tab Silhouette
 class _FolderTabPainter extends CustomPainter {
   final double tabWidth;
-  final double shoulderDrop;
-  final Color backgroundColor;
-  final Color borderColor;
+  final double shoulderDrop = 16.0;
+  final Color backgroundColor = Colors.white;
+  final Color borderColor = const Color(0xFFE5E7EB);
 
   _FolderTabPainter({
     required this.tabWidth,
-    this.shoulderDrop = 16.0,
-    this.backgroundColor = Colors.white,
-    this.borderColor = const Color(0xFFE5E7EB),
   });
 
   @override

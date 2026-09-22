@@ -42,7 +42,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       'floor': '2nd Floor',
       'category': 'Electrical',
       'categoryIcon': Icons.bolt_outlined,
-      'issue': 'Geyser in bathroom is tripping the MCB switch every 2 minutes. Unable to get hot water.',
+      'issue':
+          'Geyser in bathroom is tripping the MCB switch every 2 minutes. Unable to get hot water.',
       'reportedTime': '2 hours ago',
       'reportedDate': '28 Aug 2026, 08:30 AM',
       'photoName': 'geyser_mcb_issue.jpg',
@@ -60,7 +61,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       'floor': '1st Floor',
       'category': 'Plumbing',
       'categoryIcon': Icons.plumbing_outlined,
-      'issue': 'Washbasin tap is continuously leaking and making noise throughout the night.',
+      'issue':
+          'Washbasin tap is continuously leaking and making noise throughout the night.',
       'reportedTime': '4 hours ago',
       'reportedDate': '28 Aug 2026, 06:15 AM',
       'photoName': 'tap_leak_photo.jpg',
@@ -101,11 +103,13 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       'floor': '1st Floor',
       'category': 'WiFi',
       'categoryIcon': Icons.wifi_outlined,
-      'issue': '1st floor Wi-Fi access point was blinking red and dropping connection.',
+      'issue':
+          '1st floor Wi-Fi access point was blinking red and dropping connection.',
       'reportedDate': '26 Aug, 11:20 AM',
       'resolvedDate': 'Resolved 26 Aug, 01:10 PM',
       'resolvedBy': 'Resolved by Owner',
-      'resolutionNote': 'Router rebooted and static DNS configured. Speed verified at 120 Mbps.',
+      'resolutionNote':
+          'Router rebooted and static DNS configured. Speed verified at 120 Mbps.',
       'status': 'resolved',
     },
     {
@@ -123,7 +127,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       'reportedDate': '25 Aug, 07:00 PM',
       'resolvedDate': 'Resolved 26 Aug, 10:00 AM',
       'resolvedBy': 'Resolved by Electrician',
-      'resolutionNote': 'Replaced damaged driver with new 15W unit. Tested and confirmed with tenant.',
+      'resolutionNote':
+          'Replaced damaged driver with new 15W unit. Tested and confirmed with tenant.',
       'status': 'resolved',
     },
     {
@@ -141,7 +146,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       'reportedDate': '24 Aug, 09:30 AM',
       'resolvedDate': 'Resolved 24 Aug, 11:00 AM',
       'resolvedBy': 'Resolved by Housekeeping',
-      'resolutionNote': 'Drain cleared and mesh filter reinstalled to prevent leaf blockages.',
+      'resolutionNote':
+          'Drain cleared and mesh filter reinstalled to prevent leaf blockages.',
       'status': 'resolved',
     },
   ];
@@ -162,7 +168,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         duration: const Duration(seconds: 2),
@@ -179,7 +186,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       ticket['status'] = 'in_progress';
       ticket['progressNote'] = 'Acknowledged by Owner • Work in progress';
     });
-    _showToast('Marked In Progress! ${ticket['residentName']} notified on WhatsApp.');
+    _showToast(
+        'Marked In Progress! ${ticket['residentName']} notified on WhatsApp.');
   }
 
   // 1-Tap Mark Resolved (Migrates from Active to History)
@@ -201,7 +209,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
         'reportedDate': ticket['reportedTime'] ?? 'Today',
         'resolvedDate': 'Resolved Today, Just Now',
         'resolvedBy': 'Resolved by Owner',
-        'resolutionNote': 'Issue inspected and fixed. Tenant notified on WhatsApp.',
+        'resolutionNote':
+            'Issue inspected and fixed. Tenant notified on WhatsApp.',
         'status': 'resolved',
       });
     });
@@ -235,45 +244,54 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(ticket['categoryIcon'] ?? Icons.image_outlined, size: 48, color: AppColors.muted),
+                    Icon(ticket['categoryIcon'] ?? Icons.image_outlined,
+                        size: 48, color: AppColors.muted),
                     const SizedBox(height: 10),
                     Text(
                       ticket['photoName'] ?? 'damage_proof.jpg',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Captured by Resident via UrbanStay Tenant App',
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11, color: AppColors.muted),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
-
               Text(
                 'Issue Summary',
-                style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                style: GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted),
               ),
               const SizedBox(height: 4),
               Text(
                 ticket['issue'],
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, height: 1.4),
+                style: GoogleFonts.outfit(
+                    fontSize: 13, color: AppColors.ink, height: 1.4),
               ),
               const SizedBox(height: 18),
-
               ElevatedButton(
                 onPressed: () => Navigator.of(ctx).pop(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.ink,
                   foregroundColor: Colors.white,
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
                 child: Text(
                   'Close Preview',
-                  style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13.5, fontWeight: FontWeight.w700),
                 ),
               ),
               const SizedBox(height: 24),
@@ -286,8 +304,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pendingCount = _activeTickets.where((t) => t['status'] == 'pending').length;
-    final inProgressCount = _activeTickets.where((t) => t['status'] == 'in_progress').length;
+    final pendingCount =
+        _activeTickets.where((t) => t['status'] == 'pending').length;
+    final inProgressCount =
+        _activeTickets.where((t) => t['status'] == 'in_progress').length;
     final totalActive = pendingCount + inProgressCount;
     final resolvedCount = _historyTickets.length;
 
@@ -317,7 +337,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -348,11 +369,11 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+                  child: const Icon(Icons.arrow_back_rounded,
+                      size: 18, color: AppColors.ink),
                 ),
               ),
               const SizedBox(width: 12),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -382,10 +403,14 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: activeCount > 0 ? const Color(0xFFFFFBEB) : AppColors.greenLight,
+              color: activeCount > 0
+                  ? const Color(0xFFFFFBEB)
+                  : AppColors.greenLight,
               borderRadius: BorderRadius.circular(99),
               border: Border.all(
-                color: activeCount > 0 ? const Color(0xFFFDE68A) : AppColors.green.withValues(alpha: 0.3),
+                color: activeCount > 0
+                    ? const Color(0xFFFDE68A)
+                    : AppColors.green.withValues(alpha: 0.3),
               ),
             ),
             child: Text(
@@ -393,7 +418,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               style: GoogleFonts.outfit(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
-                color: activeCount > 0 ? const Color(0xFF92400E) : AppColors.greenDark,
+                color: activeCount > 0
+                    ? const Color(0xFF92400E)
+                    : AppColors.greenDark,
               ),
             ),
           ),
@@ -428,10 +455,17 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 7.5),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _activeTab == 'active' ? Colors.white : Colors.transparent,
+                    color: _activeTab == 'active'
+                        ? Colors.white
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: _activeTab == 'active'
-                        ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1))]
+                        ? const [
+                            BoxShadow(
+                                color: Color(0x08000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 1))
+                          ]
                         : null,
                   ),
                   child: Row(
@@ -440,7 +474,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                       Icon(
                         Icons.build_outlined,
                         size: 14,
-                        color: _activeTab == 'active' ? AppColors.greenDark : AppColors.muted,
+                        color: _activeTab == 'active'
+                            ? AppColors.greenDark
+                            : AppColors.muted,
                       ),
                       const SizedBox(width: 6),
                       Flexible(
@@ -450,8 +486,12 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.outfit(
                             fontSize: 12,
-                            fontWeight: _activeTab == 'active' ? FontWeight.w800 : FontWeight.w600,
-                            color: _activeTab == 'active' ? AppColors.greenDark : AppColors.muted,
+                            fontWeight: _activeTab == 'active'
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: _activeTab == 'active'
+                                ? AppColors.greenDark
+                                : AppColors.muted,
                           ),
                         ),
                       ),
@@ -469,10 +509,17 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 7.5),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: _activeTab == 'history' ? Colors.white : Colors.transparent,
+                    color: _activeTab == 'history'
+                        ? Colors.white
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                     boxShadow: _activeTab == 'history'
-                        ? const [BoxShadow(color: Color(0x08000000), blurRadius: 4, offset: Offset(0, 1))]
+                        ? const [
+                            BoxShadow(
+                                color: Color(0x08000000),
+                                blurRadius: 4,
+                                offset: Offset(0, 1))
+                          ]
                         : null,
                   ),
                   child: Row(
@@ -481,7 +528,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                       Icon(
                         Icons.history_rounded,
                         size: 14,
-                        color: _activeTab == 'history' ? AppColors.greenDark : AppColors.muted,
+                        color: _activeTab == 'history'
+                            ? AppColors.greenDark
+                            : AppColors.muted,
                       ),
                       const SizedBox(width: 6),
                       Flexible(
@@ -491,8 +540,12 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.outfit(
                             fontSize: 12,
-                            fontWeight: _activeTab == 'history' ? FontWeight.w800 : FontWeight.w600,
-                            color: _activeTab == 'history' ? AppColors.greenDark : AppColors.muted,
+                            fontWeight: _activeTab == 'history'
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: _activeTab == 'history'
+                                ? AppColors.greenDark
+                                : AppColors.muted,
                           ),
                         ),
                       ),
@@ -512,8 +565,12 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   // ===========================================================================
   Widget _buildActiveTicketsTab(int pendingCount, int inProgressCount) {
     final filtered = _activeTickets.where((t) {
-      if (_selectedFloor != 'all' && !(t['floor'] as String).toLowerCase().contains(_selectedFloor)) return false;
-      if (_selectedCategory != 'all' && (t['category'] as String).toLowerCase() != _selectedCategory) return false;
+      if (_selectedFloor != 'all' &&
+          !(t['floor'] as String).toLowerCase().contains(_selectedFloor))
+        return false;
+      if (_selectedCategory != 'all' &&
+          (t['category'] as String).toLowerCase() != _selectedCategory)
+        return false;
       return true;
     }).toList();
 
@@ -539,7 +596,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
           if (filtered.isEmpty)
             _buildEmptyState('No active maintenance tickets found.')
           else
-            ...filtered.map((ticket) => _buildActiveTicketCard(ticket)).toList(),
+            ...filtered
+                .map((ticket) => _buildActiveTicketCard(ticket))
+                .toList(),
         ],
       ),
     );
@@ -550,8 +609,12 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   // ===========================================================================
   Widget _buildHistoryTab(int resolvedCount) {
     final filtered = _historyTickets.where((t) {
-      if (_selectedFloor != 'all' && !(t['floor'] as String).toLowerCase().contains(_selectedFloor)) return false;
-      if (_selectedCategory != 'all' && (t['category'] as String).toLowerCase() != _selectedCategory) return false;
+      if (_selectedFloor != 'all' &&
+          !(t['floor'] as String).toLowerCase().contains(_selectedFloor))
+        return false;
+      if (_selectedCategory != 'all' &&
+          (t['category'] as String).toLowerCase() != _selectedCategory)
+        return false;
       return true;
     }).toList();
 
@@ -571,12 +634,16 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.history_rounded, size: 16, color: AppColors.muted),
+                const Icon(Icons.history_rounded,
+                    size: 16, color: AppColors.muted),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Audit Ledger: Showing all $resolvedCount resolved repairs with full completion audit.',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.inkSecondary),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.inkSecondary),
                   ),
                 ),
               ],
@@ -594,7 +661,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
           if (filtered.isEmpty)
             _buildEmptyState('No resolution history records found.')
           else
-            ...filtered.map((ticket) => _buildHistoryTicketCard(ticket)).toList(),
+            ...filtered
+                .map((ticket) => _buildHistoryTicketCard(ticket))
+                .toList(),
         ],
       ),
     );
@@ -607,11 +676,13 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
     return Row(
       children: [
         Expanded(
-          child: _buildStatTile('$pendingCount', 'Pending Inspection', const Color(0xFFF97316)),
+          child: _buildStatTile(
+              '$pendingCount', 'Pending Inspection', const Color(0xFFF97316)),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildStatTile('$inProgressCount', 'In Progress (Active)', AppColors.green),
+          child: _buildStatTile(
+              '$inProgressCount', 'In Progress (Active)', AppColors.green),
         ),
       ],
     );
@@ -688,12 +759,14 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               },
               borderRadius: BorderRadius.circular(99),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.green : Colors.white,
                   borderRadius: BorderRadius.circular(99),
                   border: Border.all(
-                    color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                    color:
+                        isSelected ? AppColors.green : const Color(0xFFE5E7EB),
                   ),
                 ),
                 child: Text(
@@ -739,7 +812,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               },
               borderRadius: BorderRadius.circular(99),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.ink : Colors.white,
                   borderRadius: BorderRadius.circular(99),
@@ -798,7 +872,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF9FAFB),
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+                  border:
+                      Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
                 ),
                 child: Center(
                   child: Text(
@@ -835,7 +910,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(4),
@@ -857,7 +933,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                       '${ticket['room']} • ${ticket['sharingType'] ?? '2-Sharing'} • ${ticket['floor']} • ${ticket['reportedTime']}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -868,10 +947,14 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isPending ? const Color(0xFFFFFBEB) : AppColors.greenLight,
+                  color: isPending
+                      ? const Color(0xFFFFFBEB)
+                      : AppColors.greenLight,
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(
-                    color: isPending ? const Color(0xFFFDE68A) : AppColors.green.withValues(alpha: 0.25),
+                    color: isPending
+                        ? const Color(0xFFFDE68A)
+                        : AppColors.green.withValues(alpha: 0.25),
                   ),
                 ),
                 child: Text(
@@ -879,7 +962,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                   style: GoogleFonts.outfit(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: isPending ? const Color(0xFF92400E) : AppColors.greenDark,
+                    color: isPending
+                        ? const Color(0xFF92400E)
+                        : AppColors.greenDark,
                   ),
                 ),
               ),
@@ -918,12 +1003,16 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.schedule_rounded, size: 13, color: Color(0xFFD97706)),
+                  const Icon(Icons.schedule_rounded,
+                      size: 13, color: Color(0xFFD97706)),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       ticket['progressNote'],
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: const Color(0xFF92400E)),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF92400E)),
                     ),
                   ),
                 ],
@@ -946,11 +1035,15 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.image_outlined, size: 15, color: AppColors.muted),
+                      const Icon(Icons.image_outlined,
+                          size: 15, color: AppColors.muted),
                       const SizedBox(width: 6),
                       Text(
                         ticket['photoName'],
-                        style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.ink, fontWeight: FontWeight.w500),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            color: AppColors.ink,
+                            fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -958,7 +1051,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                     onTap: () => _openPhotoModal(ticket),
                     child: Text(
                       'View Photo',
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.greenDark),
                     ),
                   ),
                 ],
@@ -973,7 +1069,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               // 📞 Call — full-width with SVG phone icon
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('Calling ${ticket['residentName']}: +91${ticket['phone']}'),
+                  onTap: () => _showToast(
+                      'Calling ${ticket['residentName']}: +91${ticket['phone']}'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 44,
@@ -989,7 +1086,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                           'assets/images/phone.svg',
                           width: 18,
                           height: 18,
-                          colorFilter: const ColorFilter.mode(AppColors.ink, BlendMode.srcIn),
+                          colorFilter: const ColorFilter.mode(
+                              AppColors.ink, BlendMode.srcIn),
                         ),
                         const SizedBox(width: 7),
                         Text(
@@ -1009,14 +1107,16 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               // 💬 WhatsApp — full-width with SVG WhatsApp icon
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('WhatsApp opened with ${ticket['residentName']} regarding ${ticket['category']}'),
+                  onTap: () => _showToast(
+                      'WhatsApp opened with ${ticket['residentName']} regarding ${ticket['category']}'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 44,
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -1025,7 +1125,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                           'assets/images/whatsapp.svg',
                           width: 18,
                           height: 18,
-                          colorFilter: const ColorFilter.mode(AppColors.greenDark, BlendMode.srcIn),
+                          colorFilter: const ColorFilter.mode(
+                              AppColors.greenDark, BlendMode.srcIn),
                         ),
                         const SizedBox(width: 7),
                         Text(
@@ -1075,7 +1176,6 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 ),
                 const SizedBox(width: 8),
               ],
-
               Expanded(
                 child: InkWell(
                   onTap: () => _markResolved(ticket),
@@ -1089,7 +1189,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                     child: Center(
                       child: Text(
                         'Mark Resolved',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white),
+                        style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white),
                       ),
                     ),
                   ),
@@ -1128,12 +1231,16 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.greenLight,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
+                  border: Border.all(
+                      color: AppColors.green.withValues(alpha: 0.25)),
                 ),
                 child: Center(
                   child: Text(
                     ticket['initials'] ?? 'RS',
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.greenDark),
                   ),
                 ),
               ),
@@ -1161,14 +1268,18 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 1.5),
                           decoration: BoxDecoration(
                             color: const Color(0xFFE5E7EB),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             ticket['category'],
-                            style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                            style: GoogleFonts.outfit(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink),
                           ),
                         ),
                       ],
@@ -1179,7 +1290,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                       '${ticket['room']} • ${ticket['sharingType'] ?? '2-Sharing'} (${ticket['bed']}) • ${ticket['resolvedDate']}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11, color: AppColors.muted),
                     ),
                   ],
                 ),
@@ -1195,7 +1307,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 ),
                 child: Text(
                   'Resolved',
-                  style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                  style: GoogleFonts.outfit(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.greenDark),
                 ),
               ),
             ],
@@ -1205,7 +1320,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
           // Issue Text
           Text(
             ticket['issue'],
-            style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.inkSecondary, height: 1.35),
+            style: GoogleFonts.outfit(
+                fontSize: 12.5, color: AppColors.inkSecondary, height: 1.35),
           ),
           const SizedBox(height: 10),
 
@@ -1225,11 +1341,17 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                   children: [
                     Text(
                       ticket['resolvedBy'],
-                      style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.greenDark),
                     ),
                     Text(
                       'Tenant Notified ✓',
-                      style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.muted),
                     ),
                   ],
                 ),
@@ -1237,7 +1359,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                   const SizedBox(height: 4),
                   Text(
                     ticket['resolutionNote'],
-                    style: GoogleFonts.outfit(fontSize: 11, color: AppColors.inkSecondary, height: 1.3),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        color: AppColors.inkSecondary,
+                        height: 1.3),
                   ),
                 ],
               ],
@@ -1254,12 +1379,16 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       alignment: Alignment.center,
       child: Column(
         children: [
-          const Icon(Icons.check_circle_outline_rounded, size: 40, color: AppColors.green),
+          const Icon(Icons.check_circle_outline_rounded,
+              size: 40, color: AppColors.green),
           const SizedBox(height: 10),
           Text(
             msg,
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.muted),
+            style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.muted),
           ),
         ],
       ),
@@ -1269,9 +1398,11 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   // ===========================================================================
   // REUSABLE NATIVE MODAL WRAPPER
   // ===========================================================================
-  Widget _buildNativeBottomSheetWrapper({required String title, required Widget child}) {
+  Widget _buildNativeBottomSheetWrapper(
+      {required String title, required Widget child}) {
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

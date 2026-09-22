@@ -227,7 +227,7 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
@@ -239,37 +239,36 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
                     Text(
                       widget.residentName,
                       style: GoogleFonts.outfit(
-                        fontSize: 13.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppColors.ink,
                       ),
                     ),
-                    Text(
-                      widget.pgName,
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.greenDark,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.green,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        widget.pgName,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
+                const SizedBox(height: 5),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Room ${widget.roomNumber} • ${widget.floor} • Bed ${widget.bedId}',
+                      'Room ${widget.roomNumber}',
                       style: GoogleFonts.outfit(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                    Text(
-                      widget.sharingType,
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: AppColors.muted,
                       ),
@@ -506,13 +505,13 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
 
           const SizedBox(height: 20),
 
-          // 5. Grounded Dark Action Button (Identical to paid_via_cash_card.dart)
+          // 5. Green Action Button
           SizedBox(
             height: 48,
             child: ElevatedButton(
               onPressed: _isSubmitting ? null : _handleSubmit,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.ink,
+                backgroundColor: AppColors.green,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -570,12 +569,12 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected
-                ? AppColors.greenLight
-                : const Color(0xFFF9FAFB),
+                ? AppColors.green
+                : Colors.white,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected ? AppColors.green : const Color(0xFFD1D5DB),
-              width: isSelected ? 1.4 : 1.0,
+              color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+              width: 1.0,
             ),
           ),
           child: Text(
@@ -583,7 +582,7 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
             style: GoogleFonts.outfit(
               fontSize: 12.5,
               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected ? AppColors.greenDark : AppColors.ink,
+              color: isSelected ? Colors.white : AppColors.ink,
             ),
           ),
         ),

@@ -41,15 +41,19 @@ class PaidViaCashCard extends StatefulWidget {
 class _PaidViaCashCardState extends State<PaidViaCashCard> {
   late bool _isExpanded;
   late String _selectedRecipient;
-  final TextEditingController _customRecipientController = TextEditingController();
+  final TextEditingController _customRecipientController =
+      TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
-  final String _cashDate = '13 Sep 2026';
+  DateTime _selectedDate = DateTime(2026, 9, 13);
+  late String _selectedRentMonth;
 
   @override
   void initState() {
     super.initState();
     _isExpanded = widget.initiallyExpanded;
     _selectedRecipient = '${widget.defaultOwnerName} (Owner)';
+    final parts = widget.cycleMonth.split(' ');
+    _selectedRentMonth = parts.isNotEmpty ? parts.first : 'September';
   }
 
   @override
@@ -59,9 +63,52 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
     super.dispose();
   }
 
-  void _submit() {
-    String recipient = _selectedRecipient;
-    if (recipient == 'Other / Custom Person...') {
+  String _formatDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: AppColors.green,
+              onPrimary: Colors.white,
+              onSurface: AppColors.ink,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+
+  void _showConfirmationDialog() {
+    if (_selectedRecipient == 'Other / Custom Person...') {
       final custom = _customRecipientController.text.trim();
       if (custom.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -76,6 +123,101 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
         );
         return;
       }
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          'Confirm Cash Payment',
+          style: GoogleFonts.outfit(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ink,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to record this cash payment to $_selectedRecipient?',
+          style: GoogleFonts.outfit(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w400,
+            color: const Color(0xFF4B5563),
+            height: 1.4,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.ink,
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      _submit();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.green,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Yes, Confirm',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _submit() {
+    String recipient = _selectedRecipient;
+    if (recipient == 'Other / Custom Person...') {
+      final custom = _customRecipientController.text.trim();
+      if (custom.isEmpty) {
+        return;
+      }
       recipient = custom;
     }
 
@@ -85,12 +227,11 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
       'paymentMode': 'CASH',
       'amount': widget.amount,
       'recipient': recipient,
-      'date': _cashDate,
+      'date': _formatDate(_selectedDate),
+      'cycleMonth': _selectedRentMonth,
       'remarks': _remarksController.text.trim(),
       'residentName': widget.residentName,
       'room': widget.roomNumber,
-      'floor': widget.floor,
-      'bed': widget.bedId,
     };
 
     widget.onCashSubmitted(payload);
@@ -115,7 +256,7 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 1. Accordion Header
+          // 1. Accordion Header (No payment icon)
           InkWell(
             onTap: () {
               setState(() => _isExpanded = !_isExpanded);
@@ -123,20 +264,6 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
             borderRadius: BorderRadius.circular(8),
             child: Row(
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.payments_outlined,
-                    color: AppColors.ink,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,7 +277,7 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
                           letterSpacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 1),
+                      const SizedBox(height: 2),
                       Text(
                         'Record cash handover to owner, warden or relative',
                         style: GoogleFonts.outfit(
@@ -179,11 +306,11 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
             const Divider(height: 1, color: Color(0xFFF3F4F6)),
             const SizedBox(height: 14),
 
-            // Pre-added Lease & Room Details Summary Strip (Clean standard app pattern)
+            // Pre-added Lease & Room Details Summary Strip (Pure white, clean borders)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
@@ -195,37 +322,37 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
                       Text(
                         widget.residentName,
                         style: GoogleFonts.outfit(
-                          fontSize: 13.5,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.ink,
+                          color: AppColors.greenDark,
                         ),
                       ),
                       Text(
                         AppCurrency.format(widget.amount),
                         style: GoogleFonts.outfit(
-                          fontSize: 16,
+                          fontSize: 15.5,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.greenDark,
+                          color: AppColors.ink,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 5),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Room ${widget.roomNumber} • ${widget.floor} • Bed ${widget.bedId}',
+                        'Room ${widget.roomNumber}',
                         style: GoogleFonts.outfit(
-                          fontSize: 11.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: AppColors.muted,
                         ),
                       ),
                       Text(
-                        '${widget.cycleMonth} Rent',
+                        _selectedRentMonth,
                         style: GoogleFonts.outfit(
-                          fontSize: 11,
+                          fontSize: 12,
                           fontWeight: FontWeight.w500,
                           color: AppColors.muted,
                         ),
@@ -251,9 +378,9 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFD1D5DB)),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -308,14 +435,16 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: TextField(
                   controller: _customRecipientController,
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13, fontWeight: FontWeight.w600),
                   decoration: const InputDecoration(
                     hintText: "e.g. Owner's Father, Brother, Relative",
-                    hintStyle: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                    hintStyle:
+                        TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
                     border: InputBorder.none,
                   ),
                 ),
@@ -324,7 +453,7 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
 
             const SizedBox(height: 12),
 
-            // Handover Date
+            // Handover Date (Interactive with real date picker)
             Text(
               'Handover Date',
               style: GoogleFonts.outfit(
@@ -334,26 +463,32 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
               ),
             ),
             const SizedBox(height: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFD1D5DB)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _cashDate,
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ink,
+            InkWell(
+              onTap: _pickDate,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _formatDate(_selectedDate),
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink,
+                      ),
                     ),
-                  ),
-                  const Icon(Icons.calendar_today_rounded, size: 15, color: AppColors.muted),
-                ],
+                    const Icon(Icons.calendar_today_rounded,
+                        size: 15, color: AppColors.muted),
+                  ],
+                ),
               ),
             ),
 
@@ -374,7 +509,7 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFD1D5DB)),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
               child: TextField(
                 controller: _remarksController,
@@ -390,17 +525,18 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
 
             const SizedBox(height: 16),
 
-            // Submit Cash Button
+            // Record Cash Payment Button (Green bg, white text, no amount, triggers confirmation modal)
             ElevatedButton(
-              onPressed: _submit,
+              onPressed: _showConfirmationDialog,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF111111),
+                backgroundColor: AppColors.green,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
               child: Text(
-                'Record Cash Payment (${AppCurrency.format(widget.amount)})',
+                'Record Cash Payment',
                 style: GoogleFonts.outfit(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,

@@ -11,7 +11,7 @@ class PaymentLedgerScreen extends StatefulWidget {
     super.key,
     this.roomNumber = '104',
     this.bedLabel = 'Bed B',
-    this.propertyName = 'UrbanStay Prime',
+    this.propertyName = 'UrbanStay Premium PG',
   });
 
   @override
@@ -19,11 +19,7 @@ class PaymentLedgerScreen extends StatefulWidget {
 }
 
 class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
-  String _selectedFilter = 'All';
-
-  final List<String> _filters = ['All', 'Rent', 'Security Deposit', 'Maintenance'];
-
-  // Verified transaction records
+  // Verified transaction records (Supporting both UPI and Cash)
   late final List<LedgerRecord> _transactions = [
     LedgerRecord(
       id: 'TXN-2026-09-104',
@@ -31,27 +27,28 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
       category: 'Rent',
       amount: 8500.0,
       timestamp: '03 Sep 2026, 11:24 AM',
-      method: 'Google Pay (UPI)',
+      method: 'UPI',
       utrNumber: '425689104231',
       status: LedgerStatus.verified,
       receiptNumber: 'REC-2026-09-0104',
       hasProofScreenshot: true,
-      screenshotLabel: 'GPay_Payment_Sep2026.png',
-      screenshotDetails: 'Google Pay • Ref: 425689104231 • ₹8,500.00',
+      screenshotLabel: 'UPI_Payment_Sep2026.png',
+      screenshotDetails: 'UPI • Ref: 425689104231 • ₹8,500.00',
     ),
     LedgerRecord(
-      id: 'TXN-2026-08-104',
+      id: 'TXN-2026-08-104-CSH',
       title: 'August 2026 Rent',
       category: 'Rent',
       amount: 8500.0,
       timestamp: '04 Aug 2026, 07:15 PM',
-      method: 'PhonePe (UPI)',
-      utrNumber: '421890334812',
+      method: 'Cash',
+      utrNumber: 'CSH-REC-8412',
+      recipient: 'Arun Kumar (Owner)',
       status: LedgerStatus.verified,
       receiptNumber: 'REC-2026-08-0104',
       hasProofScreenshot: true,
-      screenshotLabel: 'PhonePe_Receipt_Aug2026.png',
-      screenshotDetails: 'PhonePe • Ref: 421890334812 • ₹8,500.00',
+      screenshotLabel: 'Cash_Handover_Aug2026.pdf',
+      screenshotDetails: 'Cash Handover • Arun Kumar (Owner) • ₹8,500.00',
     ),
     LedgerRecord(
       id: 'TXN-2026-07-104',
@@ -59,13 +56,13 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
       category: 'Rent',
       amount: 8500.0,
       timestamp: '05 Jul 2026, 09:42 AM',
-      method: 'Paytm (UPI)',
+      method: 'UPI',
       utrNumber: '418765432190',
       status: LedgerStatus.verified,
       receiptNumber: 'REC-2026-07-0104',
       hasProofScreenshot: true,
-      screenshotLabel: 'Paytm_Payment_Jul2026.png',
-      screenshotDetails: 'Paytm • Ref: 418765432190 • ₹8,500.00',
+      screenshotLabel: 'UPI_Receipt_Jul2026.png',
+      screenshotDetails: 'UPI • Ref: 418765432190 • ₹8,500.00',
     ),
     LedgerRecord(
       id: 'TXN-2026-04-104-DEP',
@@ -82,11 +79,6 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
       screenshotDetails: 'HDFC IMPS • Ref: 409123847561 • ₹15,000.00',
     ),
   ];
-
-  List<LedgerRecord> get _filteredTransactions {
-    if (_selectedFilter == 'All') return _transactions;
-    return _transactions.where((t) => t.category == _selectedFilter).toList();
-  }
 
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
@@ -141,39 +133,31 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: Colors.white,
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 480),
           decoration: const BoxDecoration(
-            color: Color(0xFFF4F6F9),
+            color: Colors.white,
             border: Border.symmetric(
               vertical: BorderSide(color: Color(0xFFE5E7EB), width: 1),
             ),
           ),
           child: Scaffold(
-            backgroundColor: const Color(0xFFF4F6F9),
+            backgroundColor: Colors.white,
             appBar: _buildAppBar(),
             body: SafeArea(
-              child: Column(
-                children: [
-                  _buildFilterBar(),
-                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                  Expanded(
-                    child: _filteredTransactions.isEmpty
-                        ? _buildEmptyState()
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                            itemCount: _filteredTransactions.length,
-                            separatorBuilder: (context, index) => const SizedBox(height: 14),
-                            itemBuilder: (context, index) {
-                              final record = _filteredTransactions[index];
-                              return _buildTransactionCard(record);
-                            },
-                          ),
-                  ),
-                ],
-              ),
+              child: _transactions.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                      itemCount: _transactions.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: 14),
+                      itemBuilder: (context, index) {
+                        final record = _transactions[index];
+                        return _buildTransactionCard(record);
+                      },
+                    ),
             ),
           ),
         ),
@@ -205,7 +189,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
           ),
           const SizedBox(height: 1),
           Text(
-            '${widget.propertyName} • Room ${widget.roomNumber} - ${widget.bedLabel}',
+            '${widget.propertyName} • Room ${widget.roomNumber}',
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.w500,
@@ -221,55 +205,10 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
     );
   }
 
-  Widget _buildFilterBar() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        child: Row(
-          children: _filters.map((filter) {
-            final isSelected = _selectedFilter == filter;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: InkWell(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _selectedFilter = filter);
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF111111) : const Color(0xFFF4F6F9),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? const Color(0xFF111111) : const Color(0xFFE5E7EB),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    filter,
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                      color: isSelected ? Colors.white : const Color(0xFF6B7280),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
   Widget _buildTransactionCard(LedgerRecord record) {
     final isVerified = record.status == LedgerStatus.verified;
     final isUnderReview = record.status == LedgerStatus.underReview;
+    final isCash = record.method.toLowerCase().contains('cash');
 
     return Container(
       decoration: BoxDecoration(
@@ -288,7 +227,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Title, Amount & Verification Chip
+          // 1. Title & Amount (Verified badge moved below payment proof)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -317,60 +256,13 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '₹${record.amount.toStringAsFixed(0)}',
-                    style: GoogleFonts.outfit(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF08A63F),
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                    decoration: BoxDecoration(
-                      color: isVerified
-                          ? const Color(0xFFEBF8EE)
-                          : (isUnderReview ? const Color(0xFFFEF3C7) : const Color(0xFFF3F4F6)),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: isVerified
-                            ? const Color(0xFF08A63F).withOpacity(0.2)
-                            : (isUnderReview ? const Color(0xFFF59E0B).withOpacity(0.25) : const Color(0xFFE5E7EB)),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isVerified
-                              ? Icons.check_circle_rounded
-                              : (isUnderReview ? Icons.schedule_rounded : Icons.info_outline_rounded),
-                          size: 11,
-                          color: isVerified
-                              ? const Color(0xFF068237)
-                              : (isUnderReview ? const Color(0xFFB45309) : const Color(0xFF6B7280)),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          isVerified ? 'VERIFIED' : (isUnderReview ? 'UNDER REVIEW' : 'PENDING'),
-                          style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                            color: isVerified
-                                ? const Color(0xFF068237)
-                                : (isUnderReview ? const Color(0xFFB45309) : const Color(0xFF6B7280)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Text(
+                '₹${record.amount.toStringAsFixed(0)}',
+                style: GoogleFonts.outfit(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF08A63F),
+                ),
               ),
             ],
           ),
@@ -379,7 +271,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
           const Divider(height: 1, color: Color(0xFFF3F4F6)),
           const SizedBox(height: 10),
 
-          // 2. Metadata Grid (Payment Method & Bank UTR)
+          // 2. Metadata Grid (Payment Method & Reference / Recipient)
           Row(
             children: [
               Expanded(
@@ -412,7 +304,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'BANK REF (UTR)',
+                      isCash ? 'HANDED OVER TO' : 'BANK REF (UTR)',
                       style: GoogleFonts.outfit(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
@@ -422,15 +314,21 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
                     ),
                     const SizedBox(height: 2),
                     InkWell(
-                      onTap: () => _copyToClipboard(record.utrNumber, 'UTR Number'),
+                      onTap: () => _copyToClipboard(
+                        isCash ? (record.recipient ?? record.utrNumber) : record.utrNumber,
+                        isCash ? 'Recipient details' : 'UTR Number',
+                      ),
                       child: Row(
                         children: [
-                          Text(
-                            record.utrNumber,
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF111111),
+                          Flexible(
+                            child: Text(
+                              isCash ? (record.recipient ?? record.utrNumber) : record.utrNumber,
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF111111),
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 4),
@@ -444,14 +342,14 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
             ],
           ),
 
-          // 3. Online Payment Proof Screenshot Attachment
+          // 3. Online Payment Proof / Cash Proof (Without icon, 'View' text)
           if (record.hasProofScreenshot) ...[
             const SizedBox(height: 12),
             InkWell(
               onTap: () => _openScreenshotViewer(record),
               borderRadius: BorderRadius.circular(10),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF9FAFB),
                   borderRadius: BorderRadius.circular(10),
@@ -459,33 +357,19 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEBF8EE),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF08A63F).withOpacity(0.2), width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.photo_outlined,
-                        size: 18,
-                        color: Color(0xFF068237),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Payment Proof Screenshot',
+                            isCash ? 'Cash Handover Proof' : 'Payment Proof Screenshot',
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                               color: const Color(0xFF111111),
                             ),
                           ),
+                          const SizedBox(height: 1),
                           Text(
                             record.screenshotLabel,
                             style: GoogleFonts.outfit(
@@ -504,7 +388,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'View Proof',
+                          'View',
                           style: GoogleFonts.outfit(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -525,50 +409,73 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
             ),
           ],
 
+          // 4. Verification Badge (Moved below payment proof)
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+            decoration: BoxDecoration(
+              color: isVerified
+                  ? const Color(0xFFEBF8EE)
+                  : (isUnderReview ? const Color(0xFFFEF3C7) : const Color(0xFFF3F4F6)),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: isVerified
+                    ? const Color(0xFF08A63F).withOpacity(0.2)
+                    : (isUnderReview ? const Color(0xFFF59E0B).withOpacity(0.25) : const Color(0xFFE5E7EB)),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isVerified
+                      ? Icons.check_circle_rounded
+                      : (isUnderReview ? Icons.schedule_rounded : Icons.info_outline_rounded),
+                  size: 11.5,
+                  color: isVerified
+                      ? const Color(0xFF068237)
+                      : (isUnderReview ? const Color(0xFFB45309) : const Color(0xFF6B7280)),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isVerified ? 'VERIFIED' : (isUnderReview ? 'UNDER REVIEW' : 'PENDING'),
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                    color: isVerified
+                        ? const Color(0xFF068237)
+                        : (isUnderReview ? const Color(0xFFB45309) : const Color(0xFF6B7280)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 12),
 
-          // 4. Receipt Download & Share Actions
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _downloadReceipt(record),
-                  icon: const Icon(Icons.receipt_long_outlined, size: 15, color: Color(0xFF111111)),
-                  label: Text(
-                    'Download Receipt',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFF111111),
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                  ),
+          // 5. Download Receipt Button (Full width, share button removed)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _downloadReceipt(record),
+              icon: const Icon(Icons.receipt_long_outlined, size: 15, color: Color(0xFF111111)),
+              label: Text(
+                'Download Receipt',
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF111111),
                 ),
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 42,
-                height: 38,
-                child: OutlinedButton(
-                  onPressed: () => _copyToClipboard(
-                    'UrbanStay Rent Receipt ${record.receiptNumber}: ₹${record.amount.toStringAsFixed(0)} (UTR: ${record.utrNumber})',
-                    'Receipt reference',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    backgroundColor: const Color(0xFFF9FAFB),
-                    side: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: const Icon(Icons.share_outlined, size: 16, color: Color(0xFF111111)),
-                ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
               ),
-            ],
+            ),
           ),
         ],
       ),
@@ -583,7 +490,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
           const Icon(Icons.receipt_outlined, size: 48, color: Color(0xFF9CA3AF)),
           const SizedBox(height: 12),
           Text(
-            'No transactions in this category',
+            'No transactions recorded',
             style: GoogleFonts.outfit(
               fontSize: 14,
               fontWeight: FontWeight.w600,
@@ -592,7 +499,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Select "All" to view your complete payment history',
+            'Your payment receipts and verified ledger will appear here',
             style: GoogleFonts.outfit(
               fontSize: 12,
               fontWeight: FontWeight.w400,
@@ -605,7 +512,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
   }
 }
 
-/// Modal dialog that displays the payment screenshot proof
+/// Modal dialog that displays payment proof (supporting both UPI and Cash)
 class _PaymentProofDialog extends StatelessWidget {
   final LedgerRecord record;
 
@@ -613,6 +520,8 @@ class _PaymentProofDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCash = record.method.toLowerCase().contains('cash');
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -642,7 +551,7 @@ class _PaymentProofDialog extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Payment Proof Attachment',
+                      isCash ? 'Cash Payment Proof' : 'Payment Proof Attachment',
                       style: GoogleFonts.outfit(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -659,7 +568,7 @@ class _PaymentProofDialog extends StatelessWidget {
             ),
             const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
-            // Simulated Payment Screenshot Container
+            // Payment Voucher Container
             Padding(
               padding: const EdgeInsets.all(16),
               child: Container(
@@ -672,7 +581,6 @@ class _PaymentProofDialog extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Green Check Circle
                     Container(
                       width: 52,
                       height: 52,
@@ -688,7 +596,9 @@ class _PaymentProofDialog extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Paid to UrbanStay Technologies',
+                      isCash
+                          ? 'Cash Received at Reception'
+                          : 'Paid to UrbanStay Technologies',
                       style: GoogleFonts.outfit(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -718,14 +628,22 @@ class _PaymentProofDialog extends StatelessWidget {
                     const Divider(height: 1, color: Color(0xFFE5E7EB)),
                     const SizedBox(height: 12),
 
-                    // Key-value pairs inside screenshot
-                    _buildProofRow('UPI Transaction ID', record.utrNumber),
-                    const SizedBox(height: 8),
-                    _buildProofRow('Google Transaction ID', 'CICAgIC...9281'),
-                    const SizedBox(height: 8),
-                    _buildProofRow('Payment Mode', record.method),
-                    const SizedBox(height: 8),
-                    _buildProofRow('Bank Reference (UTR)', record.utrNumber),
+                    // Key-value pairs
+                    if (isCash) ...[
+                      _buildProofRow('Payment Mode', 'Cash (Reception Desk)'),
+                      const SizedBox(height: 8),
+                      _buildProofRow('Handed Over To', record.recipient ?? 'Arun Kumar (Owner)'),
+                      const SizedBox(height: 8),
+                      _buildProofRow('Audit Ref Number', record.utrNumber),
+                      const SizedBox(height: 8),
+                      _buildProofRow('Verification Status', 'Verified by Owner'),
+                    ] else ...[
+                      _buildProofRow('Payment Mode', 'UPI'),
+                      const SizedBox(height: 8),
+                      _buildProofRow('Bank Reference (UTR)', record.utrNumber),
+                      const SizedBox(height: 8),
+                      _buildProofRow('Reconciliation', 'Auto-Verified'),
+                    ],
                   ],
                 ),
               ),
@@ -759,11 +677,17 @@ class _PaymentProofDialog extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.of(context).pop();
-                        Clipboard.setData(ClipboardData(text: record.utrNumber));
+                        Clipboard.setData(ClipboardData(
+                          text: isCash
+                              ? (record.recipient ?? record.utrNumber)
+                              : record.utrNumber,
+                        ));
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              'UTR ${record.utrNumber} copied',
+                              isCash
+                                  ? 'Receipt Ref ${record.utrNumber} copied'
+                                  : 'UTR ${record.utrNumber} copied',
                               style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500),
                             ),
                             backgroundColor: const Color(0xFF111111),
@@ -780,7 +704,7 @@ class _PaymentProofDialog extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                       child: Text(
-                        'Copy UTR',
+                        isCash ? 'Copy Ref' : 'Copy UTR',
                         style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -838,6 +762,7 @@ class LedgerRecord {
   final bool hasProofScreenshot;
   final String screenshotLabel;
   final String screenshotDetails;
+  final String? recipient;
 
   LedgerRecord({
     required this.id,
@@ -852,5 +777,6 @@ class LedgerRecord {
     required this.hasProofScreenshot,
     required this.screenshotLabel,
     required this.screenshotDetails,
+    this.recipient,
   });
 }

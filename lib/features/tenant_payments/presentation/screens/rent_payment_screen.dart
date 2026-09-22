@@ -11,6 +11,7 @@ class RentPaymentScreen extends StatefulWidget {
   final String bedId;
   final String pgName;
   final String ownerName;
+  final String ownerPhone;
   final String ownerUpiId;
   final String tenantPhone;
   final String ownerBankName;
@@ -31,6 +32,7 @@ class RentPaymentScreen extends StatefulWidget {
     required this.pgName,
     this.tenantPhone = '8618818322',
     this.ownerName = 'Arun Kumar',
+    this.ownerPhone = '98450 12345',
     this.ownerUpiId = 'arun.kumar@oksbi',
     this.ownerBankName = 'State Bank of India (SBI)',
     this.amount = 8500.0,
@@ -138,6 +140,115 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
     });
   }
 
+  void _showConfirmPaymentPopup() {
+    final utr = _utrController.text.trim();
+    final phone = _phoneController.text.trim();
+
+    String? utrErr;
+    String? phoneErr;
+
+    if (phone.length < 10) {
+      phoneErr = 'Enter 10-digit mobile number used for payment';
+    }
+
+    if (utr.length < 8) {
+      utrErr = 'Enter a valid 12-digit bank reference (UTR)';
+    }
+
+    if (utrErr != null || phoneErr != null) {
+      setState(() {
+        _utrError = utrErr;
+        _phoneError = phoneErr;
+      });
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          'Confirm Payment',
+          style: GoogleFonts.outfit(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ink,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to submit this payment proof to ${widget.ownerName}?',
+          style: GoogleFonts.outfit(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w400,
+            color: const Color(0xFF4B5563),
+            height: 1.4,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.ink,
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 42,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      _submitUtr();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.green,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(
+                      'Yes, Confirm',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isSubmitted) {
@@ -185,36 +296,6 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
           preferredSize: const Size.fromHeight(1),
           child: Container(color: const Color(0xFFE5E7EB), height: 1),
         ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEBF8EE),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: const Color(0xFFB7E4C7)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.shield_outlined,
-                  size: 13,
-                  color: AppColors.greenDark,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '0% Extra Fee',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.greenDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
       body: Center(
         child: ConstrainedBox(
@@ -827,7 +908,7 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Room ${widget.roomNumber} (Bed ${widget.bedId}) • ${widget.cycleMonth}',
+                    'Room ${widget.roomNumber} • ${widget.cycleMonth}',
                     style: GoogleFonts.outfit(
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
@@ -849,47 +930,6 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
           ),
 
           const SizedBox(height: 12),
-
-          // Direct Bank Beneficiary Tag
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.account_balance_outlined,
-                  size: 15,
-                  color: Color(0xFF4B5563),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Direct settlement to ${widget.ownerName} (${widget.ownerBankName})',
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.outfit(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                      color: const Color(0xFF374151),
-                    ),
-                  ),
-                ),
-                Text(
-                  '₹0 Fee',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.greenDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10),
 
           // Bill Breakdown Accordion Toggle
           InkWell(
@@ -925,13 +965,7 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
             const SizedBox(height: 10),
             const Divider(height: 1, color: Color(0xFFF3F4F6)),
             const SizedBox(height: 10),
-            _buildBillItem('Base Monthly Stay Rent', _formattedAmount),
-            const SizedBox(height: 6),
-            _buildBillItem('WiFi, Water & Power Backup', 'Included (₹0)',
-                isGreen: true),
-            const SizedBox(height: 6),
-            _buildBillItem('Payment Gateway Convenience', 'FREE (₹0)',
-                isGreen: true),
+            _buildBillItem('Monthly Stay Rent', _formattedAmount),
             const SizedBox(height: 10),
             const Divider(height: 1, color: Color(0xFFF3F4F6)),
             const SizedBox(height: 10),
@@ -1125,7 +1159,7 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
                       style: GoogleFonts.outfit(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
+                        color: AppColors.greenDark,
                       ),
                     ),
                   ],
@@ -1147,7 +1181,79 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
                       style: GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.ink,
+                        color: AppColors.greenDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Owner Phone Number',
+                          style: GoogleFonts.outfit(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                        Text(
+                          '+91 ${widget.ownerPhone}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.greenDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                    InkWell(
+                      onTap: () {
+                        Clipboard.setData(
+                            ClipboardData(text: widget.ownerPhone));
+                        HapticFeedback.lightImpact();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Copied "${widget.ownerPhone}" to clipboard!',
+                              style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w500),
+                            ),
+                            backgroundColor: AppColors.ink,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFD1D5DB)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.copy_rounded,
+                                size: 12, color: AppColors.ink),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Copy',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -1298,43 +1404,25 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEBF8EE),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.receipt_long_rounded,
-                  size: 18,
-                  color: AppColors.greenDark,
+              Text(
+                'SUBMIT PAYMENT PROOF',
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: AppColors.muted,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'SUBMIT PAYMENT PROOF',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                    Text(
-                      'Confirm Payment to Arun Kumar',
-                      style: GoogleFonts.outfit(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: 2),
+              Text(
+                'Confirm Payment to ${widget.ownerName}',
+                style: GoogleFonts.outfit(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
                 ),
               ),
             ],
@@ -1647,7 +1735,7 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
           SizedBox(
             height: 48,
             child: ElevatedButton(
-              onPressed: _isProcessing ? null : _submitUtr,
+              onPressed: _isProcessing ? null : _showConfirmPaymentPopup,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 shape: RoundedRectangleBorder(
@@ -1664,25 +1752,14 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Submit UTR & Confirm Rent ($_formattedAmount)',
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.check_circle_outline_rounded,
-                          size: 17,
-                          color: Colors.white,
-                        ),
-                      ],
+                  : Text(
+                      'Submit UTR & Confirm Rent',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.2,
+                      ),
                     ),
             ),
           ),

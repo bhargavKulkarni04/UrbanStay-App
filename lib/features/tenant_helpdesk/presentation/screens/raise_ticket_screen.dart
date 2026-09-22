@@ -33,7 +33,7 @@ class RaiseTicketScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -57,7 +57,7 @@ class RaiseTicketScreen extends StatelessWidget {
               ),
             ),
             Text(
-              'Room $roomNumber • Bed $bedId',
+              'Room $roomNumber',
               style: GoogleFonts.outfit(
                 fontSize: 11.5,
                 fontWeight: FontWeight.w500,
