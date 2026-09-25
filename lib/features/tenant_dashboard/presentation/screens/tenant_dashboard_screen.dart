@@ -12,6 +12,9 @@ import '../../../tenant_helpdesk/presentation/screens/washing_machine_booking_sc
 import '../../../tenant_housekeeping/presentation/widgets/room_sweep_sheet.dart';
 import '../../../tenant_housekeeping/presentation/widgets/full_room_clean_sheet.dart';
 import '../../../tenant_housekeeping/presentation/widgets/bedsheet_change_sheet.dart';
+import '../../../tenant_notice/presentation/screens/move_out_notice_screen.dart';
+import '../../../tenant_food_menu/presentation/screens/tenant_food_menu_screen.dart';
+import '../../../tenant_notice_board/presentation/screens/tenant_notice_board_screen.dart';
 
 class TenantDashboardScreen extends StatefulWidget {
   final String tenantName;
@@ -42,6 +45,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   String _currentDueDate = '05 Sep';
   final double _currentRentAmount = 8500.0;
   Map<String, dynamic>? _activeTicket;
+  bool _isEatingDinner = true;
 
   void _simulateOwnerApproval() {
     setState(() {
@@ -78,67 +82,76 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 🟢 1. Top Architectural Header with Smooth Curve
-                _buildSmoothCurvedHeader(context),
-
-                const SizedBox(height: 18),
-
-                // 🔍 2. Clean Search Input Bar
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildSearchBar(),
-                ),
-
-                const SizedBox(height: 18),
-
-                // ⚡ 3. Hero Rent Status & Pay Banner
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildHeroRentCard(),
-                ),
-
-                const SizedBox(height: 22),
-
-                // 💳 4. Payments Card (Custom Stepped Folder Tab)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildPaymentsCard(),
-                ),
-
-                const SizedBox(height: 20),
-
-                // 🛠️ 4. Helpdesk Card (Custom Stepped Folder Tab)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildHelpdeskCard(),
-                ),
-
-                const SizedBox(height: 20),
-
-                // 🧹 5. Housekeeping & Services Card (Custom Stepped Folder Tab)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildHousekeepingCard(),
-                ),
-
-                const SizedBox(height: 20),
-
-                // 🚪 7. Tenancy & Exit Card (Custom Stepped Folder Tab)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: _buildTenancyCard(),
-                ),
-
-                const SizedBox(height: 36),
-              ],
-            ),
-          ),
+          child: _currentNavIndex == 0
+              ? _buildHomeBody(context)
+              : (_currentNavIndex == 1
+                  ? const TenantFoodMenuScreen()
+                  : const TenantNoticeBoardScreen()),
         ),
+      ),
+    );
+  }
+
+  /// 🏠 Tab 0: Main Home Body
+  Widget _buildHomeBody(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 🟢 1. Top Architectural Header with Smooth Curve
+          _buildSmoothCurvedHeader(context),
+
+          const SizedBox(height: 18),
+
+          // 🔍 2. Clean Search Input Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildSearchBar(),
+          ),
+
+          const SizedBox(height: 18),
+
+          // ⚡ 3. Hero Rent Status & Pay Banner
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildHeroRentCard(),
+          ),
+
+          const SizedBox(height: 22),
+
+          // 💳 4. Payments Card (Custom Stepped Folder Tab)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildPaymentsCard(),
+          ),
+
+          const SizedBox(height: 20),
+
+          // 🛠️ 4. Helpdesk Card (Custom Stepped Folder Tab)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildHelpdeskCard(),
+          ),
+
+          const SizedBox(height: 20),
+
+          // 🧹 5. Housekeeping & Services Card (Custom Stepped Folder Tab)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildHousekeepingCard(),
+          ),
+
+          const SizedBox(height: 20),
+
+          // 🚪 7. Tenancy & Exit Card (Custom Stepped Folder Tab)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildTenancyCard(),
+          ),
+
+          const SizedBox(height: 36),
+        ],
       ),
     );
   }
@@ -783,7 +796,19 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
           _buildItemButton(
             icon: Icons.event_busy_outlined,
             label: 'Move-Out\nNotice (30D)',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MoveOutNoticeScreen(
+                    roomNumber: widget.roomNumber,
+                    bedIdentifier: widget.bedId,
+                    monthlyRent: _currentRentAmount,
+                    securityDeposit: 23000.0,
+                  ),
+                ),
+              );
+            },
           ),
           _buildItemButton(
             icon: Icons.payments_outlined,
@@ -865,7 +890,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -876,18 +901,13 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
               ),
               _buildNavTab(
                 index: 1,
-                icon: Icons.event_note_rounded,
-                label: 'Food & Notices',
+                icon: Icons.restaurant_menu_rounded,
+                label: 'Food Menu',
               ),
               _buildNavTab(
                 index: 2,
-                icon: Icons.notifications_none_rounded,
-                label: 'Notifications',
-              ),
-              _buildNavTab(
-                index: 3,
-                icon: Icons.grid_view_rounded,
-                label: 'More',
+                icon: Icons.campaign_outlined,
+                label: 'Notice Board',
               ),
             ],
           ),
@@ -940,6 +960,307 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       ),
     );
   }
+
+  /// 🍽️ Tab 1: Food & Mess Menu View
+  Widget _buildFoodMenuView() {
+    return const TenantFoodMenuScreen();
+  }
+
+  Widget _legacyFoodMenuView() {
+    return SafeArea(
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Food & Mess Menu',
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              'Daily freshly prepared meals • Pure & hygienic kitchen',
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                color: AppColors.muted,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Headcount Stopper Card (Prevents cook ration wastage)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'DINNER HEADCOUNT TODAY',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.greenDark,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFBBF7D0)),
+                        ),
+                        child: Text(
+                          '64/75 Eating Tonight',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.greenDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Are you eating dinner at the PG tonight?',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Update by 4:00 PM to help our cook avoid food ration wastage.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            setState(() => _isEatingDinner = true);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Confirmed: You are marked as Eating Dinner tonight.'),
+                                backgroundColor: AppColors.green,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isEatingDinner
+                                ? AppColors.green
+                                : Colors.white,
+                            foregroundColor:
+                                _isEatingDinner ? Colors.white : AppColors.ink,
+                            elevation: _isEatingDinner ? 2 : 0,
+                            side: BorderSide(
+                              color: _isEatingDinner
+                                  ? AppColors.green
+                                  : const Color(0xFFE5E7EB),
+                            ),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          child: Text(
+                            'I am Eating ✓',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() => _isEatingDinner = false);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Updated: You are marked as Skipping Dinner tonight.'),
+                                backgroundColor: AppColors.ink,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor:
+                                !_isEatingDinner ? AppColors.ink : Colors.white,
+                            foregroundColor: !_isEatingDinner
+                                ? Colors.white
+                                : AppColors.muted,
+                            side: BorderSide(
+                              color: !_isEatingDinner
+                                  ? AppColors.ink
+                                  : const Color(0xFFE5E7EB),
+                            ),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          child: Text(
+                            'Skipping Tonight ✕',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            Text(
+              "TODAY'S MENU",
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.muted,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            _buildMealCard(
+              title: 'Breakfast',
+              timing: '7:30 AM – 10:00 AM',
+              status: 'Closed',
+              statusColor: const Color(0xFF9CA3AF),
+              statusBg: const Color(0xFFF3F4F6),
+              menuItems:
+                  'Idli, Crispy Medu Vada, Madras Sambar, Coconut Chutney & Fresh Filter Coffee / Tea',
+            ),
+            const SizedBox(height: 12),
+
+            _buildMealCard(
+              title: 'Lunch',
+              timing: '12:30 PM – 2:30 PM',
+              status: 'Closed',
+              statusColor: const Color(0xFF9CA3AF),
+              statusBg: const Color(0xFFF3F4F6),
+              menuItems:
+                  'Steamed Sona Masoori Rice, Dal Tadka, Aloo Gobi Dry, Soft Phulka Rotis, Fresh Curd & Mango Pickle',
+            ),
+            const SizedBox(height: 12),
+
+            _buildMealCard(
+              title: 'Dinner',
+              timing: '7:30 PM – 10:00 PM',
+              status: 'Upcoming Tonight',
+              statusColor: AppColors.greenDark,
+              statusBg: AppColors.greenLight,
+              menuItems:
+                  'Paneer Butter Masala, Hot Tawa Chapati, Jeera Rice, Mixed Vegetable Salad, Dal Fry & Gulab Jamun',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMealCard({
+    required String title,
+    required String timing,
+    required String status,
+    required Color statusColor,
+    required Color statusBg,
+    required String menuItems,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x04000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  status,
+                  style: GoogleFonts.outfit(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            timing,
+            style: GoogleFonts.outfit(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w500,
+              color: AppColors.muted,
+            ),
+          ),
+          const Divider(color: Color(0xFFF3F4F6), height: 18),
+          Text(
+            menuItems,
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.ink,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
 
   /// Smart Initial Generator (e.g. "Bhargav S Kulkarni" -> "BK", "Joy Sen" -> "JS")
   String _getInitials(String name) {

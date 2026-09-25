@@ -17,6 +17,7 @@ import '../../../owner_onboarding/presentation/screens/owner_onboarding_approval
 import '../../../owner_reports/presentation/screens/owner_reports_screen.dart';
 import '../../../owner_billing/presentation/screens/owner_saas_billing_screen.dart';
 import '../../../owner_rent/presentation/screens/owner_day_collection_screen.dart';
+import '../../../owner_food_menu/presentation/screens/owner_food_menu_screen.dart';
 
 /// Screen 5: Owner Command Center Dashboard.
 /// 1-to-1 exact translation of `ProductionCode/owner_dashboard.html`.
@@ -310,6 +311,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               )
             else if (_activeSubScreen == 'day_collection')
               OwnerDayCollectionScreen(
+                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+              )
+            else if (_activeSubScreen == 'food_menu')
+              OwnerFoodMenuScreen(
                 onBack: () => setState(() => _activeSubScreen = 'dashboard'),
               )
             else if (_activeNavIndex == 3 || _activeSubScreen == 'billing')
@@ -2199,6 +2204,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       {'title': 'Complaints', 'icon': Icons.handyman_outlined, 'onTap': () => setState(() => _activeSubScreen = 'complaints')},
       {'title': 'Move-In KYC', 'icon': Icons.how_to_reg_outlined, 'onTap': () => setState(() => _activeSubScreen = 'onboarding')},
       {'title': 'Staff & Warden', 'icon': Icons.badge_outlined, 'onTap': () => setState(() => _activeSubScreen = 'staff')},
+      {'title': 'Food Menu', 'icon': Icons.restaurant_menu_outlined, 'onTap': () => setState(() => _activeSubScreen = 'food_menu')},
       {'title': 'Invite Manager', 'icon': Icons.person_add_alt_1_outlined, 'onTap': _showInviteManagerModal},
       {'title': 'Reports & P&L', 'icon': Icons.insights_outlined, 'onTap': () => setState(() => _activeSubScreen = 'reports')},
     ];

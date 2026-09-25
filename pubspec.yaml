@@ -1,7 +1,7 @@
 name: urbanstay
 description: "UrbanStay - PG and Hostel Operations Operating System"
 publish_to: 'none'
-version: 1.0.70+71
+version: 1.0.74+75
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -12,6 +12,7 @@ dependencies:
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.10+1
   flutter_contacts: ^2.3.1
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

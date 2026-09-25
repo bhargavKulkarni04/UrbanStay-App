@@ -59,13 +59,37 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
     },
   ];
 
-  static const List<String> _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const List<String> _weekDays = [
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun'
+  ];
   static const List<String> _weekDaysFull = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday'
   ];
   static const List<String> _monthsFull = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
   ];
 
   String get _selectedItemsText {
@@ -80,20 +104,23 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
   void initState() {
     super.initState();
     final now = DateTime.now();
-    _selectedDate = widget.initialDate ?? DateTime(now.year, now.month, now.day);
+    _selectedDate =
+        widget.initialDate ?? DateTime(now.year, now.month, now.day);
     _displayedMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
     _selectedSlot = widget.initialSlot ?? 'Morning Slot (9:00 AM – 11:30 AM)';
   }
 
   void _prevMonth() {
     setState(() {
-      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month - 1, 1);
+      _displayedMonth =
+          DateTime(_displayedMonth.year, _displayedMonth.month - 1, 1);
     });
   }
 
   void _nextMonth() {
     setState(() {
-      _displayedMonth = DateTime(_displayedMonth.year, _displayedMonth.month + 1, 1);
+      _displayedMonth =
+          DateTime(_displayedMonth.year, _displayedMonth.month + 1, 1);
     });
   }
 
@@ -111,7 +138,9 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
 
   bool _isToday(DateTime date) {
     final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
   }
 
   String _formatFullDate(DateTime date) {
@@ -400,7 +429,9 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
         top: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: _isScheduled ? _buildScheduledConfirmationView() : _buildSelectionView(),
+          child: _isScheduled
+              ? _buildScheduledConfirmationView()
+              : _buildSelectionView(),
         ),
       ),
     );
@@ -452,7 +483,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
               ],
             ),
             IconButton(
-              icon: const Icon(Icons.close_rounded, size: 22, color: AppColors.muted),
+              icon: const Icon(Icons.close_rounded,
+                  size: 22, color: AppColors.muted),
               onPressed: () => Navigator.of(context).pop(),
               splashRadius: 20,
               padding: EdgeInsets.zero,
@@ -508,7 +540,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
                 TextButton(
                   onPressed: _goToToday,
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -559,7 +592,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
         // Slots row
         Row(
           children: _slots.map((slot) {
-            final isSelected = _selectedSlot == '${slot['title']} (${slot['time']})';
+            final isSelected =
+                _selectedSlot == '${slot['title']} (${slot['time']})';
             return Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -571,12 +605,15 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 12, horizontal: 10),
                     decoration: BoxDecoration(
                       color: isSelected ? AppColors.greenLight : Colors.white,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                        color: isSelected
+                            ? AppColors.green
+                            : const Color(0xFFE5E7EB),
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -588,7 +625,9 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
                           style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: isSelected ? AppColors.greenDark : AppColors.ink,
+                            color: isSelected
+                                ? AppColors.greenDark
+                                : AppColors.ink,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -599,7 +638,9 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
                           style: GoogleFonts.outfit(
                             fontSize: 11,
                             fontWeight: FontWeight.w400,
-                            color: isSelected ? AppColors.greenDark : AppColors.muted,
+                            color: isSelected
+                                ? AppColors.greenDark
+                                : AppColors.muted,
                           ),
                         ),
                       ],
@@ -804,11 +845,13 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFEF3C7),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFF59E0B), width: 0.8),
+                      border: Border.all(
+                          color: const Color(0xFFF59E0B), width: 0.8),
                     ),
                     child: Text(
                       'Scheduled',
@@ -870,7 +913,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
               child: OutlinedButton(
                 onPressed: () {
                   setState(() {
-                    _isScheduled = false; // Opens calendar/slot picker back up to edit!
+                    _isScheduled =
+                        false; // Opens calendar/slot picker back up to edit!
                   });
                 },
                 style: OutlinedButton.styleFrom(
@@ -947,7 +991,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
     final year = _displayedMonth.year;
     final month = _displayedMonth.month;
     final daysInMonth = DateTime(year, month + 1, 0).day;
-    final firstWeekday = DateTime(year, month, 1).weekday; // 1 = Monday, 7 = Sunday
+    final firstWeekday =
+        DateTime(year, month, 1).weekday; // 1 = Monday, 7 = Sunday
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -981,7 +1026,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Icon(Icons.chevron_left_rounded, size: 18, color: AppColors.ink),
+                      child: const Icon(Icons.chevron_left_rounded,
+                          size: 18, color: AppColors.ink),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -994,7 +1040,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.ink),
+                      child: const Icon(Icons.chevron_right_rounded,
+                          size: 18, color: AppColors.ink),
                     ),
                   ),
                 ],
@@ -1029,7 +1076,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
           // Days grid
           Builder(
             builder: (context) {
-              final totalSlots = ((firstWeekday - 1) + daysInMonth <= 35) ? 35 : 42;
+              final totalSlots =
+                  ((firstWeekday - 1) + daysInMonth <= 35) ? 35 : 42;
               final dayWidgets = <Widget>[];
 
               for (int i = 0; i < totalSlots; i++) {
@@ -1088,7 +1136,8 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
               // Build rows of 7
               final rows = <Widget>[];
               for (int r = 0; r < dayWidgets.length; r += 7) {
-                final end = (r + 7 < dayWidgets.length) ? r + 7 : dayWidgets.length;
+                final end =
+                    (r + 7 < dayWidgets.length) ? r + 7 : dayWidgets.length;
                 rows.add(
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),

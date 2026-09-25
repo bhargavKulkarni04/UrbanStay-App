@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../tenant_dashboard/presentation/screens/tenant_dashboard_screen.dart';
 
 /// Screen 14: Tenant Digital Check-In Wizard.
 /// 100% exact translation of `ProductionCode/tenant_checkin.html`
@@ -189,7 +190,12 @@ class _TenantCheckinScreenState extends State<TenantCheckinScreen> {
           duration: Duration(seconds: 2),
         ),
       );
-      Navigator.of(context).pop();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (context) => const TenantDashboardScreen(),
+        ),
+        (route) => false,
+      );
     }
   }
 

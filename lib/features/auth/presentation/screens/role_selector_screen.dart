@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../owner_setup/presentation/screens/owner_setup_screen.dart';
 import '../../../tenant_checkin/presentation/screens/tenant_checkin_screen.dart';
+import '../../../tenant_dashboard/presentation/screens/tenant_dashboard_screen.dart';
 
 /// Screen 3: Role Selector & Auth Screen (Tenant vs PG Owner).
 /// 1-to-1 exact translation of `ProductionCode/auth_preview.html`.
@@ -140,19 +141,27 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
         ),
       );
     } else {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => TenantCheckinScreen(
-            initialPgCode: _pgCodeController.text.trim().isNotEmpty
-                ? _pgCodeController.text.trim().toUpperCase()
-                : 'AR-101',
-            initialName: _nameController.text.trim().isNotEmpty
-                ? _nameController.text.trim()
-                : null,
-            initialPhoneOrEmail: identifier,
+      if (_mode == AuthMode.signIn) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const TenantDashboardScreen(),
           ),
-        ),
-      );
+        );
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => TenantCheckinScreen(
+              initialPgCode: _pgCodeController.text.trim().isNotEmpty
+                  ? _pgCodeController.text.trim().toUpperCase()
+                  : 'AR-101',
+              initialName: _nameController.text.trim().isNotEmpty
+                  ? _nameController.text.trim()
+                  : null,
+              initialPhoneOrEmail: identifier,
+            ),
+          ),
+        );
+      }
     }
   }
 

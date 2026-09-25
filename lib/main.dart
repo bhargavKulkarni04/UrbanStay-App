@@ -107,8 +107,8 @@ class UrbanStayApp extends StatelessWidget {
           child: content,
         );
       },
-      // 🏠 Tenant Dashboard (Resident Experience)
-      home: const TenantDashboardScreen(),
+      // 🚀 Screen 1: App Onboarding Walkthrough (New User Experience)
+      home: const OnboardingWalkthroughScreen(),
     );
   }
 }
