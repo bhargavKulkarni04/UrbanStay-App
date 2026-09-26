@@ -11,6 +11,7 @@ import 'features/owner_rent/presentation/screens/owner_rent_collection_screen.da
 import 'features/owner_rent/presentation/screens/owner_day_collection_screen.dart';
 import 'features/tenant_dashboard/presentation/screens/tenant_dashboard_screen.dart';
 import 'features/tenant_payments/presentation/screens/rent_payment_screen.dart';
+import 'features/tenant_profile/presentation/screens/profile_settings_screen.dart';
 
 import 'features/owner_billing/presentation/screens/owner_saas_billing_screen.dart';
 
@@ -107,8 +108,8 @@ class UrbanStayApp extends StatelessWidget {
           child: content,
         );
       },
-      // 🚀 Screen 1: App Onboarding Walkthrough (New User Experience)
-      home: const OnboardingWalkthroughScreen(),
+      // 🚀 Testing Tenant Profile & Settings Screen
+      home: const ProfileSettingsScreen(),
     );
   }
 }
