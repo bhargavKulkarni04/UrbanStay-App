@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -160,15 +160,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
   Future<void> _fetchLiveGeoData() async {
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 4);
-      final request = await client.getUrl(Uri.parse(
-        'https://raw.githubusercontent.com/sab99r/Indian-States-And-Districts/master/states-and-districts.json',
-      ));
-      final response = await request.close();
+      final response = await http.get(
+        Uri.parse('https://raw.githubusercontent.com/sab99r/Indian-States-And-Districts/master/states-and-districts.json'),
+      ).timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
-        final responseBody = await response.transform(utf8.decoder).join();
-        final Map<String, dynamic> data = jsonDecode(responseBody);
+        final Map<String, dynamic> data = jsonDecode(response.body);
         final statesList = data['states'] as List<dynamic>?;
         if (statesList != null) {
           final Map<String, List<String>> map = {};
@@ -195,13 +191,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   Future<Map<String, dynamic>?> _lookupPincodeFromApi(String pincode) async {
     if (pincode.length != 6) return null;
     try {
-      final client = HttpClient();
-      client.connectionTimeout = const Duration(seconds: 4);
-      final request = await client.getUrl(Uri.parse('https://api.postalpincode.in/pincode/$pincode'));
-      final response = await request.close();
+      final response = await http.get(
+        Uri.parse('https://api.postalpincode.in/pincode/$pincode'),
+      ).timeout(const Duration(seconds: 6));
       if (response.statusCode == 200) {
-        final responseBody = await response.transform(utf8.decoder).join();
-        final List<dynamic> data = jsonDecode(responseBody);
+        final List<dynamic> data = jsonDecode(response.body);
         if (data.isNotEmpty && data[0]['Status'] == 'Success') {
           final postOffices = data[0]['PostOffice'] as List<dynamic>?;
           if (postOffices != null && postOffices.isNotEmpty) {

@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:ui';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -21,7 +23,8 @@ class OwnerSetupScreen extends StatefulWidget {
   final bool isScaleMode;
   final int initialStep;
   final VoidCallback? onBack;
-  final Function(int newTotalBeds, int newTotalRooms, int newFloors)? onCapacityUpdated;
+  final Function(int newTotalBeds, int newTotalRooms, int newFloors)?
+      onCapacityUpdated;
 
   const OwnerSetupScreen({
     super.key,
@@ -38,13 +41,14 @@ class OwnerSetupScreen extends StatefulWidget {
 class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
   int _currentStep = 1;
 
-  // Step 1 Controllers
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
+  // Step 1 Controllers & Inline Error State
   final _legalNameController = TextEditingController();
   final _fatherNameController = TextEditingController();
   final _whatsappController = TextEditingController();
   final _emailController = TextEditingController();
+  String? _legalNameError;
+  String? _whatsappError;
+  String? _emailError;
   final _aadhaarController = TextEditingController();
   final _addressController = TextEditingController();
   bool _frontPhotoAttached = false;
@@ -57,16 +61,26 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
 
   // Step 2 Controllers & State (Zero pre-selected defaults)
   final _pgBrandNameController = TextEditingController();
+  String? _pgBrandNameError;
   String? _genderCategory;
   String? _propertyStructure;
-  String? _ownershipType;
   final _streetAddressController = TextEditingController();
   final _areaLocalityController = TextEditingController();
   final _landmarkController = TextEditingController();
-  final _cityStateController = TextEditingController();
+  String _selectedState = '';
+  String _selectedCity = '';
+  final _stateController = TextEditingController();
+  final _cityController = TextEditingController();
   final _pincodeController = TextEditingController();
   final _mapsUrlController = TextEditingController();
   bool _pincodeResolved = false;
+  bool _isFetchingPostal = false;
+  Map<String, List<String>> _liveStatesMap = {};
+  bool _bankConfirmed = false;
+  String? _bankConfirmError;
+  String? _bankHolderError;
+  String? _bankNameError;
+  String? _upiIdError;
   String? _liftCount;
   String? _powerBackup;
 
@@ -148,12 +162,24 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       _selectedSharings.addAll(['1-Share', '2-Share', '3-Share']);
       for (final sh in ['1-Share', '2-Share', '3-Share']) {
         _sharingAssignedRooms.putIfAbsent(sh, () => []);
-        _rentControllers.putIfAbsent(sh, () => TextEditingController(text: sh.startsWith('1') ? '12000' : (sh.startsWith('2') ? '8500' : '7000')));
-        _depositControllers.putIfAbsent(sh, () => TextEditingController(text: sh.startsWith('1') ? '20000' : (sh.startsWith('2') ? '15000' : '12000')));
+        _rentControllers.putIfAbsent(
+            sh,
+            () => TextEditingController(
+                text: sh.startsWith('1')
+                    ? '12000'
+                    : (sh.startsWith('2') ? '8500' : '7000')));
+        _depositControllers.putIfAbsent(
+            sh,
+            () => TextEditingController(
+                text: sh.startsWith('1')
+                    ? '20000'
+                    : (sh.startsWith('2') ? '15000' : '12000')));
       }
     } else {
       _currentStep = widget.initialStep;
     }
+
+    _fetchLiveGeoData();
 
     _pincodeController.addListener(() {
       final code = _pincodeController.text.trim();
@@ -161,6 +187,134 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         _pincodeResolved = code.length == 6;
       });
     });
+  }
+
+  Future<void> _fetchLiveGeoData() async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse(
+                'https://raw.githubusercontent.com/sab99r/Indian-States-And-Districts/master/states-and-districts.json'),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final statesList = data['states'] as List<dynamic>?;
+        if (statesList != null) {
+          final Map<String, List<String>> map = {};
+          for (final item in statesList) {
+            final stName = item['state']?.toString() ?? '';
+            final districts = (item['districts'] as List<dynamic>?)
+                    ?.map((d) => d.toString())
+                    .toList() ??
+                [];
+            if (stName.isNotEmpty && districts.isNotEmpty) {
+              map[stName] = districts;
+            }
+          }
+          if (mounted && map.isNotEmpty) {
+            setState(() => _liveStatesMap = map);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<Map<String, dynamic>?> _lookupPincodeFromApi(String pincode) async {
+    if (pincode.length != 6) return null;
+    try {
+      final response = await http
+          .get(
+            Uri.parse('https://api.postalpincode.in/pincode/$pincode'),
+          )
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data.isNotEmpty && data[0]['Status'] == 'Success') {
+          final postOffices = data[0]['PostOffice'] as List<dynamic>?;
+          if (postOffices != null && postOffices.isNotEmpty) {
+            final first = postOffices[0];
+            return {
+              'state': first['State']?.toString() ?? '',
+              'city': first['District']?.toString() ??
+                  first['Block']?.toString() ??
+                  '',
+              'locality': first['Name']?.toString() ?? '',
+              'allLocalities':
+                  postOffices.map((p) => p['Name'].toString()).toSet().toList(),
+            };
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  List<String> get _availableStates {
+    return _liveStatesMap.keys.toList();
+  }
+
+  List<String> get _availableCities {
+    return _liveStatesMap[_selectedState] ?? [];
+  }
+
+  Widget _buildDropdownField({
+    required String label,
+    required String value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final effectiveValue =
+        items.contains(value) ? value : (items.isNotEmpty ? items.first : null);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.muted,
+          ),
+        ),
+        const SizedBox(height: 5),
+        Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: effectiveValue,
+              isExpanded: true,
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 20,
+                color: AppColors.ink,
+              ),
+              items: items.map((e) {
+                return DropdownMenuItem<String>(
+                  value: e,
+                  child: Text(
+                    e,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -176,7 +330,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     _streetAddressController.dispose();
     _areaLocalityController.dispose();
     _landmarkController.dispose();
-    _cityStateController.dispose();
+    _stateController.dispose();
+    _cityController.dispose();
     _pincodeController.dispose();
     _mapsUrlController.dispose();
 
@@ -284,7 +439,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             final floorNum = floorNumMatch != null
                 ? int.parse(floorNumMatch.group(0)!)
                 : (fIndex + 1);
-            flats.add('${floorNum}${r.toString().padLeft(2, '0')}');
+            flats.add('$floorNum${r.toString().padLeft(2, '0')}');
           }
         }
       }
@@ -437,12 +592,19 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       } else {
         _sharingAssignedRooms.forEach((sharing, rooms) {
           int mult = 2;
-          if (sharing.startsWith('1')) mult = 1;
-          else if (sharing.startsWith('2')) mult = 2;
-          else if (sharing.startsWith('3')) mult = 3;
-          else if (sharing.startsWith('4')) mult = 4;
-          else if (sharing.startsWith('5')) mult = 5;
-          else if (sharing.startsWith('6')) mult = 6;
+          if (sharing.startsWith('1')) {
+            mult = 1;
+          } else if (sharing.startsWith('2')) {
+            mult = 2;
+          } else if (sharing.startsWith('3')) {
+            mult = 3;
+          } else if (sharing.startsWith('4')) {
+            mult = 4;
+          } else if (sharing.startsWith('5')) {
+            mult = 5;
+          } else if (sharing.startsWith('6')) {
+            mult = 6;
+          }
           calcBeds += (rooms.length * mult);
         });
         if (calcBeds == 0) calcBeds = calcRooms * 2;
@@ -460,15 +622,18 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         SnackBar(
           backgroundColor: AppColors.ink,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           content: Row(
             children: [
-              const Icon(Icons.check_circle_rounded, color: AppColors.green, size: 20),
+              const Icon(Icons.check_circle_rounded,
+                  color: AppColors.green, size: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   'Building capacity updated successfully to $calcBeds Beds ($calcRooms Rooms)!',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.w600, color: Colors.white),
+                  style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.w600, color: Colors.white),
                 ),
               ),
             ],
@@ -481,25 +646,58 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     }
 
     if (_currentStep == 1) {
+      bool hasError = false;
       if (_legalNameController.text.trim().isEmpty) {
-        _showSnackBar('Please enter your full legal name.');
-        return;
+        setState(() => _legalNameError = 'Please enter your full legal name');
+        hasError = true;
       }
+      if (_whatsappController.text.trim().length != 10) {
+        setState(() =>
+            _whatsappError = 'Please enter a valid 10-digit WhatsApp number');
+        hasError = true;
+      }
+      if (_emailController.text.trim().isNotEmpty) {
+        final email = _emailController.text.trim();
+        final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w+$');
+        if (!emailRegex.hasMatch(email)) {
+          setState(() => _emailError =
+              'Please enter a valid email address (e.g. owner@gmail.com)');
+          hasError = true;
+        }
+      }
+      if (hasError) return;
       setState(() => _currentStep = 2);
     } else if (_currentStep == 2) {
       if (_pgBrandNameController.text.trim().isEmpty) {
-        _showSnackBar('Please enter your PG / Property name.');
+        setState(
+            () => _pgBrandNameError = 'Please enter your PG / Property name');
         return;
       }
       setState(() => _currentStep = 3);
     } else if (_currentStep == 3) {
       setState(() => _currentStep = 4);
     } else if (_currentStep == 4) {
-      if (_bankHolderNameController.text.trim().isEmpty ||
-          _upiIdController.text.trim().isEmpty) {
-        _showSnackBar('Please enter your Bank Account Name and UPI ID.');
-        return;
+      bool hasError = false;
+      if (_bankHolderNameController.text.trim().isEmpty) {
+        setState(() => _bankHolderError = 'Please enter account holder name');
+        hasError = true;
       }
+      if (_bankNameController.text.trim().isEmpty) {
+        setState(() => _bankNameError = 'Please select your bank');
+        hasError = true;
+      }
+      if (_upiIdController.text.trim().isEmpty ||
+          !_upiIdController.text.contains('@')) {
+        setState(() => _upiIdError =
+            'Please enter a valid UPI ID (e.g. yourname@hdfcbank)');
+        hasError = true;
+      }
+      if (!_bankConfirmed) {
+        setState(() => _bankConfirmError =
+            'Please check the box to confirm account ownership');
+        hasError = true;
+      }
+      if (hasError) return;
       _triggerCelebrationLaunch();
     }
   }
@@ -955,7 +1153,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                   GestureDetector(
                     onTap: () => setState(() => _currentStep = 2),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF4F6F9),
@@ -973,16 +1172,19 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                     ),
                   ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: AppColors.greenLight,
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+                    border: Border.all(
+                        color: AppColors.green.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.upgrade_rounded, size: 14, color: AppColors.green),
+                      const Icon(Icons.upgrade_rounded,
+                          size: 14, color: AppColors.green),
                       const SizedBox(width: 4),
                       Text(
                         'Scale Capacity Mode',
@@ -1077,14 +1279,6 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         ),
         const SizedBox(height: 10),
 
-        _FloatingInput(
-          controller: _fatherNameController,
-          label: 'Father / Husband Name',
-          keyboardType: TextInputType.name,
-        ),
-        const SizedBox(height: 6),
-        _buildDivider(),
-
         // WhatsApp Phone with Country Pill
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1129,6 +1323,16 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
           controller: _emailController,
           label: 'Email Address',
           keyboardType: TextInputType.emailAddress,
+          errorText: _emailError,
+          onChanged: (val) {
+            if (_emailError != null) {
+              setState(() {
+                if (val.trim().contains('@') && val.trim().contains('.')) {
+                  _emailError = null;
+                }
+              });
+            }
+          },
         ),
         const SizedBox(height: 6),
         _buildDivider(),
@@ -1271,28 +1475,6 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         const SizedBox(height: 6),
         _buildDivider(),
 
-        // Ownership Type (Zero Pre-selected)
-        _buildSectionLabel('Ownership Type'),
-        Row(
-          children: [
-            _buildInteractiveCard(
-              title: 'Owned Building',
-              sub: 'Sole Owner',
-              isSelected: _ownershipType == 'Owned Building',
-              onTap: () => setState(() => _ownershipType = 'Owned Building'),
-            ),
-            const SizedBox(width: 6),
-            _buildInteractiveCard(
-              title: 'Leased Property',
-              sub: 'On Lease',
-              isSelected: _ownershipType == 'Leased Property',
-              onTap: () => setState(() => _ownershipType = 'Leased Property'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        _buildDivider(),
-
         // PG Address with Pincode badge
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1313,7 +1495,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                   borderRadius: BorderRadius.circular(5),
                 ),
                 child: Text(
-                  '✓ Bengaluru Verified',
+                  '✓ Verified Location',
                   style: AppTypography.captionSmall.copyWith(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w700,
@@ -1327,33 +1509,94 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
 
         _FloatingInput(
           controller: _streetAddressController,
-          label: 'Street Address (Door No, Cross, Main Road)',
+          label: 'Street Address',
         ),
         const SizedBox(height: 10),
 
         _FloatingInput(
           controller: _areaLocalityController,
-          label: 'Area / Locality (e.g. Koramangala 5th Block)',
+          label: 'Area / Locality',
         ),
         const SizedBox(height: 10),
 
         _FloatingInput(
           controller: _landmarkController,
-          label: 'Nearest Landmark (e.g. Near Sony World Signal)',
+          label: 'Nearest Landmark',
         ),
         const SizedBox(height: 10),
 
-        _FloatingInput(
-          controller: _cityStateController,
-          label: 'City & State',
+        Row(
+          children: [
+            Expanded(
+              child: _FloatingInput(
+                controller: _stateController,
+                label: 'State',
+                readOnly: true,
+                onTap: _showStatePickerModal,
+                suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.muted),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _FloatingInput(
+                controller: _cityController,
+                label: 'City',
+                readOnly: true,
+                onTap: _showCityPickerModal,
+                suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.muted),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 10),
 
         _FloatingInput(
           controller: _pincodeController,
-          label: '6-Digit Pincode (e.g. 560034)',
+          label: '6-Digit Pincode',
           keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(6),
+          ],
           maxLength: 6,
+          suffixIcon: _isFetchingPostal
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.green),
+                  ),
+                )
+              : null,
+          onChanged: (val) async {
+            if (val.trim().length == 6) {
+              setState(() => _isFetchingPostal = true);
+              final res = await _lookupPincodeFromApi(val.trim());
+              if (res != null && mounted) {
+                setState(() {
+                  if (res['state'] != null &&
+                      (res['state'] as String).isNotEmpty) {
+                    _stateController.text = res['state'] as String;
+                  }
+                  if (res['city'] != null &&
+                      (res['city'] as String).isNotEmpty) {
+                    _cityController.text = res['city'] as String;
+                  }
+                  if (res['locality'] != null &&
+                      (res['locality'] as String).isNotEmpty &&
+                      _areaLocalityController.text.trim().isEmpty) {
+                    _areaLocalityController.text = res['locality'] as String;
+                  }
+                  _pincodeResolved = true;
+                });
+              }
+              if (mounted) setState(() => _isFetchingPostal = false);
+            }
+          },
         ),
         const SizedBox(height: 10),
 
@@ -1365,8 +1608,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         const SizedBox(height: 6),
         _buildDivider(),
 
-        // Elevator / Lift (Zero Pre-selected)
-        _buildSectionLabel('Elevator / Lift'),
+        // Lift (Zero Pre-selected)
+        _buildSectionLabel('Lift'),
         Row(
           children: [
             _buildInteractiveCard(
@@ -1493,7 +1736,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         Row(
           children: [
             ...floorOptions.take(3).map((opt) {
-              final isSelected = _floorCount == opt['title'] && !_showCustomFloor;
+              final isSelected =
+                  _floorCount == opt['title'] && !_showCustomFloor;
               return _buildInteractiveCard(
                 title: opt['title']!,
                 sub: opt['sub']!,
@@ -1503,7 +1747,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                   _showCustomFloor = false;
                 }),
               );
-            }).expand((w) => [w, const SizedBox(width: 6)]).toList(),
+            }).expand((w) => [w, const SizedBox(width: 6)]),
             _buildCustomFloorCard(isSelected: _showCustomFloor),
           ],
         ),
@@ -1607,13 +1851,13 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                                 fillColor: const Color(0xFFF9FAFB),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
-                                  borderSide:
-                                      const BorderSide(color: Color(0xFFE5E7EB)),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFE5E7EB)),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
-                                  borderSide:
-                                      const BorderSide(color: Color(0xFFE5E7EB)),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFE5E7EB)),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
@@ -2021,10 +2265,12 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                 // Row 1: Hall (3-Sharing)
                 _buildOccupancyRow(
                   title: 'Hall (3-Sharing)',
-                  count: _bhkOccupancy[_selectedBhkTab]?['Hall (3-Sharing)'] ?? 0,
+                  count:
+                      _bhkOccupancy[_selectedBhkTab]?['Hall (3-Sharing)'] ?? 0,
                   onDecrement: () {
-                    final cur =
-                        _bhkOccupancy[_selectedBhkTab]?['Hall (3-Sharing)'] ?? 0;
+                    final cur = _bhkOccupancy[_selectedBhkTab]
+                            ?['Hall (3-Sharing)'] ??
+                        0;
                     if (cur > 0) {
                       setState(() =>
                           _bhkOccupancy[_selectedBhkTab]!['Hall (3-Sharing)'] =
@@ -2032,8 +2278,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                     }
                   },
                   onIncrement: () {
-                    final cur =
-                        _bhkOccupancy[_selectedBhkTab]?['Hall (3-Sharing)'] ?? 0;
+                    final cur = _bhkOccupancy[_selectedBhkTab]
+                            ?['Hall (3-Sharing)'] ??
+                        0;
                     setState(() =>
                         _bhkOccupancy[_selectedBhkTab]!['Hall (3-Sharing)'] =
                             cur + 1);
@@ -2051,9 +2298,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                             ?['Bedroom (2-Sharing)'] ??
                         0;
                     if (cur > 0) {
-                      setState(() =>
-                          _bhkOccupancy[_selectedBhkTab]![
-                              'Bedroom (2-Sharing)'] = cur - 1);
+                      setState(() => _bhkOccupancy[_selectedBhkTab]![
+                          'Bedroom (2-Sharing)'] = cur - 1);
                     }
                   },
                   onIncrement: () {
@@ -2061,8 +2307,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                             ?['Bedroom (2-Sharing)'] ??
                         0;
                     setState(() =>
-                        _bhkOccupancy[_selectedBhkTab]![
-                            'Bedroom (2-Sharing)'] = cur + 1);
+                        _bhkOccupancy[_selectedBhkTab]!['Bedroom (2-Sharing)'] =
+                            cur + 1);
                   },
                 ),
                 const Divider(height: 24, color: Color(0xFFF0F0F0)),
@@ -2070,8 +2316,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                 _buildOccupancyRow(
                   title: 'Master Room',
                   isMaster: true,
-                  count:
-                      _bhkOccupancy[_selectedBhkTab]?['Master Room'] ?? 0,
+                  count: _bhkOccupancy[_selectedBhkTab]?['Master Room'] ?? 0,
                   onDecrement: () {
                     final cur =
                         _bhkOccupancy[_selectedBhkTab]?['Master Room'] ?? 0;
@@ -2346,15 +2591,19 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                               runSpacing: 8,
                               children: rooms.map((room) {
                                 final isThisSelected =
-                                    _sharingAssignedRooms[sharing]?.contains(room) ??
+                                    _sharingAssignedRooms[sharing]
+                                            ?.contains(room) ??
                                         false;
                                 final isOtherAssigned =
                                     _sharingAssignedRooms.entries.any(
-                                  (e) => e.key != sharing && e.value.contains(room),
+                                  (e) =>
+                                      e.key != sharing &&
+                                      e.value.contains(room),
                                 );
                                 final otherSharing = isOtherAssigned
                                     ? _sharingAssignedRooms.entries
-                                        .firstWhere((e) => e.value.contains(room))
+                                        .firstWhere(
+                                            (e) => e.value.contains(room))
                                         .key
                                     : null;
 
@@ -2362,9 +2611,11 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                                   onTap: () {
                                     setState(() {
                                       if (isThisSelected) {
-                                        _sharingAssignedRooms[sharing]?.remove(room);
+                                        _sharingAssignedRooms[sharing]
+                                            ?.remove(room);
                                       } else {
-                                        for (final list in _sharingAssignedRooms.values) {
+                                        for (final list
+                                            in _sharingAssignedRooms.values) {
                                           list.remove(room);
                                         }
                                         _sharingAssignedRooms
@@ -2398,8 +2649,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                                       children: [
                                         Text(
                                           room,
-                                          style:
-                                              AppTypography.bodySemiBold.copyWith(
+                                          style: AppTypography.bodySemiBold
+                                              .copyWith(
                                             fontSize: 12.5,
                                             fontWeight: isThisSelected
                                                 ? FontWeight.w700
@@ -2601,6 +2852,24 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             controller: _customDueDayController,
             label: 'Enter Custom Due Day (1 to 28 of every month)',
             keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(2),
+            ],
+            onChanged: (val) {
+              if (val.isNotEmpty) {
+                final day = int.tryParse(val);
+                if (day != null && day > 28) {
+                  _customDueDayController.text = '28';
+                  _customDueDayController.selection =
+                      const TextSelection.collapsed(offset: 2);
+                } else if (day != null && day < 1 && val != '') {
+                  _customDueDayController.text = '1';
+                  _customDueDayController.selection =
+                      const TextSelection.collapsed(offset: 1);
+                }
+              }
+            },
           ),
         ],
 
@@ -2802,15 +3071,18 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
 
         _FloatingInput(
           controller: _bankNameController,
-          label: 'Bank Name (e.g. HDFC Bank, SBI, ICICI, Canara)',
-          keyboardType: TextInputType.text,
+          label: 'Bank Name',
+          readOnly: true,
+          onTap: _showBankPickerModal,
+          suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: AppColors.muted),
         ),
         const SizedBox(height: 6),
         _buildDivider(),
 
         _FloatingInput(
           controller: _upiIdController,
-          label: 'Primary UPI ID / VPA (e.g. yourname@hdfcbank)',
+          label: 'Primary UPI ID / VPA',
           keyboardType: TextInputType.emailAddress,
         ),
         const SizedBox(height: 10),
@@ -2913,6 +3185,57 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             ),
           ),
         ),
+        const SizedBox(height: 14),
+
+        // Mandatory Confirmation Checkbox
+        InkWell(
+          onTap: () => setState(() => _bankConfirmed = !_bankConfirmed),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: _bankConfirmed
+                  ? AppColors.greenLight
+                  : const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color:
+                    _bankConfirmed ? AppColors.green : const Color(0xFFE5E7EB),
+                width: _bankConfirmed ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: Checkbox(
+                    value: _bankConfirmed,
+                    activeColor: AppColors.green,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    onChanged: (val) =>
+                        setState(() => _bankConfirmed = val ?? false),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'I confirm that the UPI ID, Phone Number, and Bank details belong to me. Tenant rent payments will credit directly to this account.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -2921,7 +3244,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
   Widget _buildBottomBar() {
     final continueLabel = widget.isScaleMode
         ? 'Save & Update Bed Capacity'
-        : (_currentStep == 4 ? 'Complete Setup & Launch Dashboard' : 'Continue');
+        : (_currentStep == 4
+            ? 'Complete Setup & Launch Dashboard'
+            : 'Continue');
 
     return SafeArea(
       top: false,
@@ -3282,6 +3607,491 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       ),
     );
   }
+
+  // ─── Picker Modals ───────────────────────────────────────────────
+
+  void _showStatePickerModal() {
+    final items = _availableStates;
+    final searchController = TextEditingController();
+    List<String> filtered = List.from(items);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setModal) {
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.80,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                // Handle
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 6),
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                // Title
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Select State',
+                        style: GoogleFonts.outfit(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (items.isEmpty)
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.green,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Search box
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search state…',
+                      hintStyle: GoogleFonts.outfit(
+                          color: AppColors.muted, fontSize: 14),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: AppColors.muted, size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFF4F6F9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (q) {
+                      setModal(() {
+                        filtered = items
+                            .where((s) =>
+                                s.toLowerCase().contains(q.toLowerCase()))
+                            .toList();
+                      });
+                    },
+                  ),
+                ),
+                if (items.isEmpty)
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const CircularProgressIndicator(
+                              color: AppColors.green),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Loading states from API…',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13, color: AppColors.muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) {
+                        final state = filtered[i];
+                        final isSelected = state == _selectedState;
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              _selectedState = state;
+                              _selectedCity = '';
+                              _stateController.text = state;
+                              _cityController.text = '';
+                            });
+                            Navigator.of(ctx).pop();
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 13),
+                            margin: const EdgeInsets.symmetric(vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.green.withValues(alpha: 0.06)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    state,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: isSelected
+                                          ? AppColors.green
+                                          : AppColors.ink,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  const Icon(Icons.check_rounded,
+                                      size: 18, color: AppColors.green),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  void _showCityPickerModal() {
+    if (_selectedState.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please select a State first',
+            style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w600, color: Colors.white),
+          ),
+          backgroundColor: AppColors.ink,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    final items = _availableCities;
+    final searchController = TextEditingController();
+    List<String> filtered = List.from(items);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setModal) {
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.80,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 6),
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  child: Text(
+                    'Select City / District',
+                    style: GoogleFonts.outfit(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search city…',
+                      hintStyle: GoogleFonts.outfit(
+                          color: AppColors.muted, fontSize: 14),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: AppColors.muted, size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFF4F6F9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (q) {
+                      setModal(() {
+                        filtered = items
+                            .where((c) =>
+                                c.toLowerCase().contains(q.toLowerCase()))
+                            .toList();
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final city = filtered[i];
+                      final isSelected = city == _selectedCity;
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedCity = city;
+                            _cityController.text = city;
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 13),
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.green.withValues(alpha: 0.06)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  city,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? AppColors.green
+                                        : AppColors.ink,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(Icons.check_rounded,
+                                    size: 18, color: AppColors.green),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  void _showBankPickerModal() {
+    const banks = [
+      'Axis Bank',
+      'Bank of Baroda',
+      'Bank of India',
+      'Bank of Maharashtra',
+      'Canara Bank',
+      'Central Bank of India',
+      'City Union Bank',
+      'CSB Bank',
+      'DCB Bank',
+      'Dhanlaxmi Bank',
+      'Federal Bank',
+      'HDFC Bank',
+      'ICICI Bank',
+      'IDBI Bank',
+      'IDFC First Bank',
+      'Indian Bank',
+      'Indian Overseas Bank',
+      'IndusInd Bank',
+      'Jammu & Kashmir Bank',
+      'Karnataka Bank',
+      'Karur Vysya Bank',
+      'Kotak Mahindra Bank',
+      'Nainital Bank',
+      'Punjab & Sind Bank',
+      'Punjab National Bank',
+      'RBL Bank',
+      'South Indian Bank',
+      'State Bank of India (SBI)',
+      'Tamilnad Mercantile Bank',
+      'UCO Bank',
+      'Union Bank of India',
+      'Yes Bank',
+    ];
+
+    final searchController = TextEditingController();
+    List<String> filtered = List.from(banks);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(builder: (ctx, setModal) {
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.80,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 6),
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE5E7EB),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                  child: Text(
+                    'Select Your Bank',
+                    style: GoogleFonts.outfit(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  child: TextField(
+                    controller: searchController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search bank…',
+                      hintStyle: GoogleFonts.outfit(
+                          color: AppColors.muted, fontSize: 14),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: AppColors.muted, size: 20),
+                      filled: true,
+                      fillColor: const Color(0xFFF4F6F9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onChanged: (q) {
+                      setModal(() {
+                        filtered = banks
+                            .where((b) =>
+                                b.toLowerCase().contains(q.toLowerCase()))
+                            .toList();
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final bank = filtered[i];
+                      final isSelected = bank == _bankNameController.text;
+                      return InkWell(
+                        onTap: () {
+                          setState(() {
+                            _bankNameController.text = bank;
+                            _bankNameError = null;
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 13),
+                          margin: const EdgeInsets.symmetric(vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? AppColors.green.withValues(alpha: 0.06)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  bank,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? AppColors.green
+                                        : AppColors.ink,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                const Icon(Icons.check_rounded,
+                                    size: 18, color: AppColors.green),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        });
+      },
+    );
+  }
 }
 
 /// Smart Floating Label Input Field
@@ -3296,6 +4106,11 @@ class _FloatingInput extends StatelessWidget {
   final int? maxLength;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final String? errorText;
+  final List<TextInputFormatter>? inputFormatters;
+  final bool readOnly;
+  final VoidCallback? onTap;
+  final Widget? suffixIcon;
 
   const _FloatingInput({
     required this.controller,
@@ -3304,6 +4119,11 @@ class _FloatingInput extends StatelessWidget {
     this.maxLength,
     this.onChanged,
     this.onSubmitted,
+    this.errorText,
+    this.inputFormatters,
+    this.readOnly = false,
+    this.onTap,
+    this.suffixIcon,
   });
 
   @override
@@ -3314,6 +4134,9 @@ class _FloatingInput extends StatelessWidget {
       maxLength: maxLength,
       onChanged: onChanged,
       onFieldSubmitted: onSubmitted,
+      readOnly: readOnly,
+      onTap: onTap,
+      inputFormatters: inputFormatters,
       style: const TextStyle(
         fontFamily: 'Outfit',
         fontSize: 15,
@@ -3322,6 +4145,8 @@ class _FloatingInput extends StatelessWidget {
       ),
       decoration: InputDecoration(
         labelText: label,
+        errorText: errorText,
+        suffixIcon: suffixIcon,
         labelStyle: const TextStyle(
           fontFamily: 'Outfit',
           fontSize: 13.5,
@@ -3342,11 +4167,27 @@ class _FloatingInput extends StatelessWidget {
         contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.0),
+          borderSide: BorderSide(
+            color: errorText != null
+                ? const Color(0xFFDC2626)
+                : const Color(0xFFE5E7EB),
+            width: 1.0,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.ink, width: 1.2),
+          borderSide: BorderSide(
+            color: errorText != null ? const Color(0xFFDC2626) : AppColors.ink,
+            width: 1.2,
+          ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.0),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.2),
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
