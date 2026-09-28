@@ -2483,11 +2483,11 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '${tenant['extensionReason'] ?? 'Requested payment extension till 15th.'}',
+                      'Requested to pay on ${tenant['requestedDate'] ?? tenant['extensionDate'] ?? '15 Aug 2026'}',
                       style: GoogleFonts.outfit(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF92400E)),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF92400E)),
                     ),
                   ),
                 ],
@@ -2563,14 +2563,69 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               children: [
                 Expanded(
                   child: InkWell(
-                    onTap: () => _declineExtension(tenant),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (dCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: Text(
+                            'Decline Extension?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          content: Text(
+                            'Are you sure you want to decline the payment extension for ${tenant['name']}?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dCtx),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(dCtx);
+                                _declineExtension(tenant);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFDC2626),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                'Yes, Decline',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       height: 36,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: const Color(0xFFFFFBEB),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFCA5A5)),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
                       ),
                       child: Center(
                         child: Text(
@@ -2578,7 +2633,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                           style: GoogleFonts.outfit(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
-                              color: AppColors.danger),
+                              color: const Color(0xFFB45309)),
                         ),
                       ),
                     ),
@@ -2588,13 +2643,70 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 Expanded(
                   flex: 2,
                   child: InkWell(
-                    onTap: () => _approveExtension(tenant),
+                    onTap: () {
+                      final extDate = tenant['requestedDate'] ?? '15 Aug';
+                      showDialog(
+                        context: context,
+                        builder: (dCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: Text(
+                            'Approve Extension?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          content: Text(
+                            'Approve rent payment extension for ${tenant['name']} till $extDate?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dCtx),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(dCtx);
+                                _approveExtension(tenant);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF59E0B),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                'Yes, Approve',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       height: 36,
                       decoration: BoxDecoration(
-                        color: AppColors.ink,
+                        color: const Color(0xFFFEF3C7),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
                       ),
                       child: Center(
                         child: Text(
@@ -2602,7 +2714,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                           style: GoogleFonts.outfit(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white),
+                              color: const Color(0xFFB45309)),
                         ),
                       ),
                     ),
@@ -2690,8 +2802,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFDC2626),
+                color: const Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
               ),
               child: Column(
                 children: [
@@ -2701,16 +2814,16 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0.5,
-                      color: Colors.white,
+                      color: const Color(0xFF92400E),
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    tenant['dueLabel'] ?? 'Due on 15 Aug',
+                    'Extension Approved • Due ${tenant['extensionDate'] ?? '15 Aug'}',
                     style: GoogleFonts.outfit(
                       fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFB45309),
                     ),
                   ),
                 ],

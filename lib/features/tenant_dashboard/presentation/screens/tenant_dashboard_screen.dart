@@ -5,7 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../tenant_payments/presentation/screens/rent_payment_screen.dart';
 import '../../../tenant_payments/presentation/screens/paid_via_cash_screen.dart';
 import '../../../tenant_payments/presentation/screens/payment_ledger_screen.dart';
-import '../../../tenant_payments/presentation/screens/security_deposit_screen.dart';
+import '../../../tenant_payments/presentation/widgets/request_extension_sheet.dart';
 import '../../../tenant_helpdesk/presentation/screens/raise_ticket_screen.dart';
 import '../../../tenant_helpdesk/presentation/screens/ticket_status_screen.dart';
 import '../../../tenant_helpdesk/presentation/screens/washing_machine_booking_screen.dart';
@@ -507,9 +507,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             onTap: _openPaymentLedger,
           ),
           _buildItemButton(
-            icon: Icons.shield_outlined,
-            label: 'Security\nDeposit',
-            onTap: _openSecurityDeposit,
+            icon: Icons.event_repeat_rounded,
+            label: 'Request\nExtension',
+            onTap: _openRequestExtension,
           ),
         ],
       ),
@@ -567,17 +567,12 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     );
   }
 
-  void _openSecurityDeposit() {
-    HapticFeedback.lightImpact();
-    Navigator.push(
+  void _openRequestExtension() {
+    RequestExtensionSheet.show(
       context,
-      MaterialPageRoute(
-        builder: (context) => SecurityDepositScreen(
-          roomNumber: widget.roomNumber,
-          bedLabel: 'Bed ${widget.bedId}',
-          propertyName: widget.pgName,
-        ),
-      ),
+      onExtensionRequested: (selectedDay) {
+        // Callback if needed for dashboard state updates
+      },
     );
   }
 
@@ -1258,9 +1253,6 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       ),
     );
   }
-
-
-
 
   /// Smart Initial Generator (e.g. "Bhargav S Kulkarni" -> "BK", "Joy Sen" -> "JS")
   String _getInitials(String name) {

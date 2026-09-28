@@ -154,8 +154,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       'phone': '9733445566',
       'amount': 7500,
       'payDay': 3,
-      'status': 'pending',
-      'dueLabel': 'Salary Cycle 3rd • Awaiting UPI Transfer',
+      'status': 'extension_requested',
+      'requestedDate': '15 Aug 2026',
+      'dueLabel': 'Extension Requested • Due 15 Aug',
       'approvedBy': 'Arun Kumar (Co-Owner)',
     },
     {
@@ -711,10 +712,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6.5),
           decoration: BoxDecoration(
-            color: isSel ? AppColors.ink : Colors.white,
+            color: isSel ? AppColors.green : Colors.white,
             borderRadius: BorderRadius.circular(99),
             border: Border.all(
-                color: isSel ? AppColors.ink : const Color(0xFFE5E7EB)),
+                color: isSel ? AppColors.green : const Color(0xFFE5E7EB)),
           ),
           child: Text(
             label,
@@ -1107,6 +1108,234 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           ),
           const SizedBox(height: 8),
 
+          // Extension Request Bar with Yellow Decline and Approve Buttons
+          if (tenant['status'] == 'extension_requested') ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.schedule_rounded,
+                      size: 13, color: Color(0xFFD97706)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Requested to pay on ${tenant['requestedDate'] ?? '15 Aug 2026'}',
+                      style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (dCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: Text(
+                            'Decline Extension?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          content: Text(
+                            'Are you sure you want to decline the payment extension for ${tenant['name']}?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dCtx),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(dCtx);
+                                setState(() {
+                                  tenant['status'] = 'overdue';
+                                  tenant['dueLabel'] = 'Extension Declined • Due Immediately';
+                                });
+                                _showToast('Extension Declined for ${tenant['name']}');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFDC2626),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                'Yes, Decline',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '✕ Decline',
+                          style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFB45309)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: InkWell(
+                    onTap: () {
+                      final extDate = tenant['requestedDate'] ?? '15 Aug 2026';
+                      showDialog(
+                        context: context,
+                        builder: (dCtx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          title: Text(
+                            'Approve Extension?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                          content: Text(
+                            'Approve rent payment extension for ${tenant['name']} till $extDate?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(dCtx),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(dCtx);
+                                setState(() {
+                                  tenant['status'] = 'extension_approved';
+                                  tenant['extensionDate'] = extDate;
+                                  tenant['dueLabel'] = 'Extension Approved • Due $extDate';
+                                });
+                                _showToast('Extension Approved for ${tenant['name']} till $extDate ✓');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF59E0B),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                'Yes, Approve',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDE68A)),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '✓ Approve (${tenant['requestedDate'] ?? '15 Aug'})',
+                          style: GoogleFonts.outfit(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFFB45309)),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ] else if (tenant['status'] == 'extension_approved') ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded,
+                      size: 13, color: Color(0xFFB45309)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Extension Approved • Due ${tenant['extensionDate'] ?? '15 Aug 2026'}',
+                      style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // ROW 2: If Paid -> Full-Width Change Date (Receipt Removed)
           //        If Not Paid -> View Proof, Reject, Accept
           if (isPaid)
@@ -1145,7 +1374,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 ),
               ),
             )
-          else ...[
+          else if (tenant['status'] != 'extension_requested') ...[
             // Verification Bar: View Proof, Reject, and Accept
             Row(
               children: [

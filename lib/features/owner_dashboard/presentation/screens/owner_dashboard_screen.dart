@@ -18,6 +18,7 @@ import '../../../owner_reports/presentation/screens/owner_reports_screen.dart';
 import '../../../owner_billing/presentation/screens/owner_saas_billing_screen.dart';
 import '../../../owner_rent/presentation/screens/owner_day_collection_screen.dart';
 import '../../../owner_food_menu/presentation/screens/owner_food_menu_screen.dart';
+import '../../../owner_tenant_controls/presentation/screens/owner_tenant_controls_screen.dart';
 
 /// Screen 5: Owner Command Center Dashboard.
 /// 1-to-1 exact translation of `ProductionCode/owner_dashboard.html`.
@@ -317,6 +318,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               OwnerFoodMenuScreen(
                 onBack: () => setState(() => _activeSubScreen = 'dashboard'),
               )
+            else if (_activeSubScreen == 'tenant_controls')
+              OwnerTenantControlsScreen(
+                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+              )
             else if (_activeNavIndex == 3 || _activeSubScreen == 'billing')
               OwnerSaaSBillingScreen(
                 onBack: () => setState(() {
@@ -368,13 +373,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 ],
               ),
 
-            // Bottom Navigation Bar (Fixed 4 Tabs)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _buildBottomNavbar(),
-            ),
+            // Bottom Navigation Bar (Fixed 4 Tabs - ONLY on Main Dashboard)
+            if (_activeSubScreen == 'dashboard' && _activeNavIndex == 0)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildBottomNavbar(),
+              ),
 
             // Active Interactive Modals
             if (_showApprovalModal) _buildApprovalModalSheet(),
@@ -2206,6 +2212,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       {'title': 'Staff & Warden', 'icon': Icons.badge_outlined, 'onTap': () => setState(() => _activeSubScreen = 'staff')},
       {'title': 'Food Menu', 'icon': Icons.restaurant_menu_outlined, 'onTap': () => setState(() => _activeSubScreen = 'food_menu')},
       {'title': 'Invite Manager', 'icon': Icons.person_add_alt_1_outlined, 'onTap': _showInviteManagerModal},
+      {'title': 'Tenant Controls', 'icon': Icons.tune_rounded, 'onTap': () => setState(() => _activeSubScreen = 'tenant_controls')},
       {'title': 'Reports & P&L', 'icon': Icons.insights_outlined, 'onTap': () => setState(() => _activeSubScreen = 'reports')},
     ];
 
