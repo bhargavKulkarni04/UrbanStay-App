@@ -150,9 +150,53 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             child: _buildTenancyCard(),
           ),
 
+          const SizedBox(height: 28),
+
+          // 🏡 Community Footer Illustration & Namma Bengaluru Signature
+          _buildTenantCommunityFooter(),
+
           const SizedBox(height: 36),
         ],
       ),
+    );
+  }
+
+  /// 🏡 Community Footer Signature matching Phone Verify typography
+  Widget _buildTenantCommunityFooter() {
+    return Column(
+      children: [
+        Text(
+          'built with love in,',
+          style: GoogleFonts.outfit(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+            color: AppColors.muted,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Namma Bengaluru',
+          style: GoogleFonts.outfit(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w800,
+            color: AppColors.ink,
+            letterSpacing: -0.2,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Clean cropped line-art illustration
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Image.asset(
+            'assets/images/Footer_tenant.png',
+            width: double.infinity,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ],
     );
   }
 

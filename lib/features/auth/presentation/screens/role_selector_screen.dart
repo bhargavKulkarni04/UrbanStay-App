@@ -32,13 +32,13 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
 
   // Controllers
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneEmailController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _pgCodeController = TextEditingController();
 
   // Focus Nodes
   final FocusNode _nameFocusNode = FocusNode();
-  final FocusNode _phoneEmailFocusNode = FocusNode();
+  final FocusNode _emailFocusNode = FocusNode();
   final FocusNode _passwordFocusNode = FocusNode();
   final FocusNode _pgCodeFocusNode = FocusNode();
 
@@ -59,7 +59,7 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
     );
 
     _nameFocusNode.addListener(() => setState(() {}));
-    _phoneEmailFocusNode.addListener(() => setState(() {}));
+    _emailFocusNode.addListener(() => setState(() {}));
     _passwordFocusNode.addListener(() => setState(() {}));
     _pgCodeFocusNode.addListener(() => setState(() {}));
   }
@@ -68,11 +68,11 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
   void dispose() {
     _waveController.dispose();
     _nameController.dispose();
-    _phoneEmailController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _pgCodeController.dispose();
     _nameFocusNode.dispose();
-    _phoneEmailFocusNode.dispose();
+    _emailFocusNode.dispose();
     _passwordFocusNode.dispose();
     _pgCodeFocusNode.dispose();
     super.dispose();
@@ -98,13 +98,26 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
   }
 
   void _handleSubmit() {
-    final identifier = _phoneEmailController.text.trim();
+    final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (identifier.isEmpty || password.isEmpty) {
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please fill in all required fields.'),
+          backgroundColor: AppColors.ink,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Standard RFC-compliant email validation
+    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email address (e.g. name@example.com).'),
           backgroundColor: AppColors.ink,
           duration: Duration(seconds: 2),
         ),
@@ -116,17 +129,6 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter your full legal name.'),
-          backgroundColor: AppColors.ink,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-    if (_role == AuthRole.tenant && _mode == AuthMode.register && _pgCodeController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your PG Property Code (e.g. AR-101).'),
           backgroundColor: AppColors.ink,
           duration: Duration(seconds: 2),
         ),
@@ -157,7 +159,7 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
               initialName: _nameController.text.trim().isNotEmpty
                   ? _nameController.text.trim()
                   : null,
-              initialPhoneOrEmail: identifier,
+              initialPhoneOrEmail: email,
             ),
           ),
         );
@@ -524,26 +526,15 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
           const SizedBox(height: 12),
         ],
 
-        // PG Code Field (Tenant Registration only)
-        if (_role == AuthRole.tenant && _mode == AuthMode.register) ...[
-          _buildInputWrapper(
-            controller: _pgCodeController,
-            focusNode: _pgCodeFocusNode,
-            icon: Icons.domain_rounded,
-            hint: 'PG Property Code (e.g. AR-101)',
-            keyboardType: TextInputType.text,
-            textCapitalization: TextCapitalization.characters,
-          ),
-          const SizedBox(height: 12),
-        ],
-
-        // Mobile / Email Field
+        // Email Address Field (Industry standard, ₹0 free Supabase auth)
         _buildInputWrapper(
-          controller: _phoneEmailController,
-          focusNode: _phoneEmailFocusNode,
-          icon: Icons.phone_outlined,
-          hint: 'Mobile Number or Email',
+          controller: _emailController,
+          focusNode: _emailFocusNode,
+          icon: Icons.mail_outline_rounded,
+          hint: 'Email Address',
           keyboardType: TextInputType.emailAddress,
+          autofillHints: const [AutofillHints.email],
+          autocorrect: false,
         ),
 
         const SizedBox(height: 12),
@@ -556,6 +547,7 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
           hint: 'Password or 6-digit PIN',
           obscureText: _obscurePassword,
           keyboardType: TextInputType.visiblePassword,
+          autofillHints: const [AutofillHints.password],
           suffixIcon: IconButton(
             icon: Icon(
               _obscurePassword
@@ -584,13 +576,15 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization textCapitalization = TextCapitalization.none,
     bool obscureText = false,
+    Iterable<String>? autofillHints,
+    bool autocorrect = true,
     Widget? suffixIcon,
   }) {
     final hasFocus = focusNode.hasFocus;
     return Container(
       height: 52,
       decoration: BoxDecoration(
-        color: hasFocus ? Colors.white : const Color(0xFFF8F9FA),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: hasFocus ? AppColors.green : const Color(0xFFE5E7EB),
@@ -622,6 +616,8 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
               obscureText: obscureText,
               keyboardType: keyboardType,
               textCapitalization: textCapitalization,
+              autofillHints: autofillHints,
+              autocorrect: autocorrect,
               style: AppTypography.bodyRegular.copyWith(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w600,

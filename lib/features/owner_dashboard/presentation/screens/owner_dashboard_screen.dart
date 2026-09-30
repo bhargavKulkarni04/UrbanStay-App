@@ -545,16 +545,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          color: AppColors.greenLight,
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                        child: const Icon(Icons.apartment_rounded, size: 15, color: AppColors.greenDark),
-                      ),
-                      const SizedBox(width: 8),
                       Text(
                         prop['name'] as String,
                         style: GoogleFonts.outfit(
@@ -613,35 +603,18 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppColors.greenLight,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.green.withValues(alpha: 0.18)),
-                    ),
-                    child: const Icon(
-                      Icons.apartment_rounded,
-                      size: 20,
-                      color: AppColors.greenDark,
+                  Text(
+                    prop['name'] as String,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: AppColors.ink,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        prop['name'] as String,
-                        style: GoogleFonts.outfit(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.4,
-                          color: AppColors.ink,
-                        ),
-                      ),
                       Row(
                         children: [
                           const Icon(Icons.location_on_outlined, size: 11, color: AppColors.muted),
@@ -658,8 +631,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                     ],
                   ),
-                ],
-              ),
 
               // Live % Full Badge
               Container(
@@ -1556,19 +1527,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 14, color: AppColors.muted),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.outfit(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
-                color: AppColors.muted,
-              ),
-            ),
-          ],
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+            color: AppColors.muted,
+          ),
         ),
         Text(
           value,
@@ -1663,13 +1628,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           ),
           const SizedBox(height: 14),
 
-          // 3 Tactile Inside Blocks (Pure White Background, All Green Numbers)
+          // 2 Tactile Inside Blocks (Pure White Background, All Green Numbers)
           Row(
             children: [
               // Block 1: Paid Beds
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1680,20 +1645,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     children: [
                       FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.check_circle_outline_rounded, size: 13, color: AppColors.green),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Paid Beds',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.greenDark,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'Paid Beds',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.greenDark,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1716,7 +1674,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           'of 31 Occupied',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
-                            fontSize: 10,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w500,
                             color: AppColors.muted,
                           ),
@@ -1726,12 +1684,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
 
               // Block 2: Pending Dues
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1742,20 +1700,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     children: [
                       FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.schedule_rounded, size: 13, color: AppColors.muted),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Pending',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'Pending',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -1778,69 +1729,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           'This Month',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-
-              // Block 3: Defaulters
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.verified_user_outlined, size: 13, color: AppColors.muted),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Defaulters',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          '0',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.8,
-                            color: AppColors.green,
-                          ),
-                        ),
-                      ),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          'Zero Overdue',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.outfit(
-                            fontSize: 10,
+                            fontSize: 10.5,
                             fontWeight: FontWeight.w500,
                             color: AppColors.muted,
                           ),
@@ -1851,48 +1740,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-
-          // 1-Tap Action Button: Send WhatsApp Payment Links
-          InkWell(
-            onTap: () => setState(() => _activeSubScreen = 'rent'),
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.green),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            'Send WhatsApp Payment Links to 6 Pending',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.arrow_forward_rounded, size: 13, color: AppColors.green),
-                ],
-              ),
-            ),
           ),
         ],
       ),
@@ -1978,20 +1825,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     children: [
                       FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.receipt_long_outlined, size: 13, color: AppColors.muted),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Submitted',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'Submitted',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -2040,20 +1880,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     children: [
                       FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.task_alt_rounded, size: 13, color: AppColors.green),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Approved',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.greenDark,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'Approved',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.greenDark,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -2102,20 +1935,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     children: [
                       FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.pending_actions_outlined, size: 13, color: AppColors.green),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Pending',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'Pending',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 4),

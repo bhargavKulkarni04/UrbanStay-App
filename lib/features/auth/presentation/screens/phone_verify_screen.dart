@@ -472,7 +472,7 @@ class _PhoneVerifyScreenState extends State<PhoneVerifyScreen>
               height: 52,
               padding: const EdgeInsets.symmetric(horizontal: 13),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8F9FA),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: const Color(0xFFE5E7EB),
@@ -503,7 +503,7 @@ class _PhoneVerifyScreenState extends State<PhoneVerifyScreen>
                 height: 52,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
                     color: const Color(0xFFE5E7EB),
@@ -685,13 +685,11 @@ class _PhoneVerifyScreenState extends State<PhoneVerifyScreen>
               height: 52,
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: _otpFocusNodes[index].hasFocus
-                        ? AppColors.green
-                        : const Color(0xFFE5E7EB),
-                    width: 1.8,
+                    color: const Color(0xFFE5E7EB),
+                    width: 1.5,
                   ),
                 ),
                 child: Center(

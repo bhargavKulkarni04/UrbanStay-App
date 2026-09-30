@@ -108,8 +108,8 @@ class UrbanStayApp extends StatelessWidget {
           child: content,
         );
       },
-      // 🚀 Owner Command Center Dashboard (Full Nav & Quick Actions)
-      home: const OwnerDashboardScreen(),
+      // 🚀 Resident / Tenant Living Dashboard
+      home: const TenantDashboardScreen(),
     );
   }
 }

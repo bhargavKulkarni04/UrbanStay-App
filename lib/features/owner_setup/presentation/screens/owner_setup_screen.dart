@@ -135,6 +135,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
   bool _showCustomLateFee = false;
   final _customLateFeeController = TextEditingController();
 
+  String? _washingMachines;
+  final _customWashingMachinesController = TextEditingController();
+
   String? _noticePeriod;
 
   // Step 4 Controllers & State
@@ -2967,7 +2970,117 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         const SizedBox(height: 6),
         _buildDivider(),
 
-        // 10. Move-out Notice Period (Zero Pre-selected)
+        // 10. Working Washing Machines (Zero Pre-selected, Direct Inline Custom)
+        _buildSectionLabel('Working Washing Machines'),
+        Row(
+          children: [
+            _buildInteractiveCard(
+              title: '1',
+              sub: 'Machine',
+              isSelected: _washingMachines == '1',
+              onTap: () => setState(() {
+                _washingMachines = '1';
+                _customWashingMachinesController.clear();
+              }),
+            ),
+            const SizedBox(width: 6),
+            _buildInteractiveCard(
+              title: '2',
+              sub: 'Machines',
+              isSelected: _washingMachines == '2',
+              onTap: () => setState(() {
+                _washingMachines = '2';
+                _customWashingMachinesController.clear();
+              }),
+            ),
+            const SizedBox(width: 6),
+            _buildInteractiveCard(
+              title: '3',
+              sub: 'Machines',
+              isSelected: _washingMachines == '3',
+              onTap: () => setState(() {
+                _washingMachines = '3';
+                _customWashingMachinesController.clear();
+              }),
+            ),
+            const SizedBox(width: 6),
+            // Inline Custom Number Input (Digits Only, No Separate Box)
+            Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                constraints: const BoxConstraints(minHeight: 50),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                      ? AppColors.green.withValues(alpha: 0.06)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                        ? AppColors.green
+                        : const Color(0xFFE5E7EB),
+                    width: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                        ? 1.4
+                        : 1.0,
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextField(
+                      controller: _customWashingMachinesController,
+                      keyboardType: TextInputType.number,
+                      textAlign: TextAlign.center,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      style: AppTypography.bodySemiBold.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                            ? AppColors.greenDark
+                            : AppColors.ink,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '+ Custom',
+                        hintStyle: AppTypography.bodySemiBold.copyWith(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ink,
+                        ),
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onChanged: (val) {
+                        setState(() {
+                          _washingMachines = val.trim().isNotEmpty ? val.trim() : null;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      'Enter #',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.captionSmall.copyWith(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w500,
+                        color: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                            ? AppColors.green
+                            : AppColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 6),
+        _buildDivider(),
+
+        // 11. Move-out Notice Period (Zero Pre-selected)
         _buildSectionLabel('Move-out Notice Period'),
         Row(
           children: [
