@@ -14,6 +14,7 @@ import 'features/tenant_payments/presentation/screens/rent_payment_screen.dart';
 import 'features/tenant_profile/presentation/screens/profile_settings_screen.dart';
 
 import 'features/owner_billing/presentation/screens/owner_saas_billing_screen.dart';
+import 'features/auth/presentation/screens/role_selector_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -108,8 +109,8 @@ class UrbanStayApp extends StatelessWidget {
           child: content,
         );
       },
-      // 🚀 Resident / Tenant Living Dashboard
-      home: const TenantDashboardScreen(),
+      // 🚀 Choose Tenant vs Owner
+      home: const RoleSelectorScreen(),
     );
   }
 }

@@ -19,6 +19,7 @@ import '../../../owner_billing/presentation/screens/owner_saas_billing_screen.da
 import '../../../owner_rent/presentation/screens/owner_day_collection_screen.dart';
 import '../../../owner_food_menu/presentation/screens/owner_food_menu_screen.dart';
 import '../../../owner_tenant_controls/presentation/screens/owner_tenant_controls_screen.dart';
+import '../../../owner_setup/presentation/screens/owner_setup_screen.dart';
 
 /// Screen 5: Owner Command Center Dashboard.
 /// 1-to-1 exact translation of `ProductionCode/owner_dashboard.html`.
@@ -51,6 +52,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       'id': 'prop_1',
       'name': 'Greenview PG',
       'location': 'Koramangala, Bengaluru',
+      'code': 'GP4821G',
       'occupiedBeds': 31,
       'totalBeds': 35,
       'occupancyPct': '88% Full',
@@ -66,6 +68,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       'id': 'prop_2',
       'name': 'UrbanStay Luxury PG',
       'location': 'HSR Sector 2, Bengaluru',
+      'code': 'UL9124G',
       'occupiedBeds': 48,
       'totalBeds': 50,
       'occupancyPct': '96% Full',
@@ -81,6 +84,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       'id': 'prop_3',
       'name': 'UrbanStay Coliving Hub',
       'location': 'BTM 2nd Stage, Bengaluru',
+      'code': 'UC7342C',
       'occupiedBeds': 22,
       'totalBeds': 25,
       'occupancyPct': '88% Full',
@@ -162,6 +166,60 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   ];
 
   // Modals Controller State
+  String _activeNotificationFilter = 'All'; // 'All', 'Rent UPI', 'Rent Cash', 'Vacating', 'Check-In', 'Maintenance'
+  final List<Map<String, dynamic>> _notifications = [
+    {
+      'id': 'notif_1',
+      'category': 'Rent UPI',
+      'title': 'Rahul Sharma (Room 101-A) paid ₹8,500 via UPI',
+      'time': '18:42',
+      'date': 'TODAY — 08 OCT 2026',
+      'actionText': 'Verify Payment',
+      'actionTarget': 'approvals',
+      'isUnread': true,
+    },
+    {
+      'id': 'notif_2',
+      'category': 'Rent Cash',
+      'title': 'Suresh collected ₹6,500 cash from Room 204',
+      'time': '15:10',
+      'date': 'TODAY — 08 OCT 2026',
+      'actionText': 'Confirm Cash Received',
+      'actionTarget': 'day_collection',
+      'isUnread': true,
+    },
+    {
+      'id': 'notif_3',
+      'category': 'Vacating',
+      'title': 'Amit Verma (Room 204-B) vacating on 31 Oct',
+      'time': '11:05',
+      'date': 'TODAY — 08 OCT 2026',
+      'actionText': 'View Vacating Details',
+      'actionTarget': 'notice',
+      'isUnread': true,
+    },
+    {
+      'id': 'notif_4',
+      'category': 'Check-In',
+      'title': 'Karthik Nair completed check-in for Room 302',
+      'time': '19:20',
+      'date': 'YESTERDAY — 07 OCT 2026',
+      'actionText': 'Approve Check-In',
+      'actionTarget': 'onboarding',
+      'isUnread': false,
+    },
+    {
+      'id': 'notif_5',
+      'category': 'Maintenance',
+      'title': 'Room 105 reported geyser water leakage',
+      'time': '14:45',
+      'date': 'YESTERDAY — 07 OCT 2026',
+      'actionText': 'View Complaint',
+      'actionTarget': 'complaints',
+      'isUnread': false,
+    },
+  ];
+
   bool _showApprovalModal = false;
   bool _showRentModal = false;
   bool _showExpenseModal = false;
@@ -322,6 +380,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               OwnerTenantControlsScreen(
                 onBack: () => setState(() => _activeSubScreen = 'dashboard'),
               )
+            else if (_activeSubScreen == 'notifications')
+              _buildNotificationFullPage()
             else if (_activeNavIndex == 3 || _activeSubScreen == 'billing')
               OwnerSaaSBillingScreen(
                 onBack: () => setState(() {
@@ -441,7 +501,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     clipBehavior: Clip.none,
                     children: [
                       InkWell(
-                        onTap: () => _showToast('3 Pending Notifications'),
+                        onTap: () => setState(() => _activeSubScreen = 'notifications'),
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
                           width: 36,
@@ -458,29 +518,30 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           ),
                         ),
                       ),
-                      Positioned(
-                        top: -3,
-                        right: -3,
-                        child: Container(
-                          width: 16,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: AppColors.green,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
-                          ),
-                          child: Center(
-                            child: Text(
-                              '3',
-                              style: GoogleFonts.outfit(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                      if (_notifications.where((n) => n['isUnread'] == true).isNotEmpty)
+                        Positioned(
+                          top: -3,
+                          right: -3,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: AppColors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${_notifications.where((n) => n['isUnread'] == true).length}',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(width: 8),
@@ -615,22 +676,62 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       color: AppColors.ink,
                     ),
                   ),
-                      Row(
-                        children: [
-                          const Icon(Icons.location_on_outlined, size: 11, color: AppColors.muted),
-                          const SizedBox(width: 2),
-                          Text(
-                            prop['location'] as String,
-                            style: GoogleFonts.outfit(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                  if (prop['code'] != null && (prop['code'] as String).isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    InkWell(
+                      onTap: () {
+                        final code = prop['code'] as String;
+                        Clipboard.setData(ClipboardData(text: code));
+                        _showToast('🔑 Copied PG Code: $code');
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              prop['code'] as String,
+                              style: GoogleFonts.outfit(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.copy_rounded,
+                              size: 10,
                               color: AppColors.muted,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_outlined, size: 11, color: AppColors.muted),
+                      const SizedBox(width: 2),
+                      Text(
+                        prop['location'] as String,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.muted,
+                        ),
                       ),
                     ],
                   ),
+                ],
+              ),
 
               // Live % Full Badge
               Container(
@@ -972,7 +1073,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               OutlinedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  _showToast('Opening 4-Step PG Onboarding Wizard...');
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => OwnerSetupScreen(
+                        initialStep: 2,
+                        onPropertyCreated: (newProperty) {
+                          setState(() {
+                            _properties.add(newProperty);
+                            _activePropertyIndex = _properties.length - 1;
+                          });
+                          _showToast('Successfully onboarded ${newProperty['name']}!');
+                        },
+                      ),
+                    ),
+                  );
                 },
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
@@ -2416,6 +2530,337 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // ===========================================================================
   // 7. INTERACTIVE MODAL SHEETS (8 MASTER MODALS)
   // ===========================================================================
+
+  /// Full Page: Notifications Action Center (Screen view, NOT a bottom sleeve)
+  Widget _buildNotificationFullPage() {
+    final unreadCount = _notifications.where((n) => n['isUnread'] == true).length;
+    final filters = ['All', 'Rent UPI', 'Rent Cash', 'Vacating', 'Check-In', 'Maintenance'];
+
+    final filteredList = _activeNotificationFilter == 'All'
+        ? _notifications
+        : _notifications.where((n) => n['category'] == _activeNotificationFilter).toList();
+
+    // Group filtered items by date preserving chronological order
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final notif in filteredList) {
+      final dateKey = notif['date'] as String;
+      grouped.putIfAbsent(dateKey, () => []).add(notif);
+    }
+
+    return Container(
+      color: Colors.white,
+      child: Column(
+        children: [
+          // Full Screen Top App Bar
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1.0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () => setState(() => _activeSubScreen = 'dashboard'),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: const Icon(Icons.arrow_back_rounded, size: 20, color: AppColors.ink),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Notifications',
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                        Text(
+                          unreadCount > 0 ? '$unreadCount unread alerts' : 'All alerts caught up',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                if (unreadCount > 0)
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        for (final n in _notifications) {
+                          n['isUnread'] = false;
+                        }
+                      });
+                      _showToast('All notifications marked as read ✓');
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.greenLight,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+                      ),
+                      child: Text(
+                        'Mark all as read',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.greenDark,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Horizontal Filter Bar with GREEN Capsule Pills
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: const Color(0xFFFAFAFA),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: filters.map((f) {
+                  final isSelected = _activeNotificationFilter == f;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: InkWell(
+                      onTap: () => setState(() => _activeNotificationFilter = f),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6.5),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.green : Colors.white, // GREEN CAPSULE
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                            width: 1.1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.green.withValues(alpha: 0.25),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Text(
+                          f,
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            color: isSelected ? Colors.white : AppColors.ink,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+
+          // Main Scrollable Notifications List
+          Expanded(
+            child: filteredList.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.notifications_none_rounded, size: 42, color: Color(0xFFD1D5DB)),
+                        const SizedBox(height: 10),
+                        Text(
+                          'No notifications in $_activeNotificationFilter',
+                          style: GoogleFonts.outfit(fontSize: 13.5, color: AppColors.muted),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    children: grouped.entries.map((entry) {
+                      final dateLabel = entry.key;
+                      final items = entry.value;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Date Header
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 10),
+                            child: Text(
+                              dateLabel,
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.6,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                          ),
+
+                          // Pure White Cards with Deep Black Category & Clean Green Action Text
+                          ...items.map((item) {
+                            final isUnread = item['isUnread'] == true;
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(15),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isUnread ? const Color(0xFFD1D5DB) : const Color(0xFFE5E7EB),
+                                  width: 1.1,
+                                ),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x04000000),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Top row: Category in Black & Time
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          if (isUnread) ...[
+                                            Container(
+                                              width: 6.5,
+                                              height: 6.5,
+                                              margin: const EdgeInsets.only(right: 6),
+                                              decoration: const BoxDecoration(
+                                                color: AppColors.green,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                          ],
+                                          Text(
+                                            item['category'] as String,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: -0.2,
+                                              color: AppColors.ink, // Black Category Text
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        item['time'] as String,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.muted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+
+                                  // Fact Title Line
+                                  Text(
+                                    item['title'] as String,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.35,
+                                      color: AppColors.ink,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  // Action: Green text, NO background, direct navigation
+                                  InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        item['isUnread'] = false;
+                                        final target = item['actionTarget'] as String;
+
+                                        // Direct Functional Dashboard Card Routing
+                                        if (target == 'approvals') {
+                                          _activeNavIndex = 2;
+                                          _activeSubScreen = 'approvals';
+                                        } else if (target == 'day_collection') {
+                                          _activeSubScreen = 'day_collection';
+                                        } else if (target == 'notice') {
+                                          _activeNavIndex = 1;
+                                          _activeSubScreen = 'rooms';
+                                        } else if (target == 'onboarding') {
+                                          _activeSubScreen = 'onboarding';
+                                        } else if (target == 'complaints') {
+                                          _activeSubScreen = 'complaints';
+                                        }
+                                      });
+                                      _showToast('Opened ${item['actionText']}');
+                                    },
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 2),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            item['actionText'] as String,
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: -0.2,
+                                              color: AppColors.greenDark, // Green text, no background
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          const Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 13,
+                                            color: AppColors.greenDark,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
 
   /// Modal 0: Payment Verification & Approval Queue (0% Direct Settlement)
   Widget _buildApprovalModalSheet() {

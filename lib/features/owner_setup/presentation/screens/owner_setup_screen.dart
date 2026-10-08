@@ -25,6 +25,7 @@ class OwnerSetupScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final Function(int newTotalBeds, int newTotalRooms, int newFloors)?
       onCapacityUpdated;
+  final Function(Map<String, dynamic> newProperty)? onPropertyCreated;
 
   const OwnerSetupScreen({
     super.key,
@@ -32,6 +33,7 @@ class OwnerSetupScreen extends StatefulWidget {
     this.initialStep = 1,
     this.onBack,
     this.onCapacityUpdated,
+    this.onPropertyCreated,
   });
 
   @override
@@ -570,6 +572,10 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       }
       return;
     }
+    if (widget.initialStep > 1 && _currentStep <= widget.initialStep) {
+      Navigator.of(context).pop();
+      return;
+    }
     if (_currentStep > 1) {
       setState(() {
         _currentStep--;
@@ -713,20 +719,36 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     }
   }
 
-  void _triggerCelebrationLaunch() {
-    // Generate human-readable property code e.g. US-MARU-8849
-    final brand = _pgBrandNameController.text
-        .trim()
-        .replaceAll(RegExp(r'[^a-zA-Z]'), '')
-        .toUpperCase();
-    final prefix = brand.length >= 4
-        ? brand.substring(0, 4)
-        : (brand.isNotEmpty ? brand : 'MARU');
-    final randomSuffix =
-        (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
+  String _generatePropertyCodeString() {
+    final rawBrand = _pgBrandNameController.text.trim();
+    final words = rawBrand.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    String initials = '';
+    if (words.length >= 2) {
+      final firstLetter = words[0].replaceAll(RegExp(r'[^a-zA-Z]'), '');
+      final secondLetter = words[1].replaceAll(RegExp(r'[^a-zA-Z]'), '');
+      initials = '${firstLetter.isNotEmpty ? firstLetter[0] : ''}${secondLetter.isNotEmpty ? secondLetter[0] : ''}'.toUpperCase();
+    } else if (words.length == 1) {
+      final clean = words[0].replaceAll(RegExp(r'[^a-zA-Z]'), '').toUpperCase();
+      initials = clean.length >= 2 ? clean.substring(0, 2) : (clean.isNotEmpty ? '${clean}P' : 'PG');
+    }
+    if (initials.isEmpty) initials = 'PG';
 
+    final randomSuffix = (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
+    String genderSuffix = 'G';
+    if (_genderCategory == 'Ladies') {
+      genderSuffix = 'L';
+    } else if (_genderCategory == 'Co-Living') {
+      genderSuffix = 'C';
+    } else {
+      genderSuffix = 'G'; // default / Gents
+    }
+
+    return '$initials$randomSuffix$genderSuffix';
+  }
+
+  void _triggerCelebrationLaunch() {
     setState(() {
-      _generatedPropertyCode = 'US-$prefix-$randomSuffix';
+      _generatedPropertyCode = _generatePropertyCodeString();
       _showCelebrationModal = true;
     });
   }
@@ -762,6 +784,67 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
 
   void _launchDashboard() {
     setState(() => _showCelebrationModal = false);
+    if (widget.onPropertyCreated != null) {
+      final brand = _pgBrandNameController.text.trim().isNotEmpty
+          ? _pgBrandNameController.text.trim()
+          : 'New PG Building';
+      final loc = _areaLocalityController.text.trim().isNotEmpty
+          ? '${_areaLocalityController.text.trim()}, ${_selectedCity.isNotEmpty ? _selectedCity : 'Bengaluru'}'
+          : (_selectedCity.isNotEmpty ? _selectedCity : 'Bengaluru');
+      final calcRooms = _calculateTotalRooms();
+      int calcBeds = 0;
+      if (_propertyStructure == 'Apartment Units') {
+        _bhkAssignedFlats.forEach((bhk, flats) {
+          final occ = _bhkOccupancy[bhk] ?? {};
+          final bedsInFlat = ((occ['Hall (3-Sharing)'] ?? 0) * 3) +
+              ((occ['Bedroom (2-Sharing)'] ?? 0) * 2) +
+              ((occ['Master Room'] ?? 0) * 1);
+          calcBeds += (bedsInFlat * flats.length);
+        });
+        if (calcBeds == 0) calcBeds = calcRooms * 2;
+      } else {
+        _sharingAssignedRooms.forEach((sharing, rooms) {
+          int mult = 2;
+          if (sharing.startsWith('1')) {
+            mult = 1;
+          } else if (sharing.startsWith('2')) {
+            mult = 2;
+          } else if (sharing.startsWith('3')) {
+            mult = 3;
+          } else if (sharing.startsWith('4')) {
+            mult = 4;
+          } else if (sharing.startsWith('5')) {
+            mult = 5;
+          } else if (sharing.startsWith('6')) {
+            mult = 6;
+          }
+          calcBeds += (rooms.length * mult);
+        });
+        if (calcBeds == 0) calcBeds = calcRooms * 2;
+      }
+
+      final newProp = <String, dynamic>{
+        'id': 'prop_${DateTime.now().millisecondsSinceEpoch}',
+        'name': brand,
+        'location': loc,
+        'occupiedBeds': 0,
+        'totalBeds': calcBeds > 0 ? calcBeds : 20,
+        'occupancyPct': '0% Full',
+        'vacantBeds': calcBeds > 0 ? calcBeds : 20,
+        'noticeBeds': 0,
+        'monthlyCollected': '₹0',
+        'collectedRatio': '0/0 Collected',
+        'paidCount': 0,
+        'pendingCount': 0,
+        'staffCount': 0,
+        'code': _generatedPropertyCode,
+      };
+
+      widget.onPropertyCreated!(newProp);
+      Navigator.of(context).pop();
+      return;
+    }
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => const OwnerDashboardScreen(),
@@ -1452,6 +1535,71 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             ),
           ],
         ),
+        if (_genderCategory != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFB),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.qr_code_rounded, size: 14, color: AppColors.muted),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Generated PG Code:',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _generatePropertyCodeString(),
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                  ],
+                ),
+                InkWell(
+                  onTap: () {
+                    final code = _generatePropertyCodeString();
+                    Clipboard.setData(ClipboardData(text: code));
+                    _showSnackBar('🔑 Copied $code');
+                  },
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.copy_rounded, size: 12, color: AppColors.greenDark),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Copy',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.greenDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 6),
         _buildDivider(),
 
