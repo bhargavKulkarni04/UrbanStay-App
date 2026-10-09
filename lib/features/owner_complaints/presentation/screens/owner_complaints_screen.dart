@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/state/owner_app_state.dart';
 
 /// Screen 9: Maintenance & Complaints Ticketing Hub.
 /// Strict Design Standards:
@@ -26,131 +27,11 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   String _selectedCategory = 'all';
   String _selectedFloor = 'all';
 
-  // Photo Viewer Modal Target
-  Map<String, dynamic>? _activePhotoTarget;
+  // Active Complaints List (Populated live from Supabase / State)
+  final List<Map<String, dynamic>> _activeTickets = [];
 
-  // Active Complaints List
-  final List<Map<String, dynamic>> _activeTickets = [
-    {
-      'id': 'TKT-101',
-      'residentName': 'Amit Verma',
-      'initials': 'AV',
-      'phone': '9988776655',
-      'room': 'Room 201',
-      'sharingType': '2-Sharing',
-      'bed': 'Bed B',
-      'floor': '2nd Floor',
-      'category': 'Electrical',
-      'categoryIcon': Icons.bolt_outlined,
-      'issue':
-          'Geyser in bathroom is tripping the MCB switch every 2 minutes. Unable to get hot water.',
-      'reportedTime': '2 hours ago',
-      'reportedDate': '28 Aug 2026, 08:30 AM',
-      'photoName': 'geyser_mcb_issue.jpg',
-      'hasPhoto': true,
-      'status': 'pending', // 'pending', 'in_progress'
-    },
-    {
-      'id': 'TKT-102',
-      'residentName': 'Rohan Patil',
-      'initials': 'RP',
-      'phone': '9811223344',
-      'room': 'Room 102',
-      'sharingType': '3-Sharing',
-      'bed': 'Bed A',
-      'floor': '1st Floor',
-      'category': 'Plumbing',
-      'categoryIcon': Icons.plumbing_outlined,
-      'issue':
-          'Washbasin tap is continuously leaking and making noise throughout the night.',
-      'reportedTime': '4 hours ago',
-      'reportedDate': '28 Aug 2026, 06:15 AM',
-      'photoName': 'tap_leak_photo.jpg',
-      'hasPhoto': true,
-      'status': 'in_progress',
-      'progressNote': 'Acknowledged by Owner • Work in progress',
-    },
-    {
-      'id': 'TKT-103',
-      'residentName': 'Deepak Joshi',
-      'initials': 'DJ',
-      'phone': '9877112233',
-      'room': 'Room 301',
-      'sharingType': '2-Sharing',
-      'bed': 'Bed A',
-      'floor': '3rd Floor',
-      'category': 'Carpentry',
-      'categoryIcon': Icons.handyman_outlined,
-      'issue': 'Wardrobe middle drawer handle is broken and latch is stuck.',
-      'reportedTime': 'Yesterday',
-      'reportedDate': '27 Aug 2026, 04:45 PM',
-      'photoName': 'wardrobe_latch.jpg',
-      'hasPhoto': true,
-      'status': 'pending',
-    },
-  ];
-
-  // Resolution History List
-  final List<Map<String, dynamic>> _historyTickets = [
-    {
-      'id': 'TKT-098',
-      'residentName': 'Rahul Sharma',
-      'initials': 'RS',
-      'phone': '9876543210',
-      'room': 'Room 101',
-      'sharingType': '2-Sharing',
-      'bed': 'Bed A',
-      'floor': '1st Floor',
-      'category': 'WiFi',
-      'categoryIcon': Icons.wifi_outlined,
-      'issue':
-          '1st floor Wi-Fi access point was blinking red and dropping connection.',
-      'reportedDate': '26 Aug, 11:20 AM',
-      'resolvedDate': 'Resolved 26 Aug, 01:10 PM',
-      'resolvedBy': 'Resolved by Owner',
-      'resolutionNote':
-          'Router rebooted and static DNS configured. Speed verified at 120 Mbps.',
-      'status': 'resolved',
-    },
-    {
-      'id': 'TKT-095',
-      'residentName': 'Manisha Patel',
-      'initials': 'MP',
-      'phone': '9866443322',
-      'room': 'Room 301',
-      'sharingType': '2-Sharing',
-      'bed': 'Bed B',
-      'floor': '3rd Floor',
-      'category': 'Electrical',
-      'categoryIcon': Icons.bolt_outlined,
-      'issue': 'Ceiling LED panel flickering continuously in bathroom.',
-      'reportedDate': '25 Aug, 07:00 PM',
-      'resolvedDate': 'Resolved 26 Aug, 10:00 AM',
-      'resolvedBy': 'Resolved by Electrician',
-      'resolutionNote':
-          'Replaced damaged driver with new 15W unit. Tested and confirmed with tenant.',
-      'status': 'resolved',
-    },
-    {
-      'id': 'TKT-092',
-      'residentName': 'Priya Nair',
-      'initials': 'PN',
-      'phone': '9819876543',
-      'room': 'Room 201',
-      'sharingType': '2-Sharing',
-      'bed': 'Bed B',
-      'floor': '2nd Floor',
-      'category': 'Cleaning',
-      'categoryIcon': Icons.cleaning_services_outlined,
-      'issue': 'Balcony drain clogged due to dry leaves during heavy rain.',
-      'reportedDate': '24 Aug, 09:30 AM',
-      'resolvedDate': 'Resolved 24 Aug, 11:00 AM',
-      'resolvedBy': 'Resolved by Housekeeping',
-      'resolutionNote':
-          'Drain cleared and mesh filter reinstalled to prevent leaf blockages.',
-      'status': 'resolved',
-    },
-  ];
+  // Resolution History List (Populated live from Supabase / State)
+  final List<Map<String, dynamic>> _historyTickets = [];
 
   @override
   void initState() {
@@ -221,8 +102,6 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   // PHOTO PROOF VIEWER MODAL
   // ===========================================================================
   void _openPhotoModal(Map<String, dynamic> ticket) {
-    _activePhotoTarget = ticket;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -387,7 +266,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                     ),
                   ),
                   Text(
-                    'Greenview PG • Maintenance Hub',
+                    '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • Maintenance Hub',
                     style: GoogleFonts.outfit(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w500,

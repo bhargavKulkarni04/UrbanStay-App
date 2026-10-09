@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/state/owner_app_state.dart';
 
 /// Screen: Tenant Move-In & Onboarding Approval Hub.
 /// Strict Design Rules:
@@ -581,7 +582,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                   ),
                 ),
                 Text(
-                  'Greenview PG • Security Gatekeeper',
+                  '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • Security Gatekeeper',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.outfit(

@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/state/owner_app_state.dart';
 
 /// Screen 8: Rent Collection Hub & WhatsApp Dues Chaser.
 /// 3-Tier Hierarchy: Floor -> Room (Sharing Type & Rent Total) -> Beds & Resident Cards.
@@ -22,7 +23,7 @@ class OwnerRentCollectionScreen extends StatefulWidget {
 }
 
 class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
-  String _selectedCycle = 'August 2026';
+  late String _selectedCycle;
   String _selectedFloor = 'all'; // 'all', '1st', '2nd', '3rd', 'ground'
   String _selectedStatus = 'all'; // 'all', 'overdue', 'extension', 'paid'
   String _searchQuery = '';
@@ -31,33 +32,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   // Form Controllers for Record Cash Modal
   final TextEditingController _cashAmountController = TextEditingController();
   final TextEditingController _cashNotesController = TextEditingController();
-  String _cashPaymentDate = '2026-08-18';
+  String _cashPaymentDate = DateTime.now().toIso8601String().split('T').first;
 
   // Form Controllers for Grant Extension Modal
-  String _selectedExtensionDate = '15 Aug 2026';
+  String _selectedExtensionDate = '';
   final TextEditingController _extensionReasonController =
       TextEditingController();
 
-  // Active Target for Modals
-  Map<String, dynamic> _activeCashTarget = {
-    'name': 'Amit Verma',
-    'room': '101-B',
-    'outstanding': 8500,
-  };
-
-  Map<String, dynamic> _activeExtensionTarget = {
-    'name': 'Deepak Joshi',
-    'room': '301-A',
-    'amount': 8500,
-  };
-
-  Map<String, dynamic> _activeReceiptTarget = {
-    'name': 'Rahul Sharma',
-    'room': '101-A',
-    'amount': '₹8,500',
-    'ref': '423189765412',
-    'date': '1 Aug 2026',
-  };
+  // Active Target for Modals (Populated when user taps tenant action)
+  Map<String, dynamic> _activeCashTarget = {};
+  Map<String, dynamic> _activeExtensionTarget = {};
+  Map<String, dynamic> _activeReceiptTarget = {};
 
   String _activeViewMode =
       'calendar'; // 'calendar' (Day-Wise Salary Calendar) or 'floor' (By Floor & Rooms)
@@ -72,6 +57,12 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    _selectedCycle = '${months[now.month - 1]} ${now.year}';
     _loadRentLedgerFromSupabase();
   }
 
@@ -94,10 +85,16 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
 
             final status = (row['status'] ?? 'PENDING').toString().toLowerCase();
             final isPaid = status == 'paid';
+              final tenantName = tenant?['full_name'] ?? 'Resident';
+              final nameParts = tenantName.trim().split(' ');
+              final computedInitials = nameParts.length >= 2
+                  ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
+                  : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : '?');
+
             floorMap[floorId]![roomNum]!.add({
               'id': row['id'].toString(),
-              'name': tenant?['full_name'] ?? 'Resident',
-              'initials': 'TN',
+              'name': tenantName,
+              'initials': computedInitials,
               'bed': tenant?['bed_number'] ?? 'Bed A',
               'room': roomNum,
               'roomNum': roomNum,
@@ -145,406 +142,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
     }
   }
 
-  // Master Floor, Room & Bed Hierarchy Data
-  final List<Map<String, dynamic>> _floorsData = [
-    // =========================================================================
-    // 1ST FLOOR
-    // =========================================================================
-    {
-      'id': '1st',
-      'title': '1st Floor',
-      'roomsSubtitle': 'Rooms 101 – 103 • 7 Beds',
-      'rooms': [
-        {
-          'room': 'Room 101',
-          'type': '2-Sharing',
-          'monthlyExpected': 17000,
-          'beds': [
-            {
-              'id': '1',
-              'name': 'Rahul Sharma',
-              'initials': 'RS',
-              'bed': 'Bed 101-A',
-              'room': '101-A',
-              'roomNum': '101',
-              'floor': '1st',
-              'work': 'Infosys',
-              'phone': '9876543210',
-              'amount': 8500,
-              'status': 'paid',
-              'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '423189765412',
-              'paidDate': '1 Aug 2026',
-            },
-            {
-              'id': '2',
-              'name': 'Amit Verma',
-              'initials': 'AV',
-              'bed': 'Bed 101-B',
-              'room': '101-B',
-              'roomNum': '101',
-              'floor': '1st',
-              'work': 'Christ Univ',
-              'phone': '9988776655',
-              'amount': 8500,
-              'status': 'overdue',
-              'overdueDays': '3 Days Overdue',
-              'dueLabel': 'Due since 15 Aug • All Utilities Included',
-            },
-          ],
-        },
-        {
-          'room': 'Room 102',
-          'type': '3-Sharing',
-          'monthlyExpected': 22500,
-          'beds': [
-            {
-              'id': '3',
-              'name': 'Ananya Roy',
-              'initials': 'AR',
-              'bed': 'Bed 102-A',
-              'room': '102-A',
-              'roomNum': '102',
-              'floor': '1st',
-              'work': 'Accenture',
-              'phone': '9822334455',
-              'amount': 7500,
-              'status': 'paid',
-              'paidLabel': 'Paid on 2 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '110299384756',
-              'paidDate': '2 Aug 2026',
-            },
-            {
-              'id': '4',
-              'isVacant': true,
-              'bed': 'Bed 102-B',
-              'room': '102-B',
-              'roomNum': '102',
-              'floor': '1st',
-              'title': 'Vacant Bed — Available',
-              'amount': 7500,
-              'sub': 'Ready for Walk-In Tenant',
-            },
-            {
-              'id': '5',
-              'name': 'Vikram Rao',
-              'initials': 'VR',
-              'bed': 'Bed 102-C',
-              'room': '102-C',
-              'roomNum': '102',
-              'floor': '1st',
-              'work': 'TCS',
-              'phone': '9733445566',
-              'amount': 7500,
-              'status': 'extension_approved',
-              'extensionDate': '15 Aug 2026',
-              'dueLabel': 'Extension Approved • Due 15 Aug',
-              'extensionReason': 'Salary credited on 15th from TCS',
-            },
-          ],
-        },
-        {
-          'room': 'Room 103',
-          'type': '2-Sharing',
-          'monthlyExpected': 17000,
-          'beds': [
-            {
-              'id': '6',
-              'name': 'Rohit Sen',
-              'initials': 'RS',
-              'bed': 'Bed 103-A',
-              'room': '103-A',
-              'roomNum': '103',
-              'floor': '1st',
-              'work': 'Wipro',
-              'phone': '9811223344',
-              'amount': 8500,
-              'status': 'paid',
-              'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '994411223344',
-              'paidDate': '1 Aug 2026',
-            },
-            {
-              'id': '7',
-              'name': 'Naveen Kumar',
-              'initials': 'NK',
-              'bed': 'Bed 103-B',
-              'room': '103-B',
-              'roomNum': '103',
-              'floor': '1st',
-              'work': 'Razorpay',
-              'phone': '9844119988',
-              'amount': 8500,
-              'status': 'paid',
-              'paidLabel': 'Paid on 3 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '883311224455',
-              'paidDate': '3 Aug 2026',
-            },
-          ],
-        },
-      ],
-    },
-
-    // =========================================================================
-    // 2ND FLOOR
-    // =========================================================================
-    {
-      'id': '2nd',
-      'title': '2nd Floor',
-      'roomsSubtitle': 'Rooms 201 – 202 • 4 Beds',
-      'rooms': [
-        {
-          'room': 'Room 201',
-          'type': '2-Sharing',
-          'monthlyExpected': 18000,
-          'beds': [
-            {
-              'id': '8',
-              'name': 'Karthik Raja',
-              'initials': 'KR',
-              'bed': 'Bed 201-A',
-              'room': '201-A',
-              'roomNum': '201',
-              'floor': '2nd',
-              'work': 'Swiggy',
-              'phone': '9741234567',
-              'amount': 9000,
-              'status': 'paid',
-              'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '991200458812',
-              'paidDate': '1 Aug 2026',
-            },
-            {
-              'id': '9',
-              'name': 'Priya Nair',
-              'initials': 'PN',
-              'bed': 'Bed 201-B',
-              'room': '201-B',
-              'roomNum': '201',
-              'floor': '2nd',
-              'work': 'Dell',
-              'phone': '9819876543',
-              'amount': 9000,
-              'status': 'paid',
-              'paidLabel': 'Paid on 3 Aug (Cash)',
-              'tag': 'Cash Verified',
-              'ref': 'CASH-REC-8902',
-              'paidDate': '3 Aug 2026',
-            },
-          ],
-        },
-        {
-          'room': 'Room 202',
-          'type': '2-Sharing',
-          'monthlyExpected': 15000,
-          'beds': [
-            {
-              'id': '10',
-              'name': 'Rohan Patil',
-              'initials': 'RP',
-              'bed': 'Bed 202-A',
-              'room': '202-A',
-              'roomNum': '202',
-              'floor': '2nd',
-              'work': 'Wipro',
-              'phone': '9811223344',
-              'amount': 7500,
-              'status': 'overdue',
-              'overdueDays': '5 Days Overdue',
-              'dueLabel': 'Due since 13 Aug • All Utilities Included',
-            },
-            {
-              'id': '11',
-              'name': 'Sneha Reddy',
-              'initials': 'SR',
-              'bed': 'Bed 202-B',
-              'room': '202-B',
-              'roomNum': '202',
-              'floor': '2nd',
-              'work': 'Amazon',
-              'phone': '9845009988',
-              'amount': 7500,
-              'status': 'paid',
-              'paidLabel': 'Paid on 4 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '772288119933',
-              'paidDate': '4 Aug 2026',
-            },
-          ],
-        },
-      ],
-    },
-
-    // =========================================================================
-    // 3RD FLOOR
-    // =========================================================================
-    {
-      'id': '3rd',
-      'title': '3rd Floor',
-      'roomsSubtitle': 'Rooms 301 – 302 • 4 Beds',
-      'rooms': [
-        {
-          'room': 'Room 301',
-          'type': '2-Sharing',
-          'monthlyExpected': 17000,
-          'beds': [
-            {
-              'id': '12',
-              'name': 'Deepak Joshi',
-              'initials': 'DJ',
-              'bed': 'Bed 301-A',
-              'room': '301-A',
-              'roomNum': '301',
-              'floor': '3rd',
-              'work': 'Oracle',
-              'phone': '9877112233',
-              'amount': 8500,
-              'status': 'extension_requested',
-              'requestedDate': '15 Aug 2026',
-              'dueLabel': 'Extension Requested till 15 Aug',
-              'extensionReason':
-                  'Salary delay from Oracle. Will pay full amount on 15th.',
-            },
-            {
-              'id': '13',
-              'name': 'Manisha Patel',
-              'initials': 'MP',
-              'bed': 'Bed 301-B',
-              'room': '301-B',
-              'roomNum': '301',
-              'floor': '3rd',
-              'work': 'IBM',
-              'phone': '9866443322',
-              'amount': 8500,
-              'status': 'paid',
-              'paidLabel': 'Paid on 2 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '554433221100',
-              'paidDate': '2 Aug 2026',
-            },
-          ],
-        },
-        {
-          'room': 'Room 302',
-          'type': '2-Sharing',
-          'monthlyExpected': 16000,
-          'beds': [
-            {
-              'id': '14',
-              'name': 'Aditya Sen',
-              'initials': 'AS',
-              'bed': 'Bed 302-A',
-              'room': '302-A',
-              'roomNum': '302',
-              'floor': '3rd',
-              'work': 'Razorpay',
-              'phone': '9811883377',
-              'amount': 8000,
-              'status': 'paid',
-              'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '883399221100',
-              'paidDate': '1 Aug 2026',
-            },
-            {
-              'id': '15',
-              'name': 'Pooja Hegde',
-              'initials': 'PH',
-              'bed': 'Bed 302-B',
-              'room': '302-B',
-              'roomNum': '302',
-              'floor': '3rd',
-              'work': 'Capgemini',
-              'phone': '9833557799',
-              'amount': 8000,
-              'status': 'overdue',
-              'overdueDays': '6 Days Overdue',
-              'dueLabel': 'Due since 12 Aug • Utilities Included',
-            },
-          ],
-        },
-      ],
-    },
-
-    // =========================================================================
-    // GROUND FLOOR
-    // =========================================================================
-    {
-      'id': 'ground',
-      'title': 'Ground Floor',
-      'roomsSubtitle': 'Rooms G-01 – G-02 • 3 Beds',
-      'rooms': [
-        {
-          'room': 'Room G-01',
-          'type': '2-Sharing',
-          'monthlyExpected': 16000,
-          'beds': [
-            {
-              'id': '16',
-              'name': 'Suresh Gowda',
-              'initials': 'SG',
-              'bed': 'Bed G-01-A',
-              'room': 'G-01-A',
-              'roomNum': 'G-01',
-              'floor': 'ground',
-              'work': 'Flipkart',
-              'phone': '9844001122',
-              'amount': 8000,
-              'status': 'paid',
-              'paidLabel': 'Paid on 2 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '338811229900',
-              'paidDate': '2 Aug 2026',
-            },
-            {
-              'id': '17',
-              'name': 'Tanmay Bhat',
-              'initials': 'TB',
-              'bed': 'Bed G-01-B',
-              'room': 'G-01-B',
-              'roomNum': 'G-01',
-              'floor': 'ground',
-              'work': 'Freelance',
-              'phone': '9855112233',
-              'amount': 8000,
-              'status': 'overdue',
-              'overdueDays': '7 Days Overdue',
-              'dueLabel': 'Due since 11 Aug • All Utilities Included',
-            },
-          ],
-        },
-        {
-          'room': 'Room G-02',
-          'type': '1-Sharing (Single)',
-          'monthlyExpected': 8500,
-          'beds': [
-            {
-              'id': '18',
-              'name': 'Nikhil Kamath',
-              'initials': 'NK',
-              'bed': 'Bed G-02-A',
-              'room': 'G-02-A',
-              'roomNum': 'G-02',
-              'floor': 'ground',
-              'work': 'Zerodha',
-              'phone': '9899001122',
-              'amount': 8500,
-              'status': 'paid',
-              'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-              'tag': 'Settled 0% Fee',
-              'ref': '990011223344',
-              'paidDate': '1 Aug 2026',
-            },
-          ],
-        },
-      ],
-    },
-  ];
+  // Master Floor, Room & Bed Hierarchy Data (Populated live from Supabase — no mock fallback)
+  final List<Map<String, dynamic>> _floorsData = [];
 
   @override
   void dispose() {
@@ -592,7 +191,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   void _approveExtension(Map<String, dynamic> tenant) {
     setState(() {
       tenant['status'] = 'extension_approved';
-      tenant['extensionDate'] = tenant['requestedDate'] ?? '15 Aug 2026';
+      tenant['extensionDate'] = tenant['requestedDate'] ?? 'Not Set';
       tenant['dueLabel'] =
           'Extension Approved • Due ${tenant['extensionDate']}';
     });
@@ -865,7 +464,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 child: Column(
                   children: [
                     Text(
-                      'Greenview Luxury PG',
+                      OwnerAppState.instance.activePropertyName.isNotEmpty
+                          ? OwnerAppState.instance.activePropertyName
+                          : 'My PG',
                       style: GoogleFonts.outfit(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -1344,12 +945,60 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     const SizedBox(height: 16),
 
                     // 3-TIER HIERARCHY: Floor -> Room (Sharing Type) -> Bed Cards
-                    ..._floorsData
-                        .where((f) =>
-                            _selectedFloor == 'all' ||
-                            _selectedFloor == f['id'])
-                        .map((floor) => _buildFloorSection(floor))
-                        .toList(),
+                    if (_floorsData.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 36),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Column(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: const BoxDecoration(
+                                color: AppColors.greenLight,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.receipt_long_outlined,
+                                size: 26,
+                                color: AppColors.greenDark,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              'No Active Rent Ledgers Found',
+                              style: GoogleFonts.outfit(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Assign tenants to beds to track monthly rent, send automated WhatsApp reminders, and audit collections.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.muted,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._floorsData
+                          .where((f) =>
+                              _selectedFloor == 'all' ||
+                              _selectedFloor == f['id'])
+                          .map((floor) => _buildFloorSection(floor))
+                          .toList(),
                   ],
                 ),
               ),
@@ -1418,7 +1067,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     ),
                   ),
                   Text(
-                    'Greenview PG • 31 Beds',
+                    '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • ${OwnerAppState.instance.totalBeds} Beds',
                     style: GoogleFonts.outfit(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w500,
@@ -1472,15 +1121,21 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   // 2. 3-PILL FINANCIAL SUMMARY STRIP
   // ===========================================================================
   Widget _buildStatsStrip(int totalPendingCount, int overdueSum) {
+    final allOccupied = _getAllOccupiedTenants();
+    final totalExpected = allOccupied.fold<int>(0, (sum, item) => sum + ((item['amount'] as num?)?.toInt() ?? 0));
+    final collected = allOccupied
+        .where((t) => t['status'] == 'paid')
+        .fold<int>(0, (sum, item) => sum + ((item['amount'] as num?)?.toInt() ?? 0));
+
     return Row(
       children: [
         Expanded(
             child: _buildStatTile(
-                '₹2,63,500', 'Total Expected', AppColors.greenDark)),
+                '₹$totalExpected', 'Total Expected', AppColors.greenDark)),
         const SizedBox(width: 8),
         Expanded(
             child: _buildStatTile(
-                '₹2,12,000', 'Collected', AppColors.greenDark)),
+                '₹$collected', 'Collected', AppColors.greenDark)),
         const SizedBox(width: 8),
         Expanded(
             child: _buildStatTile(
@@ -2304,13 +1959,25 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   // 4. HORIZONTAL FLOOR SWITCHER CHIPS
   // ===========================================================================
   Widget _buildFloorChipsScroll() {
-    final floors = [
+    final List<Map<String, String>> floors = [
       {'id': 'all', 'label': 'All Floors'},
-      {'id': '1st', 'label': '1st Floor'},
-      {'id': '2nd', 'label': '2nd Floor'},
-      {'id': '3rd', 'label': '3rd Floor'},
-      {'id': 'ground', 'label': 'Ground Floor'},
     ];
+    for (final f in _floorsData) {
+      final fId = f['id']?.toString() ?? '';
+      if (!floors.any((x) => x['id'] == fId)) {
+        floors.add({
+          'id': fId,
+          'label': f['title']?.toString() ?? '$fId Floor',
+        });
+      }
+    }
+    if (floors.length == 1) {
+      floors.addAll([
+        {'id': 'ground', 'label': 'Ground Floor'},
+        {'id': '1st', 'label': '1st Floor'},
+        {'id': '2nd', 'label': '2nd Floor'},
+      ]);
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,

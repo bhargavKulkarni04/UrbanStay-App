@@ -3,20 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/app_colors.dart';
-import 'features/onboarding/presentation/screens/onboarding_walkthrough_screen.dart';
 import 'features/owner_setup/presentation/screens/owner_setup_screen.dart';
-import 'features/owner_dashboard/presentation/screens/owner_dashboard_screen.dart';
-import 'features/owner_rooms/presentation/screens/owner_rooms_screen.dart';
-import 'features/owner_rent/presentation/screens/owner_rent_collection_screen.dart';
-import 'features/owner_rent/presentation/screens/owner_day_collection_screen.dart';
-import 'features/tenant_dashboard/presentation/screens/tenant_dashboard_screen.dart';
-import 'features/tenant_payments/presentation/screens/rent_payment_screen.dart';
-import 'features/tenant_profile/presentation/screens/profile_settings_screen.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config/supabase_config.dart';
-import 'features/owner_billing/presentation/screens/owner_saas_billing_screen.dart';
-import 'features/auth/presentation/screens/role_selector_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -122,8 +111,8 @@ class UrbanStayApp extends StatelessWidget {
           child: content,
         );
       },
-      // 🚀 Choose Tenant vs Owner
-      home: const RoleSelectorScreen(),
+      // 🚀 Directly open Owner Setup Screen
+      home: const OwnerSetupScreen(),
     );
   }
 }

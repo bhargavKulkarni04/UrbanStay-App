@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/state/owner_app_state.dart';
 
 /// Screen 11: Staff Directory & Payroll Management.
 /// Strict Design System:
@@ -34,57 +35,16 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   final TextEditingController _salaryController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
-  // Master Staff Directory List
-  final List<Map<String, dynamic>> _staffList = [
-    {
-      'id': 'STF-101',
-      'name': 'Suresh Kumar',
-      'initials': 'SK',
-      'role': 'warden',
-      'workTitle': 'Warden & Operations Manager',
-      'phone': '9845122334',
-      'salary': 18000,
-      'month': 'August Salary',
-      'status': 'paid', // 'paid', 'pending'
-      'joinedDate': 'Jan 2024',
-    },
-    {
-      'id': 'STF-102',
-      'name': 'Ramesh Chand',
-      'initials': 'RC',
-      'role': 'cook',
-      'workTitle': 'Head Cook',
-      'phone': '9880144556',
-      'salary': 16000,
-      'month': 'August Salary',
-      'status': 'pending',
-      'joinedDate': 'Mar 2024',
-    },
-    {
-      'id': 'STF-103',
-      'name': 'Manjula Devi',
-      'initials': 'MD',
-      'role': 'housekeeping',
-      'workTitle': 'Housekeeping & Cleaning',
-      'phone': '9741288990',
-      'salary': 10000,
-      'month': 'August Salary',
-      'status': 'paid',
-      'joinedDate': 'Feb 2024',
-    },
-    {
-      'id': 'STF-104',
-      'name': 'Narayana Swamy',
-      'initials': 'NS',
-      'role': 'security',
-      'workTitle': 'Night Security Guard',
-      'phone': '9611033221',
-      'salary': 12000,
-      'month': 'August Salary',
-      'status': 'pending',
-      'joinedDate': 'May 2024',
-    },
-  ];
+  // Master Staff Directory List (Populated live from Supabase / User Entry)
+  final List<Map<String, dynamic>> _staffList = [];
+
+  String _currentMonthName() {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[DateTime.now().month - 1];
+  }
 
   @override
   void dispose() {
@@ -473,7 +433,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                           'workTitle': workTitle.isNotEmpty ? workTitle : _selectedModalRole,
                           'phone': phone,
                           'salary': salary,
-                          'month': 'August Salary',
+                          'month': '${_currentMonthName()} Salary',
                           'status': 'pending',
                           'joinedDate': 'Today',
                         });
@@ -669,7 +629,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     ),
                   ),
                   Text(
-                    'Greenview PG • ${_staffList.length} Active Staff',
+                    '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • ${_staffList.length} Active Staff',
                     style: GoogleFonts.outfit(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w500,

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
+import '../../../../core/state/owner_app_state.dart';
 
 /// Screen 10: Operating Costs, Grocery Rations & Monthly Expense Ledger.
 /// Strict Design System:
@@ -34,95 +35,16 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _vendorController = TextEditingController();
-  final TextEditingController _dateController =
-      TextEditingController(text: '28 Aug 2026');
-  String _selectedPayMode = 'UPI'; // 'UPI', 'Cash'
+  final TextEditingController _dateController = TextEditingController(
+      text: () {
+    final now = DateTime.now();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${now.day} ${months[now.month - 1]} ${now.year}';
+  }());
   String? _attachedBillName;
 
-  // Photo Viewer Modal Target
-  Map<String, dynamic>? _activeReceiptTarget;
-
-  // Master Expenses Ledger
-  final List<Map<String, dynamic>> _expenses = [
-    {
-      'id': 'EXP-101',
-      'title': 'Electricity Bill',
-      'category': 'Electricity',
-      'icon': Icons.bolt_rounded,
-      'vendor': 'BESCOM Karnataka • Meter #48921 (3 Floors)',
-      'amount': 24500,
-      'date': '15 Aug 2026',
-      'mode': 'Direct Bank Transfer',
-      'ref': 'Ref: TXN99120',
-      'receiptFile': 'bescom_bill_aug2026.pdf',
-      'hasReceipt': true,
-    },
-    {
-      'id': 'EXP-102',
-      'title': 'Kitchen Groceries & Ration',
-      'category': 'Kitchen',
-      'icon': Icons.restaurant_rounded,
-      'vendor': 'Annapurna Stores • Monthly Rice, Dal & Oil Supplies',
-      'amount': 18200,
-      'date': '12 Aug 2026',
-      'mode': 'Direct UPI',
-      'ref': 'Ref: UPI-RATION-88',
-      'receiptFile': 'annapurna_grocery_bill.jpg',
-      'hasReceipt': true,
-    },
-    {
-      'id': 'EXP-103',
-      'title': 'Cook & Warden Salaries',
-      'category': 'Salary',
-      'icon': Icons.badge_outlined,
-      'vendor': 'Monthly Payroll • 2 Staff Members',
-      'amount': 15000,
-      'date': '01 Aug 2026',
-      'mode': 'Bank Transfer',
-      'ref': 'Salary Vouchers Acknowledged',
-      'receiptFile': 'salary_voucher_aug.pdf',
-      'hasReceipt': true,
-    },
-    {
-      'id': 'EXP-104',
-      'title': 'Water Tankers (4 Trips)',
-      'category': 'Water',
-      'icon': Icons.water_drop_rounded,
-      'vendor': 'Kaveri Water Supplies • 6000L x 4 Trips',
-      'amount': 4800,
-      'date': '10 Aug 2026',
-      'mode': 'Cash (Petty Cash)',
-      'ref': 'Receipt Signed by Driver',
-      'receiptFile': 'water_tanker_slips.jpg',
-      'hasReceipt': true,
-    },
-    {
-      'id': 'EXP-105',
-      'title': 'Plumbing & Tap Replacements',
-      'category': 'Repair',
-      'icon': Icons.handyman_rounded,
-      'vendor': 'Sridhar Plumber • Room 102 & 201 Washroom Repairs',
-      'amount': 3400,
-      'date': '08 Aug 2026',
-      'mode': 'Cash',
-      'ref': 'Work Completed & Verified',
-      'receiptFile': 'hardware_store_receipt.jpg',
-      'hasReceipt': true,
-    },
-    {
-      'id': 'EXP-106',
-      'title': 'High-Speed Wi-Fi (300 Mbps)',
-      'category': 'WiFi',
-      'icon': Icons.wifi_rounded,
-      'vendor': 'ACT Fibernet • Commercial Account #889214',
-      'amount': 2499,
-      'date': '05 Aug 2026',
-      'mode': 'Direct UPI',
-      'ref': 'Paid (Auto-Debit)',
-      'receiptFile': 'act_invoice_aug2026.pdf',
-      'hasReceipt': true,
-    },
-  ];
+  // Master Expenses Ledger (Populated live from Supabase / State)
+  final List<Map<String, dynamic>> _expenses = [];
 
   @override
   void dispose() {
@@ -156,23 +78,6 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   int get _totalSpent =>
       _expenses.fold<int>(0, (sum, item) => sum + (item['amount'] as int));
 
-  IconData _getCategoryIcon(String cat) {
-    final lower = cat.toLowerCase();
-    if (lower.contains('elect')) return Icons.bolt_rounded;
-    if (lower.contains('kitch') ||
-        lower.contains('food') ||
-        lower.contains('ration')) return Icons.restaurant_rounded;
-    if (lower.contains('water')) return Icons.water_drop_rounded;
-    if (lower.contains('sal') ||
-        lower.contains('staff') ||
-        lower.contains('warden')) return Icons.badge_outlined;
-    if (lower.contains('repair') ||
-        lower.contains('plumb') ||
-        lower.contains('maint')) return Icons.handyman_rounded;
-    if (lower.contains('wifi') || lower.contains('internet'))
-      return Icons.wifi_rounded;
-    return Icons.receipt_rounded;
-  }
 
   // ===========================================================================
   // MODAL: LOG NEW PG EXPENSE (With "+ Other" custom category text input)
@@ -472,8 +377,6 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   // MODAL: VIEW RECEIPT PHOTO PREVIEW
   // ===========================================================================
   void _openReceiptModal(Map<String, dynamic> expense) {
-    _activeReceiptTarget = expense;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -699,7 +602,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                     ),
                   ),
                   Text(
-                    'Greenview PG • Operating Ledger',
+                    '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • Operating Ledger',
                     style: GoogleFonts.outfit(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w500,

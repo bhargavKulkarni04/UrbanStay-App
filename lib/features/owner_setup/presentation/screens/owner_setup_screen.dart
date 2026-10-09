@@ -722,19 +722,25 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
 
   String _generatePropertyCodeString() {
     final rawBrand = _pgBrandNameController.text.trim();
-    final words = rawBrand.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+    final words =
+        rawBrand.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
     String initials = '';
     if (words.length >= 2) {
       final firstLetter = words[0].replaceAll(RegExp(r'[^a-zA-Z]'), '');
       final secondLetter = words[1].replaceAll(RegExp(r'[^a-zA-Z]'), '');
-      initials = '${firstLetter.isNotEmpty ? firstLetter[0] : ''}${secondLetter.isNotEmpty ? secondLetter[0] : ''}'.toUpperCase();
+      initials =
+          '${firstLetter.isNotEmpty ? firstLetter[0] : ''}${secondLetter.isNotEmpty ? secondLetter[0] : ''}'
+              .toUpperCase();
     } else if (words.length == 1) {
       final clean = words[0].replaceAll(RegExp(r'[^a-zA-Z]'), '').toUpperCase();
-      initials = clean.length >= 2 ? clean.substring(0, 2) : (clean.isNotEmpty ? '${clean}P' : 'PG');
+      initials = clean.length >= 2
+          ? clean.substring(0, 2)
+          : (clean.isNotEmpty ? '${clean}P' : 'PG');
     }
     if (initials.isEmpty) initials = 'PG';
 
-    final randomSuffix = (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
+    final randomSuffix =
+        (1000 + (DateTime.now().millisecondsSinceEpoch % 9000)).toString();
     String genderSuffix = 'G';
     if (_genderCategory == 'Ladies') {
       genderSuffix = 'L';
@@ -783,36 +789,118 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         '💬 WhatsApp invite message copied to clipboard! Ready to share.');
   }
 
-  Future<void> _persistPropertyToSupabase({required int calcBeds, required int calcRooms}) async {
+  Future<Map<String, dynamic>?> _persistPropertyToSupabase(
+      {required int calcBeds, required int calcRooms}) async {
     try {
       final brand = _pgBrandNameController.text.trim().isNotEmpty
           ? _pgBrandNameController.text.trim()
           : 'New PG Building';
 
       final List<Map<String, dynamic>> roomsData = [];
-      final floors = _getFloorNames();
-      for (int fIndex = 0; fIndex < floors.length; fIndex++) {
-        final floorName = floors[fIndex];
-        final count =
-            int.tryParse(_floorRoomsControllers[floorName]?.text.trim() ?? '') ??
-                0;
-        for (int r = 1; r <= count; r++) {
-          final roomNumber = floorName == 'Ground Floor'
-              ? 'G-${r.toString().padLeft(2, '0')}'
-              : '${fIndex}${r.toString().padLeft(2, '0')}';
+      final floorsMap = _getFlatsPerFloor();
+      final floorsList = _getFloorNames();
+
+      int fIndex = 0;
+      for (final entry in floorsMap.entries) {
+        final floorName = entry.key;
+        final roomNames = entry.value;
+
+        for (final roomName in roomNames) {
+          String sharingType = '2-Sharing';
+          int bedsCount = 2;
+          double rent = 8500.0;
+          double deposit = 15000.0;
+
+          if (_propertyStructure == 'Apartment Units') {
+            String? assignedBhk;
+            for (final bhkEntry in _bhkAssignedFlats.entries) {
+              if (bhkEntry.value.contains(roomName)) {
+                assignedBhk = bhkEntry.key;
+                break;
+              }
+            }
+            assignedBhk ??= _bhkAssignedFlats.keys.isNotEmpty
+                ? _bhkAssignedFlats.keys.first
+                : '2 BHK';
+            sharingType = assignedBhk;
+            final occ = _bhkOccupancy[assignedBhk] ?? {};
+            bedsCount = ((occ['Hall (3-Sharing)'] ?? 0) * 3) +
+                ((occ['Bedroom (2-Sharing)'] ?? 0) * 2) +
+                ((occ['Master Room'] ?? 0) * 1);
+            if (bedsCount <= 0) bedsCount = 2;
+            rent = double.tryParse(
+                    _rentControllers[assignedBhk]?.text.trim() ?? '') ??
+                12000.0;
+            deposit = double.tryParse(
+                    _depositControllers[assignedBhk]?.text.trim() ?? '') ??
+                25000.0;
+          } else {
+            String? assignedSharing;
+            for (final sharingEntry in _sharingAssignedRooms.entries) {
+              if (sharingEntry.value.contains(roomName)) {
+                assignedSharing = sharingEntry.key;
+                break;
+              }
+            }
+            if (assignedSharing == null && _selectedSharings.isNotEmpty) {
+              assignedSharing = _selectedSharings.first;
+            }
+            sharingType = assignedSharing ?? '2-Sharing';
+
+            final digitMatch = RegExp(r'\d+').firstMatch(sharingType);
+            if (digitMatch != null) {
+              bedsCount = int.tryParse(digitMatch.group(0)!) ?? 2;
+            } else if (sharingType.toLowerCase().contains('single') ||
+                sharingType.toLowerCase().contains('1')) {
+              bedsCount = 1;
+            } else {
+              bedsCount = 2;
+            }
+
+            final rentText = _rentControllers[sharingType]?.text.trim() ?? '';
+            rent = double.tryParse(rentText) ??
+                (bedsCount == 1 ? 12000.0 : (bedsCount == 2 ? 8500.0 : 7000.0));
+
+            final depText = _depositControllers[sharingType]?.text.trim() ?? '';
+            deposit = double.tryParse(depText) ??
+                (bedsCount == 1
+                    ? 20000.0
+                    : (bedsCount == 2 ? 15000.0 : 12000.0));
+          }
+
           roomsData.add({
             'floor_number': fIndex,
             'floor_label': floorName,
-            'room_number': roomNumber,
-            'sharing_type': '2-Sharing',
-            'total_beds': 2,
-            'rent_per_bed': 8000.0,
-            'deposit_per_bed': 15000.0,
+            'room_number': roomName,
+            'sharing_type': sharingType,
+            'total_beds': bedsCount,
+            'rent_per_bed': rent,
+            'deposit_per_bed': deposit,
           });
         }
+        fIndex++;
       }
 
-      await SupabaseService.instance.createFullProperty(
+      int totalActualBeds = 0;
+      for (final r in roomsData) {
+        totalActualBeds += (r['total_beds'] as int? ?? 0);
+      }
+      final finalBedsCount = totalActualBeds > 0 ? totalActualBeds : calcBeds;
+
+      final Map<String, dynamic> floorWiseRoomsJson = {};
+      for (final entry in floorsMap.entries) {
+        final floorName = entry.key;
+        final floorRoomsMap = <String, String>{};
+        final roomList =
+            roomsData.where((r) => r['floor_label'] == floorName).toList();
+        for (final r in roomList) {
+          floorRoomsMap[r['room_number'].toString()] =
+              r['sharing_type'].toString();
+        }
+        floorWiseRoomsJson[floorName] = floorRoomsMap;
+      }
+
+      final res = await SupabaseService.instance.createFullProperty(
         brandName: brand,
         propertyCode: _generatedPropertyCode,
         genderCategory: _genderCategory ?? 'Coliving',
@@ -844,12 +932,31 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         creditingPhone: _creditingPhoneController.text.trim(),
         rentDueDay: _dueDay,
         gracePeriod: _gracePeriod,
-        lateFee: _lateFee,
+        lateFee: _showCustomLateFee &&
+                _customLateFeeController.text.trim().isNotEmpty
+            ? _customLateFeeController.text.trim()
+            : _lateFee,
         noticePeriod: _noticePeriod,
+        workingWashingMachines: int.tryParse(
+            _washingMachines?.replaceAll(RegExp(r'[^0-9]'), '') ?? '1'),
+        ownerLegalName: _legalNameController.text.trim(),
+        ownerEmail: _emailController.text.trim(),
+        ownerAadhaarNumber: _aadhaarController.text.trim(),
+        ownerPermanentAddress: _addressController.text.trim(),
+        groundFloorHasRooms: _groundFloorHasRooms ?? true,
+        totalFloors: floorsList.length,
+        totalRooms: roomsData.isNotEmpty ? roomsData.length : calcRooms,
+        floorWiseRooms: floorWiseRoomsJson,
+        roomNamingFormat: _namingFormat ?? '101, 102, 201...',
         roomsData: roomsData,
       );
+      return res;
     } catch (e) {
-      debugPrint('Supabase auto-save note (offline or schema fallback): $e');
+      debugPrint('Supabase auto-save error: $e');
+      if (mounted) {
+        _showSnackBar(' Database notice: $e');
+      }
+      return null;
     }
   }
 
@@ -893,27 +1000,40 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       if (calcBeds == 0) calcBeds = calcRooms * 2;
     }
 
-    // Persist to Supabase in background
-    _persistPropertyToSupabase(calcBeds: calcBeds, calcRooms: calcRooms);
+    final ownerName = _legalNameController.text.trim().isNotEmpty
+        ? _legalNameController.text.trim()
+        : (_bankHolderNameController.text.trim().isNotEmpty
+            ? _bankHolderNameController.text.trim()
+            : 'Owner');
+
+    // Await persistence to Supabase
+    final createdProp = await _persistPropertyToSupabase(
+        calcBeds: calcBeds, calcRooms: calcRooms);
+
+    final finalPropId = createdProp?['id']?.toString() ??
+        'prop_${DateTime.now().millisecondsSinceEpoch}';
+
+    final finalBeds = (createdProp?['total_beds'] as num?)?.toInt() ?? calcBeds;
+
+    final newProp = <String, dynamic>{
+      'id': finalPropId,
+      'name': brand,
+      'location': loc,
+      'ownerName': ownerName,
+      'occupiedBeds': 0,
+      'totalBeds': finalBeds,
+      'occupancyPct': '0% Full',
+      'vacantBeds': finalBeds,
+      'noticeBeds': 0,
+      'monthlyCollected': '₹0',
+      'collectedRatio': '0/$finalBeds Beds',
+      'paidCount': 0,
+      'pendingCount': 0,
+      'staffCount': 0,
+      'code': _generatedPropertyCode,
+    };
 
     if (widget.onPropertyCreated != null) {
-      final newProp = <String, dynamic>{
-        'id': 'prop_${DateTime.now().millisecondsSinceEpoch}',
-        'name': brand,
-        'location': loc,
-        'occupiedBeds': 0,
-        'totalBeds': calcBeds > 0 ? calcBeds : 20,
-        'occupancyPct': '0% Full',
-        'vacantBeds': calcBeds > 0 ? calcBeds : 20,
-        'noticeBeds': 0,
-        'monthlyCollected': '₹0',
-        'collectedRatio': '0/0 Collected',
-        'paidCount': 0,
-        'pendingCount': 0,
-        'staffCount': 0,
-        'code': _generatedPropertyCode,
-      };
-
       widget.onPropertyCreated!(newProp);
       Navigator.of(context).pop();
       return;
@@ -921,7 +1041,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => const OwnerDashboardScreen(),
+        builder: (_) => OwnerDashboardScreen(initialProperty: newProp),
       ),
     );
   }
@@ -1623,7 +1743,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.qr_code_rounded, size: 14, color: AppColors.muted),
+                    const Icon(Icons.qr_code_rounded,
+                        size: 14, color: AppColors.muted),
                     const SizedBox(width: 6),
                     Text(
                       'Generated PG Code:',
@@ -1653,10 +1774,12 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                   },
                   borderRadius: BorderRadius.circular(6),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     child: Row(
                       children: [
-                        const Icon(Icons.copy_rounded, size: 12, color: AppColors.greenDark),
+                        const Icon(Icons.copy_rounded,
+                            size: 12, color: AppColors.greenDark),
                         const SizedBox(width: 4),
                         Text(
                           'Copy',
@@ -3233,15 +3356,18 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                 constraints: const BoxConstraints(minHeight: 50),
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 decoration: BoxDecoration(
-                  color: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                  color: (_washingMachines != null &&
+                          !['1', '2', '3'].contains(_washingMachines))
                       ? AppColors.green.withValues(alpha: 0.06)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                    color: (_washingMachines != null &&
+                            !['1', '2', '3'].contains(_washingMachines))
                         ? AppColors.green
                         : const Color(0xFFE5E7EB),
-                    width: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                    width: (_washingMachines != null &&
+                            !['1', '2', '3'].contains(_washingMachines))
                         ? 1.4
                         : 1.0,
                   ),
@@ -3259,7 +3385,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                       style: AppTypography.bodySemiBold.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                        color: (_washingMachines != null &&
+                                !['1', '2', '3'].contains(_washingMachines))
                             ? AppColors.greenDark
                             : AppColors.ink,
                       ),
@@ -3276,7 +3403,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                       ),
                       onChanged: (val) {
                         setState(() {
-                          _washingMachines = val.trim().isNotEmpty ? val.trim() : null;
+                          _washingMachines =
+                              val.trim().isNotEmpty ? val.trim() : null;
                         });
                       },
                     ),
@@ -3287,7 +3415,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                       style: AppTypography.captionSmall.copyWith(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w500,
-                        color: (_washingMachines != null && !['1', '2', '3'].contains(_washingMachines))
+                        color: (_washingMachines != null &&
+                                !['1', '2', '3'].contains(_washingMachines))
                             ? AppColors.green
                             : AppColors.muted,
                       ),
@@ -3628,34 +3757,6 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                 ),
               ),
             ),
-            if (!widget.isScaleMode) ...[
-              const SizedBox(height: 8),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 46),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: _handleSkip,
-                    style: TextButton.styleFrom(
-                      backgroundColor: const Color(0xFFF4F4F5),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: Text(
-                      'Skip for now',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.bodySemiBold.copyWith(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
       ),

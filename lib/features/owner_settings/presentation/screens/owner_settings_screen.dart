@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/state/owner_app_state.dart';
 import 'package:urbanstay/features/owner_setup/presentation/screens/owner_setup_screen.dart';
 
 /// Screen 12: Master Owner Settings & Configuration Hub.
@@ -155,6 +156,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   void initState() {
     super.initState();
     _activeView = widget.initialView ?? 'master';
+    if (OwnerAppState.instance.activePropertyName.isNotEmpty) {
+      _propName = OwnerAppState.instance.activePropertyName;
+      _scalePgName = _propName;
+      _bizLegalName = '$_propName Hospitality Services';
+      _stampBusinessName = '$_propName Hospitality Services';
+    }
+    if (OwnerAppState.instance.totalBeds > 0) {
+      _scaleTotalBeds = OwnerAppState.instance.totalBeds;
+    }
     _fetchLiveGeoData();
   }
 
@@ -282,7 +292,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   // ===========================================================================
   Widget _buildTopHeader() {
     String title = 'Settings';
-    String subtitle = 'Greenview PG • System Configuration';
+    String subtitle =
+        '${_propName.isNotEmpty ? _propName : "My PG"} • System Configuration';
 
     if (_activeView == 'property') {
       title = 'Property Settings';
@@ -1078,7 +1089,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
-                  onPressed: () => _showToast('Generating Printable Standee PDF for Greenview PG ✓'),
+                  onPressed: () => _showToast(
+                      'Generating Printable Standee PDF for ${_propName.isNotEmpty ? _propName : "My PG"} ✓'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.green,
                     foregroundColor: Colors.white,
@@ -4715,7 +4727,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'This will permanently delete your Greenview PG data, tenant records, and direct UPI configuration. This action cannot be undone.',
+                'This will permanently delete your ${_propName.isNotEmpty ? _propName : "property"} data, tenant records, and direct UPI configuration. This action cannot be undone.',
                 style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted, height: 1.4),
               ),
               const SizedBox(height: 16),

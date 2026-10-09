@@ -3,6 +3,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
+import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen 9th Quick Action: Dedicated Day-Wise Rent Collection & Salary Cycle Hub.
 /// Features:
@@ -51,367 +53,72 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
     return '$floor • $sharing • $room';
   }
 
-  // Master Tenant List with Explicit Salary Cycle Pay Dates
-  final List<Map<String, dynamic>> _tenants = [
-    {
-      'id': 't1',
-      'name': 'Rahul Sharma',
-      'initials': 'RS',
-      'bed': 'Room 101',
-      'room': 'Room 101',
-      'sharing': '2-Sharing',
-      'floor': '1st Floor',
-      'work': 'Infosys',
-      'phone': '9876543210',
-      'amount': 8500,
-      'payDay': 1,
-      'status': 'paid',
-      'paidLabel': 'Paid on 1 Aug via Direct UPI',
-      'ref': 'UTR-423189765412',
-      'paidDate': '1 Aug 2026',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't2',
-      'name': 'Amit Verma',
-      'initials': 'AV',
-      'bed': 'Room 101',
-      'room': 'Room 101',
-      'sharing': '2-Sharing',
-      'floor': '1st Floor',
-      'work': 'Christ Univ',
-      'phone': '9988776655',
-      'amount': 8500,
-      'payDay': 1,
-      'status': 'overdue',
-      'overdueDays': '3 Days Overdue',
-      'dueLabel': 'Due since 15 Aug • All Utilities Included',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't3',
-      'name': 'Suresh Gowda',
-      'initials': 'SG',
-      'bed': 'Room G-01',
-      'room': 'Room G-01',
-      'sharing': '2-Sharing',
-      'floor': 'Ground Floor',
-      'work': 'Flipkart',
-      'phone': '9844001122',
-      'amount': 8000,
-      'payDay': 1,
-      'status': 'paid',
-      'paidLabel': 'Paid on 1 Aug via Direct UPI',
-      'ref': 'UTR-338811229900',
-      'paidDate': '1 Aug 2026',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't4',
-      'name': 'Ananya Roy',
-      'initials': 'AR',
-      'bed': 'Room 102',
-      'room': 'Room 102',
-      'sharing': '3-Sharing',
-      'floor': '1st Floor',
-      'work': 'Accenture',
-      'phone': '9822334455',
-      'amount': 7500,
-      'payDay': 2,
-      'status': 'paid',
-      'paidLabel': 'Paid on 2 Aug via Direct UPI',
-      'ref': 'UTR-110299384756',
-      'paidDate': '2 Aug 2026',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't5',
-      'name': 'Manisha Patel',
-      'initials': 'MP',
-      'bed': 'Room 301',
-      'room': 'Room 301',
-      'sharing': '2-Sharing',
-      'floor': '3rd Floor',
-      'work': 'IBM',
-      'phone': '9866443322',
-      'amount': 8500,
-      'payDay': 2,
-      'status': 'paid',
-      'paidLabel': 'Paid on 2 Aug via Direct UPI',
-      'ref': 'UTR-554433221100',
-      'paidDate': '2 Aug 2026',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't6',
-      'name': 'Vikram Rao',
-      'initials': 'VR',
-      'bed': 'Room 102',
-      'room': 'Room 102',
-      'sharing': '3-Sharing',
-      'floor': '1st Floor',
-      'work': 'TCS',
-      'phone': '9733445566',
-      'amount': 7500,
-      'payDay': 3,
-      'status': 'extension_requested',
-      'requestedDate': '15 Aug 2026',
-      'dueLabel': 'Extension Requested • Due 15 Aug',
-      'approvedBy': 'Arun Kumar (Co-Owner)',
-    },
-    {
-      'id': 't7',
-      'name': 'Tanmay Bhat',
-      'initials': 'TB',
-      'bed': 'Room G-01',
-      'room': 'Room G-01',
-      'sharing': '2-Sharing',
-      'floor': 'Ground Floor',
-      'work': 'Freelance',
-      'phone': '9855112233',
-      'amount': 8000,
-      'payDay': 3,
-      'status': 'overdue',
-      'overdueDays': '7 Days Overdue',
-      'dueLabel': 'Due since 11 Aug • Utilities Included',
-      'approvedBy': 'Arun Kumar (Co-Owner)',
-    },
-    {
-      'id': 't8',
-      'name': 'Rohit Sen',
-      'initials': 'RS',
-      'bed': 'Room 103',
-      'room': 'Room 103',
-      'sharing': '2-Sharing',
-      'floor': '1st Floor',
-      'work': 'Wipro',
-      'phone': '9811223344',
-      'amount': 8500,
-      'payDay': 5,
-      'status': 'paid',
-      'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-      'ref': 'UTR-994411223344',
-      'paidDate': '1 Aug 2026',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't9',
-      'name': 'Naveen Kumar',
-      'initials': 'NK',
-      'bed': 'Room 103',
-      'room': 'Room 103',
-      'sharing': '2-Sharing',
-      'floor': '1st Floor',
-      'work': 'Razorpay',
-      'phone': '9844119988',
-      'amount': 8500,
-      'payDay': 5,
-      'status': 'paid',
-      'paidLabel': 'Paid on 3 Aug (Direct UPI)',
-      'ref': 'UTR-883311224455',
-      'paidDate': '3 Aug 2026',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't10',
-      'name': 'Karthik Raja',
-      'initials': 'KR',
-      'bed': 'Room 201',
-      'room': 'Room 201',
-      'sharing': '2-Sharing',
-      'floor': '2nd Floor',
-      'work': 'Swiggy',
-      'phone': '9741234567',
-      'amount': 9000,
-      'payDay': 5,
-      'status': 'paid',
-      'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-      'ref': 'UTR-991200458812',
-      'paidDate': '1 Aug 2026',
-      'approvedBy': 'Bhargav S Kulkarni (Owner)',
-    },
-    {
-      'id': 't11',
-      'name': 'Priya Nair',
-      'initials': 'PN',
-      'bed': 'Room 201',
-      'room': 'Room 201',
-      'sharing': '2-Sharing',
-      'floor': '2nd Floor',
-      'work': 'Dell',
-      'phone': '9819876543',
-      'amount': 9000,
-      'payDay': 5,
-      'status': 'paid',
-      'paidLabel': 'Paid on 3 Aug (Cash)',
-      'ref': 'CSH-8902',
-      'paidDate': '3 Aug 2026',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't12',
-      'name': 'Nikhil Kamath',
-      'initials': 'NK',
-      'bed': 'Room G-02',
-      'room': 'Room G-02',
-      'sharing': 'Single Room',
-      'floor': 'Ground Floor',
-      'work': 'Zerodha',
-      'phone': '9899001122',
-      'amount': 8500,
-      'payDay': 5,
-      'status': 'paid',
-      'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-      'ref': 'UTR-990011223344',
-      'paidDate': '1 Aug 2026',
-      'approvedBy': 'Bhargav S Kulkarni (Owner)',
-    },
-    {
-      'id': 't13',
-      'name': 'Rohan Patil',
-      'initials': 'RP',
-      'bed': 'Room 202',
-      'room': 'Room 202',
-      'sharing': '2-Sharing',
-      'floor': '2nd Floor',
-      'work': 'Wipro',
-      'phone': '9811223344',
-      'amount': 7500,
-      'payDay': 7,
-      'status': 'overdue',
-      'overdueDays': '5 Days Overdue',
-      'dueLabel': 'Due since 13 Aug • All Utilities Included',
-      'approvedBy': 'Arun Kumar (Co-Owner)',
-    },
-    {
-      'id': 't14',
-      'name': 'Sneha Reddy',
-      'initials': 'SR',
-      'bed': 'Room 202',
-      'room': 'Room 202',
-      'sharing': '2-Sharing',
-      'floor': '2nd Floor',
-      'work': 'Amazon',
-      'phone': '9845009988',
-      'amount': 7500,
-      'payDay': 7,
-      'status': 'paid',
-      'paidLabel': 'Paid on 4 Aug (Direct UPI)',
-      'ref': 'UTR-772288119933',
-      'paidDate': '4 Aug 2026',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't15',
-      'name': 'Deepak Joshi',
-      'initials': 'DJ',
-      'bed': 'Room 301',
-      'room': 'Room 301',
-      'sharing': '2-Sharing',
-      'floor': '3rd Floor',
-      'work': 'Oracle',
-      'phone': '9877112233',
-      'amount': 8500,
-      'payDay': 10,
-      'status': 'pending',
-      'dueLabel': 'Extension Requested till 15 Aug',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-    {
-      'id': 't16',
-      'name': 'Aditya Sen',
-      'initials': 'AS',
-      'bed': 'Room 302',
-      'room': 'Room 302',
-      'sharing': '2-Sharing',
-      'floor': '3rd Floor',
-      'work': 'Razorpay',
-      'phone': '9811883377',
-      'amount': 8000,
-      'payDay': 10,
-      'status': 'paid',
-      'paidLabel': 'Paid on 1 Aug (Direct UPI)',
-      'ref': 'UTR-883399221100',
-      'paidDate': '1 Aug 2026',
-      'approvedBy': 'Bhargav S Kulkarni (Owner)',
-    },
-    {
-      'id': 't17',
-      'name': 'Pooja Hegde',
-      'initials': 'PH',
-      'bed': 'Room 302',
-      'room': 'Room 302',
-      'sharing': '2-Sharing',
-      'floor': '3rd Floor',
-      'work': 'Capgemini',
-      'phone': '9833557799',
-      'amount': 8000,
-      'payDay': 15,
-      'status': 'overdue',
-      'overdueDays': '6 Days Overdue',
-      'dueLabel': 'Due since 12 Aug • Utilities Included',
-      'approvedBy': 'Ramesh Gowda (Manager)',
-    },
-  ];
+  // Master Tenant List & Audit History
+  final List<Map<String, dynamic>> _tenants = [];
+  final List<Map<String, dynamic>> _historyLogs = [];
+  bool _isLoading = false;
 
-  // Master History & Audit Log
-  final List<Map<String, dynamic>> _historyLogs = [
-    {
-      'id': 'h1',
-      'type': 'payment_verified',
-      'title': '₹8,500 Direct UPI Verified',
-      'tenant': 'Rahul Sharma • 1st Floor • 2-Sharing • Room 101',
-      'phone': '9876543210',
-      'actor': 'Ramesh Gowda (Manager)',
-      'time': '1 Aug 2026, 09:35 AM',
-      'ref': 'UTR-423189765412',
-      'badge': 'Paid Early',
-    },
-    {
-      'id': 'h2',
-      'type': 'rescheduled',
-      'title': 'Salary Pay Date Changed: 5th ➔ 10th',
-      'tenant': 'Aditya Sen • 3rd Floor • 2-Sharing • Room 302',
-      'phone': '9811883377',
-      'actor': 'Bhargav S Kulkarni (Owner)',
-      'time': '1 Aug 2026, 11:20 AM',
-      'reason': 'Salary credit cycle confirmed on 10th by Razorpay HR',
-      'badge': 'Re-Scheduled',
-    },
-    {
-      'id': 'h3',
-      'type': 'payment_verified',
-      'title': '₹8,000 Direct UPI Verified',
-      'tenant': 'Suresh Gowda • Ground Floor • 2-Sharing • Room G-01',
-      'phone': '9844001122',
-      'actor': 'Ramesh Gowda (Manager)',
-      'time': '1 Aug 2026, 02:15 PM',
-      'ref': 'UTR-338811229900',
-      'badge': 'Paid on Time',
-    },
-    {
-      'id': 'h4',
-      'type': 'payment_verified',
-      'title': '₹7,500 Direct UPI Verified',
-      'tenant': 'Ananya Roy • 1st Floor • 3-Sharing • Room 102',
-      'phone': '9822334455',
-      'actor': 'Ramesh Gowda (Manager)',
-      'time': '2 Aug 2026, 10:00 AM',
-      'ref': 'UTR-110299384756',
-      'badge': 'Paid on Time',
-    },
-    {
-      'id': 'h5',
-      'type': 'rejected',
-      'title': 'Payment Rejected (Not Credited in Bank)',
-      'tenant': 'Tanmay Bhat • Ground Floor • 2-Sharing • Room G-01',
-      'phone': '9855112233',
-      'actor': 'Arun Kumar (Co-Owner)',
-      'time': '3 Aug 2026, 04:45 PM',
-      'reason': 'UTR 9988221100 invalid - not reflected in HDFC Bank',
-      'badge': 'Rejected',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadDayCollectionData();
+  }
+
+  Future<void> _loadDayCollectionData() async {
+    setState(() => _isLoading = true);
+    try {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      if (prop != null) {
+        final propId = prop['id'].toString();
+        final ledger = await SupabaseService.instance.getMonthlyRentLedger(propId);
+        if (mounted && ledger.isNotEmpty) {
+          final List<Map<String, dynamic>> loaded = [];
+          for (final row in ledger) {
+            final tenant = row['tenants'] as Map<String, dynamic>?;
+            final roomNum = tenant?['room_number'] ?? 'Room 101';
+            final floorName = roomNum.startsWith('G') ? 'Ground Floor' : '${roomNum[0]}st Floor';
+            final status = (row['status'] ?? 'PENDING').toString().toLowerCase();
+            final isPaid = status == 'paid';
+            final tenantName = tenant?['full_name'] ?? 'Resident';
+            final nameParts = tenantName.trim().split(' ');
+            final computedInitials = nameParts.length >= 2
+                ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
+                : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'TN');
+
+            final dueDay = ((tenant?['rent_cycle_date'] ?? tenant?['pay_day'] ?? row['rent_due_day'] ?? row['due_date'] ?? row['due_day']) as num?)?.toInt() ?? 1;
+
+            loaded.add({
+              'id': row['id'].toString(),
+              'name': tenantName,
+              'initials': computedInitials,
+              'bed': tenant?['bed_number'] ?? 'Bed A',
+              'room': roomNum,
+              'floor': floorName,
+              'sharing': tenant?['sharing_type'] ?? '2-Sharing',
+              'phone': tenant?['phone'] ?? '',
+              'payDay': dueDay,
+              'amount': (row['amount'] as num?)?.toInt() ?? 8000,
+              'status': isPaid ? 'paid' : 'overdue',
+              'paidDate': row['paid_at'] != null ? row['paid_at'].toString().split('T').first : null,
+              'dueLabel': isPaid ? 'Paid' : 'Rent Due',
+              'approvedBy': _selectedStaffActor,
+              'requestedDate': null,
+              'extensionDate': null,
+            });
+          }
+          setState(() {
+            _tenants.clear();
+            _tenants.addAll(loaded);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading day collection: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
 
   void _showToast(String msg) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -434,7 +141,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   @override
   Widget build(BuildContext context) {
     final defaultDays = [1, 2, 3, 5, 7, 10, 15, 20, 25];
-    final tenantDays = _tenants.map((t) => (t['payDay'] as int)).toList();
+    final tenantDays = _tenants
+        .map((t) => ((t['payDay'] as num?)?.toInt() ?? 1))
+        .toList();
     final availableDays = {...defaultDays, ...tenantDays}.toList()..sort();
 
     return Scaffold(
@@ -523,7 +232,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         ),
                       ),
                       Text(
-                        'Greenview PG • Salary Cycle Calendar',
+                        '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • Salary Cycle Calendar',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.outfit(
@@ -732,13 +441,13 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
 
   Widget _buildScheduleContent(List<int> availableDays) {
     final selectedTenants = _tenants.where((t) {
-      final matchesDay = (t['payDay'] as int) == _selectedDay;
+      final matchesDay = ((t['payDay'] as num?)?.toInt() ?? 1) == _selectedDay;
       final matchesFloor =
           _selectedFloor == 'all' || t['floor'] == _selectedFloor;
       return matchesDay && matchesFloor;
     }).toList();
     final dayTotalExpected =
-        selectedTenants.fold<int>(0, (sum, t) => sum + (t['amount'] as int));
+        selectedTenants.fold<int>(0, (sum, t) => sum + ((t['amount'] as num?)?.toInt() ?? 0));
     final dayPaidCount =
         selectedTenants.where((t) => t['status'] == 'paid').length;
 
@@ -776,7 +485,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             child: Row(
               children: availableDays.map((d) {
                 final count = _tenants.where((t) {
-                  final matchesDay = (t['payDay'] as int) == d;
+                  final matchesDay =
+                      ((t['payDay'] as num?)?.toInt() ?? 1) == d;
                   final matchesFloor =
                       _selectedFloor == 'all' || t['floor'] == _selectedFloor;
                   return matchesDay && matchesFloor;

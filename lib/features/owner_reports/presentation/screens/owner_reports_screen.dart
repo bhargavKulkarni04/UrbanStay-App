@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/state/owner_app_state.dart';
 
 /// Screen: Owner Business Intelligence & Master Reports Hub.
 /// Specific Updates:
@@ -405,7 +406,7 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                   ),
                 ),
                 Text(
-                  'Greenview PG • Comprehensive Business Audit',
+                  '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • Comprehensive Business Audit',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.outfit(

@@ -7,7 +7,6 @@
 // ==============================================================================
 
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../config/supabase_config.dart';
 
 class SupabaseService {
   SupabaseService._internal();
@@ -57,15 +56,15 @@ class SupabaseService {
   // 🏢 OWNER CORE SERVICES
   // ---------------------------------------------------------------------------
 
-  /// Fetch primary property profile for the logged in owner
+  /// Fetch primary property profile for the owner
   Future<Map<String, dynamic>?> getOwnerProperty({String? ownerId}) async {
     final uid = ownerId ?? currentUserId;
-    if (uid == null) return null;
+    var query = client.from('properties').select('*');
+    if (uid != null) {
+      query = query.eq('owner_id', uid);
+    }
 
-    final response = await client
-        .from('properties')
-        .select('*')
-        .eq('owner_id', uid)
+    final response = await query
         .order('created_at', ascending: false)
         .limit(1)
         .maybeSingle();
@@ -82,22 +81,18 @@ class SupabaseService {
     required int totalFloors,
     String? ownerId,
   }) async {
-    final uid = ownerId ?? currentUserId;
     final payload = {
-      'owner_id': uid,
-      'name': name,
-      'address': address,
+      'property_name': name,
+      'street_address': address,
       'city': city,
-      'upi_id': upiId,
-      'total_floors': totalFloors,
-      'updated_at': DateTime.now().toIso8601String(),
+      'area_locality': 'BTM Layout',
+      'upi_vpa': upiId,
+      'crediting_phone': '9876543210',
+      'total_beds': totalFloors * 10,
     };
 
-    final response = await client
-        .from('properties')
-        .upsert(payload)
-        .select()
-        .single();
+    final response =
+        await client.from('properties').upsert(payload).select().single();
 
     return response;
   }
@@ -125,14 +120,36 @@ class SupabaseService {
     String? gracePeriod,
     String? lateFee,
     String? noticePeriod,
+    int? workingWashingMachines,
+    String? ownerLegalName,
+    String? ownerEmail,
+    String? ownerAadhaarNumber,
+    String? ownerPermanentAddress,
+    String? ownerAadhaarFrontUrl,
+    String? ownerAadhaarBackUrl,
+    String? bankQrUrl,
+    bool? groundFloorHasRooms,
+    int? totalFloors,
+    int? totalRooms,
+    Map<String, dynamic>? floorWiseRooms,
+    String? roomNamingFormat,
     List<Map<String, dynamic>> roomsData = const [],
     String? ownerId,
   }) async {
-    final uid = ownerId ?? currentUserId;
+    // Parse numeric late fee (e.g. "₹50" -> 50.0)
+    final numLateFee = double.tryParse(
+          (lateFee ?? '50').replaceAll(RegExp(r'[^0-9.]'), ''),
+        ) ??
+        50.0;
+
+    int totalBedsCount = 0;
+    for (final r in roomsData) {
+      totalBedsCount += ((r['total_beds'] as num?)?.toInt() ?? 0);
+    }
+
     final propPayload = {
-      if (uid != null) 'owner_id': uid,
+      'property_name': brandName,
       'property_code': propertyCode,
-      'brand_name': brandName,
       'gender_category': genderCategory,
       'property_structure': propertyStructure,
       'street_address': streetAddress,
@@ -144,21 +161,33 @@ class SupabaseService {
       'maps_url': mapsUrl,
       'lift_count': liftCount,
       'power_backup': powerBackup,
+      'total_beds': totalBedsCount,
+      'total_floors': totalFloors ?? 1,
+      'total_rooms': totalRooms ?? roomsData.length,
+      'ground_floor_has_rooms': groundFloorHasRooms ?? true,
+      'floor_wise_rooms': floorWiseRooms,
+      'room_naming_format': roomNamingFormat ?? 'numeric',
+      'owner_legal_name': ownerLegalName,
+      'owner_email': ownerEmail,
+      'owner_aadhaar_number': ownerAadhaarNumber,
+      'owner_permanent_address': ownerPermanentAddress,
+      'owner_aadhaar_front_url': ownerAadhaarFrontUrl,
+      'owner_aadhaar_back_url': ownerAadhaarBackUrl,
+      'bank_qr_url': bankQrUrl,
+      'working_washing_machines': workingWashingMachines ?? 1,
+      'has_washing_machine': (workingWashingMachines ?? 1) > 0,
       'upi_vpa': upiVpa,
       'bank_name': bankName,
       'bank_holder_name': bankHolderName,
       'crediting_phone': creditingPhone,
       'rent_due_day': rentDueDay ?? '5th',
       'grace_period': gracePeriod ?? '3 Days',
-      'late_fee': lateFee ?? '₹50',
+      'late_fee': numLateFee,
       'notice_period': noticePeriod ?? '30 Days',
     };
 
-    final property = await client
-        .from('properties')
-        .insert(propPayload)
-        .select()
-        .single();
+    final property =
+        await client.from('properties').insert(propPayload).select().single();
 
     final propertyId = property['id'] as String;
 
@@ -175,11 +204,8 @@ class SupabaseService {
         'deposit_per_bed': r['deposit_per_bed'] ?? 15000,
       };
 
-      final insertedRoom = await client
-          .from('rooms')
-          .insert(roomPayload)
-          .select()
-          .single();
+      final insertedRoom =
+          await client.from('rooms').insert(roomPayload).select().single();
 
       final roomId = insertedRoom['id'] as String;
       final int totalBeds = (r['total_beds'] as int?) ?? 2;
@@ -189,7 +215,7 @@ class SupabaseService {
         final bedLetter = String.fromCharCode(65 + b); // 'Bed A', 'Bed B'
         bedsPayload.add({
           'room_id': roomId,
-          'bed_code': 'Bed $bedLetter',
+          'bed_label': 'Bed $bedLetter',
           'is_occupied': false,
           'status': 'Vacant',
         });
@@ -205,19 +231,29 @@ class SupabaseService {
 
   /// Live real-time bed statistics (Occupied beds, Total beds)
   Future<Map<String, int>> getBedMetrics(String propertyId) async {
-    final totalBedsRes = await client
-        .from('beds')
-        .select('id, is_occupied')
+    final roomsRes = await client
+        .from('rooms')
+        .select('id, total_beds, beds(id, is_occupied)')
         .eq('property_id', propertyId);
 
-    final List beds = totalBedsRes as List;
-    final int total = beds.length;
-    final int occupied = beds.where((b) => b['is_occupied'] == true).length;
+    final List rooms = roomsRes as List;
+    int total = 0;
+    int occupied = 0;
+
+    for (final r in rooms) {
+      final List bedsList = (r['beds'] as List?) ?? [];
+      if (bedsList.isNotEmpty) {
+        total += bedsList.length;
+        occupied += bedsList.where((b) => b['is_occupied'] == true).length;
+      } else {
+        total += ((r['total_beds'] as num?)?.toInt() ?? 0);
+      }
+    }
 
     return {
       'total': total,
       'occupied': occupied,
-      'available': total - occupied,
+      'available': (total - occupied).clamp(0, total),
     };
   }
 
@@ -234,7 +270,8 @@ class SupabaseService {
   }
 
   /// Fetch live rent collection dues & status for the month
-  Future<List<Map<String, dynamic>>> getMonthlyRentLedger(String propertyId) async {
+  Future<List<Map<String, dynamic>>> getMonthlyRentLedger(
+      String propertyId) async {
     final response = await client
         .from('rent_ledgers')
         .select('*, tenants(id, full_name, phone, room_number, bed_number)')
@@ -244,17 +281,19 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  /// Fetch SaaS subscription billing invoices for the owner
-  Future<List<Map<String, dynamic>>> getSaasInvoices({String? ownerId}) async {
+  /// Fetch SaaS subscription billing invoices for the owner / property
+  Future<List<Map<String, dynamic>>> getSaasInvoices(
+      {String? propertyId, String? ownerId}) async {
+    var query = client.from('saas_invoices').select('*');
+    if (propertyId != null && propertyId.isNotEmpty) {
+      query = query.eq('property_id', propertyId);
+    }
     final uid = ownerId ?? currentUserId;
-    if (uid == null) return [];
+    if (uid != null) {
+      query = query.eq('owner_id', uid);
+    }
 
-    final response = await client
-        .from('saas_invoices')
-        .select('*')
-        .eq('owner_id', uid)
-        .order('created_at', ascending: false);
-
+    final response = await query.order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
   }
 
@@ -284,6 +323,17 @@ class SupabaseService {
         .eq('tenant_id', tenantId)
         .eq('status', 'PENDING')
         .order('due_date', ascending: true);
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Fetch all rooms with beds for a property
+  Future<List<Map<String, dynamic>>> getRooms(String propertyId) async {
+    final response = await client
+        .from('rooms')
+        .select('*, beds(*)')
+        .eq('property_id', propertyId)
+        .order('room_number', ascending: true);
 
     return List<Map<String, dynamic>>.from(response);
   }

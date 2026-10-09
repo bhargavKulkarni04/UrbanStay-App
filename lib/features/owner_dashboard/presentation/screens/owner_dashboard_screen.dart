@@ -21,6 +21,7 @@ import '../../../owner_food_menu/presentation/screens/owner_food_menu_screen.dar
 import '../../../owner_tenant_controls/presentation/screens/owner_tenant_controls_screen.dart';
 import '../../../owner_setup/presentation/screens/owner_setup_screen.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/state/owner_app_state.dart';
 
 /// Screen 5: Owner Command Center Dashboard.
 /// 1-to-1 exact translation of `ProductionCode/owner_dashboard.html`.
@@ -36,68 +37,44 @@ import '../../../../core/services/supabase_service.dart';
 ///   6. Bottom Fixed Navigation Bar (4 tabs: Dashboard, Rooms, Approvals [badge 2], Plan / Pay).
 ///   7. 8 Fully Integrated Action Modals (Approval Queue, Rent Dues, Expense, Police KYC, Notice, Complaints, Staff, New Announcement).
 class OwnerDashboardScreen extends StatefulWidget {
-  const OwnerDashboardScreen({super.key});
+  final Map<String, dynamic>? initialProperty;
+
+  const OwnerDashboardScreen({super.key, this.initialProperty});
 
   @override
   State<OwnerDashboardScreen> createState() => _OwnerDashboardScreenState();
 }
 
 class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
-  int _activeNavIndex = 0; // 0: Dashboard, 1: Rooms, 2: Approvals, 3: Plan / Pay
+  int _activeNavIndex =
+      0; // 0: Dashboard, 1: Rooms, 2: Approvals, 3: Plan / Pay
   String _activeSubScreen = 'dashboard'; // 'dashboard', 'rooms', 'rent'
 
-  // Multi-PG Properties State
+  // Multi-PG Properties State (Populated dynamically from Supabase / Setup)
   int _activePropertyIndex = 0;
-  final List<Map<String, dynamic>> _properties = [
-    {
-      'id': 'prop_1',
-      'name': 'Greenview PG',
-      'location': 'Koramangala, Bengaluru',
-      'code': 'GP4821G',
-      'occupiedBeds': 31,
-      'totalBeds': 35,
-      'occupancyPct': '88% Full',
-      'vacantBeds': 4,
-      'noticeBeds': 3,
-      'monthlyCollected': '₹2,63,500',
-      'collectedRatio': '25/31 Collected',
-      'paidCount': 25,
-      'pendingCount': 6,
-      'staffCount': 4,
-    },
-    {
-      'id': 'prop_2',
-      'name': 'UrbanStay Luxury PG',
-      'location': 'HSR Sector 2, Bengaluru',
-      'code': 'UL9124G',
-      'occupiedBeds': 48,
-      'totalBeds': 50,
-      'occupancyPct': '96% Full',
-      'vacantBeds': 2,
-      'noticeBeds': 1,
-      'monthlyCollected': '₹4,12,000',
-      'collectedRatio': '42/48 Collected',
-      'paidCount': 42,
-      'pendingCount': 6,
-      'staffCount': 6,
-    },
-    {
-      'id': 'prop_3',
-      'name': 'UrbanStay Coliving Hub',
-      'location': 'BTM 2nd Stage, Bengaluru',
-      'code': 'UC7342C',
-      'occupiedBeds': 22,
-      'totalBeds': 25,
-      'occupancyPct': '88% Full',
-      'vacantBeds': 3,
-      'noticeBeds': 2,
-      'monthlyCollected': '₹1,98,000',
-      'collectedRatio': '20/22 Collected',
-      'paidCount': 20,
-      'pendingCount': 2,
-      'staffCount': 3,
-    },
-  ];
+  final List<Map<String, dynamic>> _properties = [];
+
+  String get _currentOwnerName {
+    if (_properties.isNotEmpty && _activePropertyIndex < _properties.length) {
+      final n = _properties[_activePropertyIndex]['ownerName'];
+      if (n != null && n.toString().trim().isNotEmpty)
+        return n.toString().trim();
+    }
+    if (widget.initialProperty?['ownerName'] != null) {
+      final n = widget.initialProperty!['ownerName'].toString().trim();
+      if (n.isNotEmpty) return n;
+    }
+    return 'Owner';
+  }
+
+  String get _currentOwnerInitials {
+    final name = _currentOwnerName;
+    if (name.isEmpty || name == 'Owner') return 'OW';
+    final parts = name.split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.length == 1)
+      return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
 
   // Team Management: Co-Owners & PG Managers State
   final List<Map<String, dynamic>> _teamMembers = [
@@ -106,7 +83,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       'name': 'Arun Kumar',
       'phone': '9845199201',
       'role': 'co_owner',
-      'assignedPropertyIds': ['prop_1', 'prop_2', 'prop_3'], // Co-Owners: Unlimited multi-building access
+      'assignedPropertyIds': [
+        'prop_1',
+        'prop_2',
+        'prop_3'
+      ], // Co-Owners: Unlimited multi-building access
       'status': 'Active',
     },
     {
@@ -114,7 +95,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       'name': 'Suresh Gowda',
       'phone': '9880123456',
       'role': 'manager',
-      'assignedPropertyIds': ['prop_1'], // PG Managers: Max 3 per property, max 3 properties assigned
+      'assignedPropertyIds': [
+        'prop_1'
+      ], // PG Managers: Max 3 per property, max 3 properties assigned
       'status': 'Active',
     },
   ];
@@ -135,91 +118,16 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     }).length;
   }
 
-  // Active Approvals State
-  final List<Map<String, String>> _approvalItems = [
-    {
-      'id': 'appr_1',
-      'name': 'Rahul Sharma (Room 101-A)',
-      'sub': 'Direct GPay to HDFC Bank • UTR: 423189765412',
-      'amount': '₹8,500',
-      'proof': 'gpay_payment_screenshot.jpg',
-    },
-    {
-      'id': 'appr_2',
-      'name': 'Amit Verma (Room 101-B)',
-      'sub': 'PhonePe Transfer • UTR: 889123450912',
-      'amount': '₹8,500',
-      'proof': 'phonepe_receipt_proof.png',
-    },
-  ];
+  // Active Approvals State (Populated dynamically from Supabase / State)
+  final List<Map<String, String>> _approvalItems = [];
 
-  // Active Announcements State
-  final List<Map<String, String>> _announcements = [
-    {
-      'id': 'ann_1',
-      'title': 'Water Tank Cleaning Tomorrow',
-      'target': 'All Residents (31)',
-      'time': 'Today, 5:30 PM',
-      'msg':
-          'Water supply will be paused tomorrow between 10:00 AM – 2:00 PM for overhead tank sanitization. Kindly store sufficient water in advance.',
-      'status': 'Delivered',
-    },
-  ];
+  // Active Announcements State (Populated dynamically from Supabase / State)
+  final List<Map<String, String>> _announcements = [];
 
   // Modals Controller State
-  String _activeNotificationFilter = 'All'; // 'All', 'Rent UPI', 'Rent Cash', 'Vacating', 'Check-In', 'Maintenance'
-  final List<Map<String, dynamic>> _notifications = [
-    {
-      'id': 'notif_1',
-      'category': 'Rent UPI',
-      'title': 'Rahul Sharma (Room 101-A) paid ₹8,500 via UPI',
-      'time': '18:42',
-      'date': 'TODAY — 08 OCT 2026',
-      'actionText': 'Verify Payment',
-      'actionTarget': 'approvals',
-      'isUnread': true,
-    },
-    {
-      'id': 'notif_2',
-      'category': 'Rent Cash',
-      'title': 'Suresh collected ₹6,500 cash from Room 204',
-      'time': '15:10',
-      'date': 'TODAY — 08 OCT 2026',
-      'actionText': 'Confirm Cash Received',
-      'actionTarget': 'day_collection',
-      'isUnread': true,
-    },
-    {
-      'id': 'notif_3',
-      'category': 'Vacating',
-      'title': 'Amit Verma (Room 204-B) vacating on 31 Oct',
-      'time': '11:05',
-      'date': 'TODAY — 08 OCT 2026',
-      'actionText': 'View Vacating Details',
-      'actionTarget': 'notice',
-      'isUnread': true,
-    },
-    {
-      'id': 'notif_4',
-      'category': 'Check-In',
-      'title': 'Karthik Nair completed check-in for Room 302',
-      'time': '19:20',
-      'date': 'YESTERDAY — 07 OCT 2026',
-      'actionText': 'Approve Check-In',
-      'actionTarget': 'onboarding',
-      'isUnread': false,
-    },
-    {
-      'id': 'notif_5',
-      'category': 'Maintenance',
-      'title': 'Room 105 reported geyser water leakage',
-      'time': '14:45',
-      'date': 'YESTERDAY — 07 OCT 2026',
-      'actionText': 'View Complaint',
-      'actionTarget': 'complaints',
-      'isUnread': false,
-    },
-  ];
+  String _activeNotificationFilter =
+      'All'; // 'All', 'Rent UPI', 'Rent Cash', 'Vacating', 'Check-In', 'Maintenance'
+  final List<Map<String, dynamic>> _notifications = [];
 
   bool _showApprovalModal = false;
   bool _showRentModal = false;
@@ -242,32 +150,43 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialProperty != null) {
+      _properties.add(widget.initialProperty!);
+    }
     _loadPropertiesFromSupabase();
   }
 
   Future<void> _loadPropertiesFromSupabase() async {
     try {
       final uid = SupabaseService.instance.currentUserId;
-      var query = SupabaseService.instance.client.from('properties').select('*');
+      var query =
+          SupabaseService.instance.client.from('properties').select('*');
       if (uid != null) {
         query = query.eq('owner_id', uid);
       }
-      final List res = await query.order('created_at', ascending: false);
+      final List res =
+          await query.order('created_at', ascending: false).limit(10);
       if (res.isNotEmpty && mounted) {
         final List<Map<String, dynamic>> loaded = [];
         for (final p in res) {
           final propId = p['id'].toString();
           final metrics = await SupabaseService.instance.getBedMetrics(propId);
-          final total = metrics['total'] ?? 0;
+          final total = (metrics['total'] != null && metrics['total']! > 0)
+              ? metrics['total']!
+              : ((p['total_beds'] as num?)?.toInt() ?? 0);
           final occupied = metrics['occupied'] ?? 0;
-          final pct = total > 0 ? '${((occupied / total) * 100).round()}% Full' : '0% Full';
+          final pct = total > 0
+              ? '${((occupied / total) * 100).round()}% Full'
+              : '0% Full';
           loaded.add({
             'id': propId,
-            'name': p['brand_name'] ?? p['name'] ?? 'PG Property',
-            'location': '${p['area_locality'] ?? ''}, ${p['city'] ?? ''}'.trim(),
+            'name': p['property_name'] ?? p['brand_name'] ?? p['name'] ?? 'PG Property',
+            'ownerName': p['owner_legal_name'] ?? p['bank_holder_name'] ?? 'Owner',
+            'location':
+                '${p['area_locality'] ?? ''}, ${p['city'] ?? ''}'.trim(),
             'code': p['property_code'] ?? '',
             'occupiedBeds': occupied,
-            'totalBeds': total > 0 ? total : 0,
+            'totalBeds': total,
             'occupancyPct': pct,
             'vacantBeds': (total - occupied) > 0 ? (total - occupied) : 0,
             'noticeBeds': 0,
@@ -283,9 +202,22 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           _properties.addAll(loaded);
           _activePropertyIndex = 0;
         });
+      } else if (mounted && widget.initialProperty != null) {
+        setState(() {
+          if (_properties.isEmpty) {
+            _properties.add(widget.initialProperty!);
+          }
+          _activePropertyIndex = 0;
+        });
       }
     } catch (e) {
       debugPrint('Supabase properties load note: $e');
+      if (mounted && widget.initialProperty != null && _properties.isEmpty) {
+        setState(() {
+          _properties.add(widget.initialProperty!);
+          _activePropertyIndex = 0;
+        });
+      }
     }
   }
 
@@ -372,6 +304,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final activeProp = _properties.isNotEmpty
+        ? _properties[_activePropertyIndex]
+        : (widget.initialProperty ?? const <String, dynamic>{});
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -435,6 +371,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               _buildNotificationFullPage()
             else if (_activeNavIndex == 3 || _activeSubScreen == 'billing')
               OwnerSaaSBillingScreen(
+                propertyId: activeProp['id']?.toString(),
+                propertyName:
+                    (activeProp['name'] as String?) ?? 'Jai shree ram',
+                totalBeds: (activeProp['totalBeds'] as num?)?.toInt() ?? 12,
+                ownerName: _currentOwnerName,
                 onBack: () => setState(() {
                   _activeNavIndex = 0;
                   _activeSubScreen = 'dashboard';
@@ -526,7 +467,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -552,7 +494,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   color: AppColors.muted,
                 ),
               ),
-
               Row(
                 children: [
                   // Notification Bell with Badge
@@ -560,7 +501,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     clipBehavior: Clip.none,
                     children: [
                       InkWell(
-                        onTap: () => setState(() => _activeSubScreen = 'notifications'),
+                        onTap: () =>
+                            setState(() => _activeSubScreen = 'notifications'),
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
                           width: 36,
@@ -577,7 +519,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           ),
                         ),
                       ),
-                      if (_notifications.where((n) => n['isUnread'] == true).isNotEmpty)
+                      if (_notifications
+                          .where((n) => n['isUnread'] == true)
+                          .isNotEmpty)
                         Positioned(
                           top: -3,
                           right: -3,
@@ -587,7 +531,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             decoration: BoxDecoration(
                               color: AppColors.green,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 1.5),
+                              border:
+                                  Border.all(color: Colors.white, width: 1.5),
                             ),
                             child: Center(
                               child: Text(
@@ -619,7 +564,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          'BK',
+                          _currentOwnerInitials,
                           style: GoogleFonts.outfit(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w800,
@@ -637,7 +582,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
           // Row 2: BIG BOLD OWNER HEADLINE
           Text(
-            'Bhargav S Kulkarni',
+            _currentOwnerName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.outfit(
@@ -654,7 +599,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             onTap: _showPropertySwitcherModal,
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8.5),
               decoration: BoxDecoration(
                 color: const Color(0xFFF9FAFB),
                 borderRadius: BorderRadius.circular(12),
@@ -675,7 +621,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.ink),
+                      const Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 16, color: AppColors.ink),
                     ],
                   ),
                   Text(
@@ -723,7 +670,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 color: AppColors.greenLight,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.home_work_rounded, color: AppColors.green, size: 26),
+              child: const Icon(Icons.home_work_rounded,
+                  color: AppColors.green, size: 26),
             ),
             const SizedBox(height: 12),
             Text(
@@ -763,7 +711,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     ),
                   );
                 },
-                icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                icon: const Icon(Icons.add_rounded,
+                    size: 18, color: Colors.white),
                 label: Text(
                   'Set Up First PG Building',
                   style: GoogleFonts.outfit(
@@ -774,7 +723,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.green,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
               ),
@@ -822,7 +772,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       color: AppColors.ink,
                     ),
                   ),
-                  if (prop['code'] != null && (prop['code'] as String).isNotEmpty) ...[
+                  if (prop['code'] != null &&
+                      (prop['code'] as String).isNotEmpty) ...[
                     const SizedBox(height: 3),
                     InkWell(
                       onTap: () {
@@ -832,11 +783,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       },
                       borderRadius: BorderRadius.circular(4),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(5),
-                          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
+                          border: Border.all(
+                              color: const Color(0xFFE5E7EB), width: 1.0),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -864,7 +817,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 11, color: AppColors.muted),
+                      const Icon(Icons.location_on_outlined,
+                          size: 11, color: AppColors.muted),
                       const SizedBox(width: 2),
                       Text(
                         prop['location'] as String,
@@ -881,7 +835,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
               // Live % Full Badge
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(6),
@@ -962,7 +917,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         ),
                         const SizedBox(height: 2),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 1.5),
                           decoration: BoxDecoration(
                             color: AppColors.greenLight,
                             borderRadius: BorderRadius.circular(4),
@@ -994,13 +950,23 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               Expanded(
                 child: Column(
                   children: [
-                    _buildMinimalStatRow(Icons.bed_outlined, 'Total Capacity', '${prop['totalBeds']} Beds', AppColors.ink),
+                    _buildMinimalStatRow(Icons.bed_outlined, 'Total Capacity',
+                        '${prop['totalBeds']} Beds', AppColors.ink),
                     const SizedBox(height: 7),
-                    _buildMinimalStatRow(Icons.people_alt_outlined, 'Occupied Beds', '${prop['occupiedBeds']} Beds', AppColors.ink),
+                    _buildMinimalStatRow(
+                        Icons.people_alt_outlined,
+                        'Occupied Beds',
+                        '${prop['occupiedBeds']} Beds',
+                        AppColors.ink),
                     const SizedBox(height: 7),
-                    _buildMinimalStatRow(Icons.single_bed_outlined, 'Vacant Beds', '${prop['vacantBeds']} Beds', AppColors.ink),
+                    _buildMinimalStatRow(
+                        Icons.single_bed_outlined,
+                        'Vacant Beds',
+                        '${prop['vacantBeds']} Beds',
+                        AppColors.ink),
                     const SizedBox(height: 7),
-                    _buildMinimalStatRow(Icons.badge_outlined, 'Active Staff', '${prop['staffCount']} Staff', AppColors.ink),
+                    _buildMinimalStatRow(Icons.badge_outlined, 'Active Staff',
+                        '${prop['staffCount']} Staff', AppColors.ink),
                   ],
                 ),
               ),
@@ -1021,7 +987,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               Expanded(
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded, size: 13, color: AppColors.muted),
+                    const Icon(Icons.info_outline_rounded,
+                        size: 13, color: AppColors.muted),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -1053,7 +1020,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                     ),
                     const SizedBox(width: 2),
-                    const Icon(Icons.arrow_forward_rounded, size: 12, color: AppColors.green),
+                    const Icon(Icons.arrow_forward_rounded,
+                        size: 12, color: AppColors.green),
                   ],
                 ),
               ),
@@ -1112,7 +1080,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                       Text(
                         'Switch telemetry, beds & staff directory',
-                        style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                        style: GoogleFonts.outfit(
+                            fontSize: 12, color: AppColors.muted),
                       ),
                     ],
                   ),
@@ -1128,7 +1097,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
                       child: const Center(
-                        child: Icon(Icons.close, size: 15, color: AppColors.muted),
+                        child:
+                            Icon(Icons.close, size: 15, color: AppColors.muted),
                       ),
                     ),
                   ),
@@ -1146,16 +1116,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     onTap: () {
                       setState(() => _activePropertyIndex = idx);
                       Navigator.of(ctx).pop();
-                      _showToast('Switched to ${prop['name']} (${prop['location']})');
+                      _showToast(
+                          'Switched to ${prop['name']} (${prop['location']})');
                     },
                     borderRadius: BorderRadius.circular(14),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: isSelected ? AppColors.greenLight : Colors.white,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                          color: isSelected
+                              ? AppColors.green
+                              : const Color(0xFFE5E7EB),
                           width: isSelected ? 1.6 : 1.0,
                         ),
                       ),
@@ -1172,16 +1146,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                       style: GoogleFonts.outfit(
                                         fontSize: 14.5,
                                         fontWeight: FontWeight.w800,
-                                        color: isSelected ? AppColors.greenDark : AppColors.ink,
+                                        color: isSelected
+                                            ? AppColors.greenDark
+                                            : AppColors.ink,
                                       ),
                                     ),
                                     if (isSelected) ...[
                                       const SizedBox(width: 6),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 1.5),
                                         decoration: BoxDecoration(
                                           color: AppColors.green,
-                                          borderRadius: BorderRadius.circular(4),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
                                         ),
                                         child: Text(
                                           'ACTIVE',
@@ -1198,15 +1176,18 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                 const SizedBox(height: 3),
                                 Text(
                                   '${prop['location']} • ${prop['occupiedBeds']}/${prop['totalBeds']} Beds • ${prop['staffCount']} Staff',
-                                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted),
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11.5, color: AppColors.muted),
                                 ),
                               ],
                             ),
                           ),
                           if (isSelected)
-                            const Icon(Icons.check_circle_rounded, size: 20, color: AppColors.green)
+                            const Icon(Icons.check_circle_rounded,
+                                size: 20, color: AppColors.green)
                           else
-                            const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.muted),
+                            const Icon(Icons.chevron_right_rounded,
+                                size: 18, color: AppColors.muted),
                         ],
                       ),
                     ),
@@ -1228,7 +1209,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             _properties.add(newProperty);
                             _activePropertyIndex = _properties.length - 1;
                           });
-                          _showToast('Successfully onboarded ${newProperty['name']}!');
+                          _showToast(
+                              'Successfully onboarded ${newProperty['name']}!');
                         },
                       ),
                     ),
@@ -1237,12 +1219,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.add_business_outlined, size: 16, color: AppColors.ink),
+                    const Icon(Icons.add_business_outlined,
+                        size: 16, color: AppColors.ink),
                     const SizedBox(width: 8),
                     Text(
                       '+ Onboard New PG Building',
@@ -1269,7 +1253,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     String selectedRole = 'manager'; // 'manager', 'co_owner'
     // Default selected property IDs (initialized to active property)
     Set<String> selectedPropertyIds = {
-      _properties.isNotEmpty ? (_properties[_activePropertyIndex]['id'] as String) : 'prop_1'
+      _properties.isNotEmpty
+          ? (_properties[_activePropertyIndex]['id'] as String)
+          : 'prop_1'
     };
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
@@ -1287,7 +1273,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(modalCtx).viewInsets.bottom + 24),
+              padding: EdgeInsets.fromLTRB(
+                  20, 16, 20, MediaQuery.of(modalCtx).viewInsets.bottom + 24),
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1322,7 +1309,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                               ),
                               Text(
                                 'Manage active managers and co-owners',
-                                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                                style: GoogleFonts.outfit(
+                                    fontSize: 12, color: AppColors.muted),
                               ),
                             ],
                           ),
@@ -1336,10 +1324,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFF3F4F6),
                               shape: BoxShape.circle,
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border:
+                                  Border.all(color: const Color(0xFFE5E7EB)),
                             ),
                             child: const Center(
-                              child: Icon(Icons.close, size: 15, color: AppColors.muted),
+                              child: Icon(Icons.close,
+                                  size: 15, color: AppColors.muted),
                             ),
                           ),
                         ),
@@ -1353,11 +1343,17 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     if (_teamMembers.isNotEmpty) ...[
                       Text(
                         'Active Co-Owners & Managers (${_teamMembers.length})',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                        style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink),
                       ),
                       const SizedBox(height: 8),
                       ..._teamMembers.map((member) {
-                        final assignedIds = (member['assignedPropertyIds'] as List?)?.cast<String>() ?? [];
+                        final assignedIds =
+                            (member['assignedPropertyIds'] as List?)
+                                    ?.cast<String>() ??
+                                [];
                         final assignedNames = _properties
                             .where((p) => assignedIds.contains(p['id']))
                             .map((p) => p['name'] as String)
@@ -1372,7 +1368,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF9FAFB),
                             borderRadius: BorderRadius.circular(10),
@@ -1409,14 +1406,17 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                               InkWell(
                                 onTap: () {
                                   setModalState(() {
-                                    _teamMembers.removeWhere((m) => m['id'] == member['id']);
+                                    _teamMembers.removeWhere(
+                                        (m) => m['id'] == member['id']);
                                   });
                                   setState(() {});
-                                  _showToast('${member['name']} removed from team');
+                                  _showToast(
+                                      '${member['name']} removed from team');
                                 },
                                 borderRadius: BorderRadius.circular(6),
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 4),
                                   child: Text(
                                     'Remove',
                                     style: GoogleFonts.outfit(
@@ -1441,29 +1441,54 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     // =========================================================
                     Text(
                       'Invite New Co-Owner / Manager',
-                      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(height: 12),
 
                     // Full Name Field
-                    Text('Full Name', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                    Text('Full Name',
+                        style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: nameCtrl,
-                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ink),
                       decoration: InputDecoration(
                         hintText: 'e.g. Ramesh Kumar',
-                        hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                        hintStyle: GoogleFonts.outfit(
+                            fontSize: 13, color: AppColors.muted),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE5E7EB))),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE5E7EB))),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: AppColors.green, width: 1.5)),
                       ),
                     ),
                     const SizedBox(height: 14),
 
                     // Mobile Number Field (Numbers only, 10 digits, clean title)
-                    Text('Mobile Number (WhatsApp Enabled)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                    Text('Mobile Number (WhatsApp Enabled)',
+                        style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink)),
                     const SizedBox(height: 6),
                     TextField(
                       controller: phoneCtrl,
@@ -1472,22 +1497,43 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                         LengthLimitingTextInputFormatter(10),
                       ],
-                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.ink),
                       decoration: InputDecoration(
                         prefixText: '+91 ',
-                        prefixStyle: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                        prefixStyle: GoogleFonts.outfit(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink),
                         hintText: '98451 22334',
-                        hintStyle: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                        hintStyle: GoogleFonts.outfit(
+                            fontSize: 13, color: AppColors.muted),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE5E7EB))),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide:
+                                const BorderSide(color: Color(0xFFE5E7EB))),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: AppColors.green, width: 1.5)),
                       ),
                     ),
                     const SizedBox(height: 16),
 
                     // Role Selector Cards (Pure Clean Cards, No Extra Badges)
-                    Text('Select Access Level', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                    Text('Select Access Level',
+                        style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink)),
                     const SizedBox(height: 8),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1502,10 +1548,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: selectedRole == 'manager' ? AppColors.greenLight : Colors.white,
+                                color: selectedRole == 'manager'
+                                    ? AppColors.greenLight
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: selectedRole == 'manager' ? AppColors.green : const Color(0xFFE5E7EB),
+                                  color: selectedRole == 'manager'
+                                      ? AppColors.green
+                                      : const Color(0xFFE5E7EB),
                                   width: selectedRole == 'manager' ? 1.5 : 1.0,
                                 ),
                               ),
@@ -1513,22 +1563,28 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Flexible(
                                         child: Text(
                                           'PG Manager',
-                                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink),
+                                          style: GoogleFonts.outfit(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.ink),
                                         ),
                                       ),
                                       if (selectedRole == 'manager')
-                                        const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.green),
+                                        const Icon(Icons.check_circle_rounded,
+                                            size: 16, color: AppColors.green),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     'Check-ins, UTRs & issues. Bank details hidden.',
-                                    style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted),
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 10.5, color: AppColors.muted),
                                   ),
                                 ],
                               ),
@@ -1540,15 +1596,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         // Co-Owner Card
                         Expanded(
                           child: InkWell(
-                            onTap: () => setModalState(() => selectedRole = 'co_owner'),
+                            onTap: () =>
+                                setModalState(() => selectedRole = 'co_owner'),
                             borderRadius: BorderRadius.circular(12),
                             child: Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: selectedRole == 'co_owner' ? AppColors.greenLight : Colors.white,
+                                color: selectedRole == 'co_owner'
+                                    ? AppColors.greenLight
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: selectedRole == 'co_owner' ? AppColors.green : const Color(0xFFE5E7EB),
+                                  color: selectedRole == 'co_owner'
+                                      ? AppColors.green
+                                      : const Color(0xFFE5E7EB),
                                   width: selectedRole == 'co_owner' ? 1.5 : 1.0,
                                 ),
                               ),
@@ -1556,22 +1617,28 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Flexible(
                                         child: Text(
                                           'Co-Owner',
-                                          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink),
+                                          style: GoogleFonts.outfit(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.ink),
                                         ),
                                       ),
                                       if (selectedRole == 'co_owner')
-                                        const Icon(Icons.check_circle_rounded, size: 16, color: AppColors.green),
+                                        const Icon(Icons.check_circle_rounded,
+                                            size: 16, color: AppColors.green),
                                     ],
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     'Full operations & CA statements access.',
-                                    style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted),
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 10.5, color: AppColors.muted),
                                   ),
                                 ],
                               ),
@@ -1586,28 +1653,44 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Assigned Building(s)', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                        Text('Assigned Building(s)',
+                            style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink)),
                         InkWell(
                           onTap: () {
                             setModalState(() {
-                              if (selectedPropertyIds.length == _properties.length) {
-                                selectedPropertyIds = {_properties.first['id'] as String};
+                              if (selectedPropertyIds.length ==
+                                  _properties.length) {
+                                selectedPropertyIds = {
+                                  _properties.first['id'] as String
+                                };
                               } else {
-                                selectedPropertyIds = _properties.map((p) => p['id'] as String).toSet();
+                                selectedPropertyIds = _properties
+                                    .map((p) => p['id'] as String)
+                                    .toSet();
                               }
                             });
                           },
                           borderRadius: BorderRadius.circular(6),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2.5),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF3F4F6),
                               borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                              border:
+                                  Border.all(color: const Color(0xFFE5E7EB)),
                             ),
                             child: Text(
-                              selectedPropertyIds.length == _properties.length ? 'Deselect Others' : 'Select All Buildings',
-                              style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                              selectedPropertyIds.length == _properties.length
+                                  ? 'Deselect Others'
+                                  : 'Select All Buildings',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink),
                             ),
                           ),
                         ),
@@ -1628,7 +1711,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             setModalState(() {
                               if (isSelected) {
                                 if (selectedPropertyIds.length == 1) {
-                                  _showToast('At least one building must be assigned.');
+                                  _showToast(
+                                      'At least one building must be assigned.');
                                   return;
                                 }
                                 selectedPropertyIds.remove(propId);
@@ -1639,26 +1723,36 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           },
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFFF3FAF5) : const Color(0xFFF9FAFB),
+                              color: isSelected
+                                  ? const Color(0xFFF3FAF5)
+                                  : const Color(0xFFF9FAFB),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                                color: isSelected
+                                    ? AppColors.green
+                                    : const Color(0xFFE5E7EB),
                                 width: isSelected ? 1.4 : 1.0,
                               ),
                             ),
                             child: Row(
                               children: [
                                 Icon(
-                                  isSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                                  isSelected
+                                      ? Icons.check_box_rounded
+                                      : Icons.check_box_outline_blank_rounded,
                                   size: 19,
-                                  color: isSelected ? AppColors.green : AppColors.muted,
+                                  color: isSelected
+                                      ? AppColors.green
+                                      : AppColors.muted,
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         prop['name'] as String,
@@ -1670,7 +1764,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                       ),
                                       Text(
                                         prop['location'] as String,
-                                        style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                                        style: GoogleFonts.outfit(
+                                            fontSize: 11,
+                                            color: AppColors.muted),
                                       ),
                                     ],
                                   ),
@@ -1694,7 +1790,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           return;
                         }
                         if (phone.length != 10) {
-                          _showToast('Please enter a valid 10-digit mobile number');
+                          _showToast(
+                              'Please enter a valid 10-digit mobile number');
                           return;
                         }
                         if (selectedPropertyIds.isEmpty) {
@@ -1706,16 +1803,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         if (selectedRole == 'manager') {
                           for (final pId in selectedPropertyIds) {
                             if (_getManagerCountForProperty(pId) >= 3) {
-                              final pName = _properties.firstWhere((p) => p['id'] == pId)['name'];
-                              _showToast('$pName already has 3 managers (maximum limit reached).');
+                              final pName = _properties
+                                  .firstWhere((p) => p['id'] == pId)['name'];
+                              _showToast(
+                                  '$pName already has 3 managers (maximum limit reached).');
                               return;
                             }
                           }
                         } else {
                           for (final pId in selectedPropertyIds) {
                             if (_getCoOwnerCountForProperty(pId) >= 6) {
-                              final pName = _properties.firstWhere((p) => p['id'] == pId)['name'];
-                              _showToast('$pName already has 6 co-owners (maximum limit reached).');
+                              final pName = _properties
+                                  .firstWhere((p) => p['id'] == pId)['name'];
+                              _showToast(
+                                  '$pName already has 6 co-owners (maximum limit reached).');
                               return;
                             }
                           }
@@ -1740,7 +1841,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         nameCtrl.clear();
                         phoneCtrl.clear();
 
-                        _showToast('WhatsApp Invitation sent to $name (+91 $phone) ✓');
+                        _showToast(
+                            'WhatsApp Invitation sent to $name (+91 $phone) ✓');
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.greenLight,
@@ -1748,7 +1850,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: Color(0xFFB8ECC8), width: 1.2),
+                          side: const BorderSide(
+                              color: Color(0xFFB8ECC8), width: 1.2),
                         ),
                         elevation: 0,
                       ),
@@ -1759,7 +1862,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             'assets/images/whatsapp.svg',
                             width: 18,
                             height: 18,
-                            colorFilter: const ColorFilter.mode(AppColors.greenDark, BlendMode.srcIn),
+                            colorFilter: const ColorFilter.mode(
+                                AppColors.greenDark, BlendMode.srcIn),
                           ),
                           const SizedBox(width: 8),
                           Text(
@@ -1783,7 +1887,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     );
   }
 
-  Widget _buildMinimalStatRow(IconData icon, String label, String value, Color valColor) {
+  Widget _buildMinimalStatRow(
+      IconData icon, String label, String value, Color valColor) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -1811,6 +1916,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // 3. MONTHLY COLLECTION HEALTH CARD (Centered, Pure White Aesthetics)
   // ===========================================================================
   Widget _buildCollectionHealthCard() {
+    final prop =
+        _properties.isNotEmpty ? _properties[_activePropertyIndex] : null;
+    final totalOccupied = (prop?['occupiedBeds'] as num?)?.toInt() ?? 0;
+    final paidCount = (prop?['paidCount'] as num?)?.toInt() ?? 0;
+    final pendingCount = (prop?['pendingCount'] as num?)?.toInt() ?? 0;
+    final int pct =
+        totalOccupied > 0 ? ((paidCount / totalOccupied) * 100).round() : 0;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1828,7 +1941,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: Collection Health + 81% Badge
+          // Header: Collection Health + Dynamic % Badge
           Row(
             children: [
               Text(
@@ -1849,7 +1962,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
                 child: Text(
-                  '81% Collected',
+                  '$pct% Collected',
                   style: GoogleFonts.outfit(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w800,
@@ -1861,7 +1974,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           ),
           const SizedBox(height: 12),
 
-          // Linear Visual Progress Meter (81% Completed)
+          // Linear Visual Progress Meter (Dynamic % Completed)
           ClipRRect(
             borderRadius: BorderRadius.circular(99),
             child: Container(
@@ -1870,7 +1983,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    flex: 81,
+                    flex: pct > 0 ? pct : 0,
                     child: Container(
                       decoration: BoxDecoration(
                         color: AppColors.green,
@@ -1878,9 +1991,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                     ),
                   ),
-                  const Expanded(
-                    flex: 19,
-                    child: SizedBox(),
+                  Expanded(
+                    flex: (100 - pct) > 0 ? (100 - pct) : 100,
+                    child: const SizedBox(),
                   ),
                 ],
               ),
@@ -1894,7 +2007,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               // Block 1: Paid Beds
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1918,7 +2032,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          '25',
+                          '$paidCount',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
                             fontSize: 22,
@@ -1931,7 +2045,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'of 31 Occupied',
+                          'of $totalOccupied Occupied',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
                             fontSize: 10.5,
@@ -1949,7 +2063,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               // Block 2: Pending Dues
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -1973,7 +2088,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          '6',
+                          '$pendingCount',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
                             fontSize: 22,
@@ -2010,6 +2125,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // 4. UPI PAYMENT APPROVALS CARD (Pure Executive Green/Ink, Centered)
   // ===========================================================================
   Widget _buildPaymentApprovalsCard() {
+    final state = OwnerAppState.instance;
+    final submittedCount = state.totalSubmittedPaymentsCount;
+    final approvedCount = state.approvedPaymentsCount;
+    final pendingCount = state.pendingApprovalsCount;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -2027,7 +2147,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: Title + Clean Green Pending Badge
+          // Header: Title + Dynamic Green Pending Badge
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -2041,7 +2161,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 ),
               ),
 
-              // Clean White Pending Badge
+              // Dynamic Pending Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
@@ -2051,10 +2171,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.pending_actions_outlined, size: 12, color: AppColors.greenDark),
+                    const Icon(Icons.pending_actions_outlined,
+                        size: 12, color: AppColors.greenDark),
                     const SizedBox(width: 4),
                     Text(
-                      '${_approvalItems.length} Pending Action',
+                      '$pendingCount Pending Action',
                       style: GoogleFonts.outfit(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
@@ -2074,7 +2195,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               // Block 1: Submitted
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -2098,7 +2220,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          '25',
+                          '$submittedCount',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
                             fontSize: 22,
@@ -2129,7 +2251,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               // Block 2: Approved
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -2153,7 +2276,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          '23',
+                          '$approvedCount',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
                             fontSize: 22,
@@ -2184,7 +2307,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               // Block 3: Pending
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -2255,7 +2379,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   Expanded(
                     child: Row(
                       children: [
-                        const Icon(Icons.verified_outlined, size: 14, color: AppColors.green),
+                        const Icon(Icons.verified_outlined,
+                            size: 14, color: AppColors.green),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -2273,7 +2398,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Icon(Icons.arrow_forward_rounded, size: 13, color: AppColors.green),
+                  const Icon(Icons.arrow_forward_rounded,
+                      size: 13, color: AppColors.green),
                 ],
               ),
             ),
@@ -2288,18 +2414,66 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // ===========================================================================
   Widget _buildQuickActionsSection() {
     final List<Map<String, dynamic>> actions = [
-      {'title': 'Day-Wise Rent', 'icon': Icons.calendar_month_outlined, 'onTap': () => setState(() => _activeSubScreen = 'day_collection')},
-      {'title': 'Rent Collection', 'icon': Icons.account_balance_wallet_outlined, 'onTap': () => setState(() => _activeSubScreen = 'rent')},
-      {'title': 'Expenses & P&L', 'icon': Icons.receipt_long_outlined, 'onTap': () => setState(() => _activeSubScreen = 'expenses')},
-      {'title': 'Add Room / Bed', 'icon': Icons.add_home_outlined, 'onTap': () => setState(() => _activeNavIndex = 1)},
-      {'title': 'Notice Periods', 'icon': Icons.event_note_outlined, 'onTap': () => setState(() => _showNoticeModal = true)},
-      {'title': 'Complaints', 'icon': Icons.handyman_outlined, 'onTap': () => setState(() => _activeSubScreen = 'complaints')},
-      {'title': 'Move-In KYC', 'icon': Icons.how_to_reg_outlined, 'onTap': () => setState(() => _activeSubScreen = 'onboarding')},
-      {'title': 'Staff & Warden', 'icon': Icons.badge_outlined, 'onTap': () => setState(() => _activeSubScreen = 'staff')},
-      {'title': 'Food Menu', 'icon': Icons.restaurant_menu_outlined, 'onTap': () => setState(() => _activeSubScreen = 'food_menu')},
-      {'title': 'Invite Manager', 'icon': Icons.person_add_alt_1_outlined, 'onTap': _showInviteManagerModal},
-      {'title': 'Tenant Controls', 'icon': Icons.tune_rounded, 'onTap': () => setState(() => _activeSubScreen = 'tenant_controls')},
-      {'title': 'Reports & P&L', 'icon': Icons.insights_outlined, 'onTap': () => setState(() => _activeSubScreen = 'reports')},
+      {
+        'title': 'Day-Wise Rent',
+        'icon': Icons.calendar_month_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'day_collection')
+      },
+      {
+        'title': 'Rent Collection',
+        'icon': Icons.account_balance_wallet_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'rent')
+      },
+      {
+        'title': 'Expenses & P&L',
+        'icon': Icons.receipt_long_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'expenses')
+      },
+      {
+        'title': 'Add Room / Bed',
+        'icon': Icons.add_home_outlined,
+        'onTap': () => setState(() => _activeNavIndex = 1)
+      },
+      {
+        'title': 'Notice Periods',
+        'icon': Icons.event_note_outlined,
+        'onTap': () => setState(() => _showNoticeModal = true)
+      },
+      {
+        'title': 'Complaints',
+        'icon': Icons.handyman_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'complaints')
+      },
+      {
+        'title': 'Move-In KYC',
+        'icon': Icons.how_to_reg_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'onboarding')
+      },
+      {
+        'title': 'Staff & Warden',
+        'icon': Icons.badge_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'staff')
+      },
+      {
+        'title': 'Food Menu',
+        'icon': Icons.restaurant_menu_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'food_menu')
+      },
+      {
+        'title': 'Invite Manager',
+        'icon': Icons.person_add_alt_1_outlined,
+        'onTap': _showInviteManagerModal
+      },
+      {
+        'title': 'Tenant Controls',
+        'icon': Icons.tune_rounded,
+        'onTap': () => setState(() => _activeSubScreen = 'tenant_controls')
+      },
+      {
+        'title': 'Reports & P&L',
+        'icon': Icons.insights_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'reports')
+      },
     ];
 
     return Column(
@@ -2315,7 +2489,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           ),
         ),
         const SizedBox(height: 10),
-
         LayoutBuilder(
           builder: (context, constraints) {
             final int crossCount = constraints.maxWidth < 310 ? 3 : 4;
@@ -2340,7 +2513,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     splashFactory: NoSplash.splashFactory,
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
@@ -2430,14 +2604,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.ink,
                 elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
               ),
             ),
           ],
         ),
         const SizedBox(height: 10),
-
         if (_announcements.isEmpty)
           Container(
             padding: const EdgeInsets.all(16),
@@ -2506,7 +2681,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(4),
@@ -2559,7 +2735,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                       InkWell(
                         onTap: () {
-                          setState(() => _announcements.removeWhere((item) => item['id'] == ann['id']));
+                          setState(() => _announcements
+                              .removeWhere((item) => item['id'] == ann['id']));
                           _showToast('Announcement deleted');
                         },
                         child: Text(
@@ -2595,15 +2772,19 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildNavTab(0, Icons.dashboard_outlined, 'Dashboard'),
-          _buildNavTab(1, Icons.meeting_room_outlined, 'Rooms', onTap: () => setState(() => _activeNavIndex = 1)),
-          _buildNavTab(2, Icons.verified_outlined, 'Approvals', badgeCount: 2, onTap: () => setState(() => _activeNavIndex = 2)),
-          _buildNavTab(3, Icons.credit_card_outlined, 'Plan / Pay', onTap: () => setState(() => _activeNavIndex = 3)),
+          _buildNavTab(1, Icons.meeting_room_outlined, 'Rooms',
+              onTap: () => setState(() => _activeNavIndex = 1)),
+          _buildNavTab(2, Icons.verified_outlined, 'Approvals',
+              badgeCount: 2, onTap: () => setState(() => _activeNavIndex = 2)),
+          _buildNavTab(3, Icons.credit_card_outlined, 'Plan / Pay',
+              onTap: () => setState(() => _activeNavIndex = 3)),
         ],
       ),
     );
   }
 
-  Widget _buildNavTab(int index, IconData icon, String label, {int? badgeCount, VoidCallback? onTap}) {
+  Widget _buildNavTab(int index, IconData icon, String label,
+      {int? badgeCount, VoidCallback? onTap}) {
     final isActive = _activeNavIndex == index;
     return InkWell(
       onTap: () {
@@ -2679,12 +2860,22 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
   /// Full Page: Notifications Action Center (Screen view, NOT a bottom sleeve)
   Widget _buildNotificationFullPage() {
-    final unreadCount = _notifications.where((n) => n['isUnread'] == true).length;
-    final filters = ['All', 'Rent UPI', 'Rent Cash', 'Vacating', 'Check-In', 'Maintenance'];
+    final unreadCount =
+        _notifications.where((n) => n['isUnread'] == true).length;
+    final filters = [
+      'All',
+      'Rent UPI',
+      'Rent Cash',
+      'Vacating',
+      'Check-In',
+      'Maintenance'
+    ];
 
     final filteredList = _activeNotificationFilter == 'All'
         ? _notifications
-        : _notifications.where((n) => n['category'] == _activeNotificationFilter).toList();
+        : _notifications
+            .where((n) => n['category'] == _activeNotificationFilter)
+            .toList();
 
     // Group filtered items by date preserving chronological order
     final Map<String, List<Map<String, dynamic>>> grouped = {};
@@ -2702,7 +2893,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: const BoxDecoration(
               color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1.0)),
+              border: Border(
+                  bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1.0)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2710,7 +2902,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 Row(
                   children: [
                     InkWell(
-                      onTap: () => setState(() => _activeSubScreen = 'dashboard'),
+                      onTap: () =>
+                          setState(() => _activeSubScreen = 'dashboard'),
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
                         width: 38,
@@ -2720,7 +2913,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: const Color(0xFFE5E7EB)),
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, size: 20, color: AppColors.ink),
+                        child: const Icon(Icons.arrow_back_rounded,
+                            size: 20, color: AppColors.ink),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -2737,7 +2931,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           ),
                         ),
                         Text(
-                          unreadCount > 0 ? '$unreadCount unread alerts' : 'All alerts caught up',
+                          unreadCount > 0
+                              ? '$unreadCount unread alerts'
+                              : 'All alerts caught up',
                           style: GoogleFonts.outfit(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
@@ -2760,11 +2956,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     },
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: AppColors.greenLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+                        border: Border.all(
+                            color: AppColors.green.withValues(alpha: 0.2)),
                       ),
                       child: Text(
                         'Mark all as read',
@@ -2792,21 +2990,28 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: InkWell(
-                      onTap: () => setState(() => _activeNotificationFilter = f),
+                      onTap: () =>
+                          setState(() => _activeNotificationFilter = f),
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6.5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 13, vertical: 6.5),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.green : Colors.white, // GREEN CAPSULE
+                          color: isSelected
+                              ? AppColors.green
+                              : Colors.white, // GREEN CAPSULE
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                            color: isSelected
+                                ? AppColors.green
+                                : const Color(0xFFE5E7EB),
                             width: 1.1,
                           ),
                           boxShadow: isSelected
                               ? [
                                   BoxShadow(
-                                    color: AppColors.green.withValues(alpha: 0.25),
+                                    color:
+                                        AppColors.green.withValues(alpha: 0.25),
                                     blurRadius: 6,
                                     offset: const Offset(0, 2),
                                   ),
@@ -2817,7 +3022,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           f,
                           style: GoogleFonts.outfit(
                             fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            fontWeight:
+                                isSelected ? FontWeight.w800 : FontWeight.w600,
                             color: isSelected ? Colors.white : AppColors.ink,
                           ),
                         ),
@@ -2836,11 +3042,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.notifications_none_rounded, size: 42, color: Color(0xFFD1D5DB)),
+                        const Icon(Icons.notifications_none_rounded,
+                            size: 42, color: Color(0xFFD1D5DB)),
                         const SizedBox(height: 10),
                         Text(
                           'No notifications in $_activeNotificationFilter',
-                          style: GoogleFonts.outfit(fontSize: 13.5, color: AppColors.muted),
+                          style: GoogleFonts.outfit(
+                              fontSize: 13.5, color: AppColors.muted),
                         ),
                       ],
                     ),
@@ -2879,7 +3087,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: isUnread ? const Color(0xFFD1D5DB) : const Color(0xFFE5E7EB),
+                                  color: isUnread
+                                      ? const Color(0xFFD1D5DB)
+                                      : const Color(0xFFE5E7EB),
                                   width: 1.1,
                                 ),
                                 boxShadow: const [
@@ -2895,7 +3105,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                 children: [
                                   // Top row: Category in Black & Time
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Row(
                                         children: [
@@ -2903,7 +3114,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                             Container(
                                               width: 6.5,
                                               height: 6.5,
-                                              margin: const EdgeInsets.only(right: 6),
+                                              margin: const EdgeInsets.only(
+                                                  right: 6),
                                               decoration: const BoxDecoration(
                                                 color: AppColors.green,
                                                 shape: BoxShape.circle,
@@ -2916,7 +3128,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                               fontSize: 12.5,
                                               fontWeight: FontWeight.w800,
                                               letterSpacing: -0.2,
-                                              color: AppColors.ink, // Black Category Text
+                                              color: AppColors
+                                                  .ink, // Black Category Text
                                             ),
                                           ),
                                         ],
@@ -2950,7 +3163,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                     onTap: () {
                                       setState(() {
                                         item['isUnread'] = false;
-                                        final target = item['actionTarget'] as String;
+                                        final target =
+                                            item['actionTarget'] as String;
 
                                         // Direct Functional Dashboard Card Routing
                                         if (target == 'approvals') {
@@ -2967,11 +3181,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                           _activeSubScreen = 'complaints';
                                         }
                                       });
-                                      _showToast('Opened ${item['actionText']}');
+                                      _showToast(
+                                          'Opened ${item['actionText']}');
                                     },
                                     borderRadius: BorderRadius.circular(6),
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 2),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
@@ -2981,7 +3197,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                               fontSize: 12.5,
                                               fontWeight: FontWeight.w800,
                                               letterSpacing: -0.2,
-                                              color: AppColors.greenDark, // Green text, no background
+                                              color: AppColors
+                                                  .greenDark, // Green text, no background
                                             ),
                                           ),
                                           const SizedBox(width: 4),
@@ -3018,14 +3235,18 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         children: [
           Text(
             'Residents have transferred rent directly to your bank UPI. Verify UTR / Screenshot and tap Approve to auto-issue official PDF rent receipts.',
-            style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted, height: 1.4),
+            style: GoogleFonts.outfit(
+                fontSize: 13, color: AppColors.muted, height: 1.4),
           ),
           const SizedBox(height: 14),
-
           if (_approvalItems.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(child: Text('All pending payments are approved! ✓', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, color: AppColors.green))),
+              child: Center(
+                  child: Text('All pending payments are approved! ✓',
+                      style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.green))),
             )
           else
             ..._approvalItems.map((item) {
@@ -3047,13 +3268,23 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(item['name']!, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                              Text(item['name']!,
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.ink)),
                               const SizedBox(height: 2),
-                              Text(item['sub']!, style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted)),
+                              Text(item['sub']!,
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11.5, color: AppColors.muted)),
                             ],
                           ),
                         ),
-                        Text(item['amount']!, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.green)),
+                        Text(item['amount']!,
+                            style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.green)),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -3069,18 +3300,39 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: BorderRadius.circular(6)),
-                            child: Text('IMG', style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.greenDark)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                                color: AppColors.greenLight,
+                                borderRadius: BorderRadius.circular(6)),
+                            child: Text('IMG',
+                                style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.greenDark)),
                           ),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(item['proof']!, style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.ink))),
+                          Expanded(
+                              child: Text(item['proof']!,
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.ink))),
                           InkWell(
-                            onTap: () => _showToast('Showing full payment screenshot proof'),
+                            onTap: () => _showToast(
+                                'Showing full payment screenshot proof'),
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: const Color(0xFFF4F6F9), borderRadius: BorderRadius.circular(6), border: Border.all(color: const Color(0xFFE5E7EB))),
-                              child: Text('View Proof', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700)),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                  color: const Color(0xFFF4F6F9),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: const Color(0xFFE5E7EB))),
+                              child: Text('View Proof',
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700)),
                             ),
                           ),
                         ],
@@ -3094,27 +3346,35 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         Expanded(
                           flex: 1,
                           child: OutlinedButton(
-                            onPressed: () => _rejectPayment(item['id']!, item['name']!),
+                            onPressed: () =>
+                                _rejectPayment(item['id']!, item['name']!),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: const Color(0xFFEF4444),
                               side: const BorderSide(color: Color(0xFFE5E7EB)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
                             ),
-                            child: Text('Reject', style: GoogleFonts.outfit(fontWeight: FontWeight.w700)),
+                            child: Text('Reject',
+                                style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w700)),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           flex: 2,
                           child: ElevatedButton(
-                            onPressed: () => _approvePayment(item['id']!, item['name']!, item['amount']!),
+                            onPressed: () => _approvePayment(
+                                item['id']!, item['name']!, item['amount']!),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.green,
                               foregroundColor: Colors.white,
                               elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
                             ),
-                            child: Text('✓ Approve & Send Receipt', style: GoogleFonts.outfit(fontWeight: FontWeight.w800, fontSize: 12)),
+                            child: Text('✓ Approve & Send Receipt',
+                                style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w800, fontSize: 12)),
                           ),
                         ),
                       ],
@@ -3136,9 +3396,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('6 tenants have pending rent dues for this cycle.', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
+          Text('6 tenants have pending rent dues for this cycle.',
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
           const SizedBox(height: 14),
-
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -3152,42 +3412,57 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('₹51,500 Pending', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink)),
-                    Text('6 Defaulters • 0% UPI Fee', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFEF4444))),
+                    Text('₹51,500 Pending',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink)),
+                    Text('6 Defaulters • 0% UPI Fee',
+                        style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFFEF4444))),
                   ],
                 ),
                 ElevatedButton(
                   onPressed: () {
                     setState(() => _showRentModal = false);
-                    _showToast('WhatsApp Payment Links sent to 6 Overdue Residents');
+                    _showToast(
+                        'WhatsApp Payment Links sent to 6 Overdue Residents');
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFEF2F2),
                     foregroundColor: const Color(0xFFEF4444),
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(99)),
                   ),
-                  child: Text('Send All', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 11)),
+                  child: Text('Send All',
+                      style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w700, fontSize: 11)),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
               onPressed: () {
                 setState(() => _showRentModal = false);
-                _showToast('WhatsApp Payment Links sent to 6 Overdue Residents');
+                _showToast(
+                    'WhatsApp Payment Links sent to 6 Overdue Residents');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Send WhatsApp Payment Links', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+              child: Text('Send WhatsApp Payment Links',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -3203,9 +3478,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Log daily expenses for groceries, water tankers, electricity, or repairs.', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
+          Text(
+              'Log daily expenses for groceries, water tankers, electricity, or repairs.',
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
           const SizedBox(height: 14),
-
           Row(
             children: [
               Expanded(
@@ -3215,10 +3491,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink),
                   decoration: InputDecoration(
                     hintText: 'Amount (e.g. ₹1,200)',
-                    hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
+                    hintStyle: GoogleFonts.outfit(
+                        fontSize: 12.5, color: AppColors.muted),
                     filled: true,
                     fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
                   ),
                 ),
               ),
@@ -3229,17 +3508,19 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink),
                   decoration: InputDecoration(
                     hintText: 'Category (e.g. Water)',
-                    hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
+                    hintStyle: GoogleFonts.outfit(
+                        fontSize: 12.5, color: AppColors.muted),
                     filled: true,
                     fillColor: Colors.white,
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -3253,9 +3534,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Save Expense', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+              child: Text('Save Expense',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -3271,9 +3555,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Download pre-filled Karnataka Police (BCP) Tenant Verification forms for all active residents.', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted, height: 1.4)),
+          Text(
+              'Download pre-filled Karnataka Police (BCP) Tenant Verification forms for all active residents.',
+              style: GoogleFonts.outfit(
+                  fontSize: 13, color: AppColors.muted, height: 1.4)),
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -3285,9 +3571,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Download All BCP Forms (ZIP)', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+              child: Text('Download All BCP Forms (ZIP)',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -3303,9 +3592,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('3 residents are vacating this month. Beds ready for advance booking.', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
+          Text(
+              '3 residents are vacating this month. Beds ready for advance booking.',
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
           const SizedBox(height: 14),
-
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -3319,25 +3609,36 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Rahul Sharma (Room 102-C)', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
-                    Text('Vacating on 25 May (7 days left)', style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFD97706))),
+                    Text('Rahul Sharma (Room 102-C)',
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink)),
+                    Text('Vacating on 25 May (7 days left)',
+                        style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFFD97706))),
                   ],
                 ),
                 ElevatedButton(
-                  onPressed: () => _showToast('WhatsApp Vacancy Flyer Generated'),
+                  onPressed: () =>
+                      _showToast('WhatsApp Vacancy Flyer Generated'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFDE68A),
                     foregroundColor: const Color(0xFF92400E),
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(99)),
                   ),
-                  child: Text('Share Flyer', style: GoogleFonts.outfit(fontWeight: FontWeight.w700, fontSize: 11)),
+                  child: Text('Share Flyer',
+                      style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w700, fontSize: 11)),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -3349,9 +3650,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Share Vacancy on WhatsApp', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+              child: Text('Share Vacancy on WhatsApp',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -3367,9 +3671,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Track active repair tickets raised by residents.', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
+          Text('Track active repair tickets raised by residents.',
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
           const SizedBox(height: 14),
-
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
@@ -3381,14 +3685,19 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Room 201: Geyser Not Heating', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                Text('Room 201: Geyser Not Heating',
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink)),
                 const SizedBox(height: 2),
-                Text('Reported by Vikram A • 2 hours ago', style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted)),
+                Text('Reported by Vikram A • 2 hours ago',
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5, color: AppColors.muted)),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -3400,9 +3709,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Assign to Plumber / Electrician', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+              child: Text('Assign to Plumber / Electrician',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -3418,9 +3730,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Manage warden permissions and daily food mess headcount.', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
+          Text('Manage warden permissions and daily food mess headcount.',
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
           const SizedBox(height: 14),
-
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -3433,20 +3745,32 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Warden Suresh', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
-                    Text('Can check-in tenants • No Bank Access', style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted)),
+                    Text('Warden Suresh',
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink)),
+                    Text('Can check-in tenants • No Bank Access',
+                        style: GoogleFonts.outfit(
+                            fontSize: 11, color: AppColors.muted)),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.greenLight, borderRadius: BorderRadius.circular(4)),
-                  child: Text('Active', style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.greenDark)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: AppColors.greenLight,
+                      borderRadius: BorderRadius.circular(4)),
+                  child: Text('Active',
+                      style: GoogleFonts.outfit(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.greenDark)),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
           SizedBox(
             width: double.infinity,
             height: 48,
@@ -3458,9 +3782,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text("View Today's Mess Headcount", style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+              child: Text("View Today's Mess Headcount",
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -3476,21 +3803,38 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Broadcast an instant push notification & portal alert to your residents.', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted, height: 1.4)),
+          Text(
+              'Broadcast an instant push notification & portal alert to your residents.',
+              style: GoogleFonts.outfit(
+                  fontSize: 13, color: AppColors.muted, height: 1.4)),
           const SizedBox(height: 14),
 
           // Target Audience Dropdown
-          Text('Target Audience', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted)),
+          Text('Target Audience',
+              style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted)),
           const SizedBox(height: 4),
           DropdownButtonFormField<String>(
             initialValue: _annTarget,
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
             ),
-            items: ['All Residents (31)', '1st Floor (8)', '2nd Floor (8)', '3rd Floor (8)', 'Ground Floor (7)']
-                .map((t) => DropdownMenuItem(value: t, child: Text(t, style: GoogleFonts.outfit(fontSize: 13))))
+            items: [
+              'All Residents (31)',
+              '1st Floor (8)',
+              '2nd Floor (8)',
+              '3rd Floor (8)',
+              'Ground Floor (7)'
+            ]
+                .map((t) => DropdownMenuItem(
+                    value: t,
+                    child: Text(t, style: GoogleFonts.outfit(fontSize: 13))))
                 .toList(),
             onChanged: (val) {
               if (val != null) setState(() => _annTarget = val);
@@ -3499,34 +3843,49 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           const SizedBox(height: 10),
 
           // Title Input
-          Text('Announcement Title', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted)),
+          Text('Announcement Title',
+              style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted)),
           const SizedBox(height: 4),
           TextField(
             controller: _annTitleController,
             style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink),
             decoration: InputDecoration(
               hintText: 'e.g. Water Tank Cleaning Tomorrow',
-              hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
+              hintStyle:
+                  GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
               filled: true,
               fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
             ),
           ),
           const SizedBox(height: 10),
 
           // Message Body
-          Text('Announcement Message', style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted)),
+          Text('Announcement Message',
+              style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.muted)),
           const SizedBox(height: 4),
           TextField(
             controller: _annMsgController,
             maxLines: 3,
             style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink),
             decoration: InputDecoration(
-              hintText: 'Write your message here. Residents will receive an instant app notification...',
-              hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
+              hintText:
+                  'Write your message here. Residents will receive an instant app notification...',
+              hintStyle:
+                  GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
               filled: true,
               fillColor: Colors.white,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
             ),
           ),
           const SizedBox(height: 16),
@@ -3539,9 +3898,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.green,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Send App Notification', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w700)),
+              child: Text('Send App Notification',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -3550,7 +3912,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   }
 
   /// Shared Bottom Modal Sheet Wrapper
-  Widget _buildModalWrapper({required String title, required Widget child, required VoidCallback onClose}) {
+  Widget _buildModalWrapper(
+      {required String title,
+      required Widget child,
+      required VoidCallback onClose}) {
     return Positioned.fill(
       child: Stack(
         children: [
@@ -3599,7 +3964,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             border: Border.all(color: const Color(0xFFE5E7EB)),
                           ),
                           child: const Center(
-                            child: Icon(Icons.close, size: 16, color: AppColors.muted),
+                            child: Icon(Icons.close,
+                                size: 16, color: AppColors.muted),
                           ),
                         ),
                       ),

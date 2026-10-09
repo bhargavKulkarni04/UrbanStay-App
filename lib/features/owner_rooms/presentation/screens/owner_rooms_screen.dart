@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/state/owner_app_state.dart';
 import 'shift_bed_screen.dart';
 
 /// Screen 6: Tenants & Rooms Matrix.
@@ -79,18 +80,46 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
             final int occupiedCount = bedsList.where((b) => b['is_occupied'] == true).length;
             final formattedBeds = bedsList.map((b) {
               final isOcc = b['is_occupied'] == true;
+              final String tenantName = isOcc ? (b['tenant_name'] ?? 'Resident') : '';
+              final String bedStatus = b['status'] ?? (isOcc ? 'Active' : 'Vacant');
+
+              // Compute initials from actual tenant name (e.g. 'Rahul Sharma' → 'RS')
+              String? initials;
+              if (isOcc && tenantName.isNotEmpty) {
+                final parts = tenantName.trim().split(' ');
+                if (parts.length >= 2) {
+                  initials = '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+                } else {
+                  initials = tenantName[0].toUpperCase();
+                }
+              }
+
+              // Derive docs/KYC status from bed status field
+              String docsLabel;
+              bool docsVerified;
+              if (bedStatus.toLowerCase() == 'notice') {
+                docsLabel = 'Notice Period';
+                docsVerified = false;
+              } else if (isOcc) {
+                docsLabel = b['kyc_status'] ?? 'KYC Verified ✓';
+                docsVerified = true;
+              } else {
+                docsLabel = '';
+                docsVerified = false;
+              }
+
               return {
                 'isOccupied': isOcc,
                 'bed': b['bed_code'] ?? 'Bed A',
-                'name': isOcc ? (b['tenant_name'] ?? 'Resident') : null,
-                'initials': isOcc ? 'RS' : null,
-                'status': b['status'] ?? (isOcc ? 'Active' : 'Vacant'),
+                'name': isOcc ? tenantName : null,
+                'initials': initials,
+                'status': bedStatus,
                 'phone': b['tenant_phone'] ?? '',
                 'work': b['workplace'] ?? '',
                 'rent': (r['rent_per_bed'] ?? 8000).toString(),
                 'deposit': (r['deposit_per_bed'] ?? 15000).toString(),
-                'docs': 'Aadhaar Verified',
-                'docsVerified': true,
+                'docs': docsLabel,
+                'docsVerified': docsVerified,
                 'title': !isOcc ? 'Vacant ${b['bed_code']} — Available' : null,
                 'sub': !isOcc ? '₹${r['rent_per_bed'] ?? 8000}/mo • Ready for Walk-In' : null,
               };
@@ -203,211 +232,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
     }
   }
 
-  // Master Room & Bed Data (Populated live from Supabase)
+  // Master Room & Bed Data (Populated live from Supabase — no mock/hardcoded fallback)
   final List<Map<String, dynamic>> _rooms = [];
-  final List<Map<String, dynamic>> _legacyMockRooms = [
-    {
-      'room': 'Room 101',
-      'floor': '1st',
-      'floorLabel': '1st Floor',
-      'type': '2-Sharing',
-      'occupied': 2,
-      'total': 2,
-      'beds': [
-        {
-          'isOccupied': true,
-          'bed': 'Bed A',
-          'name': 'Rahul Sharma',
-          'initials': 'RS',
-          'status': 'Active',
-          'phone': '9876543210',
-          'work': 'Infosys',
-          'rent': '8500',
-          'deposit': '15000',
-          'docs': 'Aadhaar Verified',
-          'docsVerified': true,
-        },
-        {
-          'isOccupied': true,
-          'bed': 'Bed B',
-          'name': 'Amit Verma',
-          'initials': 'AV',
-          'status': 'Active',
-          'phone': '9988776655',
-          'work': 'Christ Univ',
-          'rent': '8500',
-          'deposit': '15000',
-          'docs': 'Aadhaar Verified',
-          'docsVerified': true,
-        },
-      ],
-    },
-    {
-      'room': 'Room 102',
-      'floor': '1st',
-      'floorLabel': '1st Floor',
-      'type': '3-Sharing',
-      'occupied': 2,
-      'total': 3,
-      'beds': [
-        {
-          'isOccupied': true,
-          'bed': 'Bed A',
-          'name': 'Rohit Sen',
-          'initials': 'RS',
-          'status': 'Active',
-          'phone': '9811223344',
-          'work': 'Wipro',
-          'rent': '7500',
-          'deposit': '15000',
-          'docs': 'Aadhaar Verified',
-          'docsVerified': true,
-        },
-        {
-          'isOccupied': false,
-          'bed': 'Bed B',
-          'title': 'Vacant Bed B — Available',
-          'sub': '₹7,500/mo • Ready for Walk-In',
-          'rent': '7500',
-          'deposit': '15000',
-        },
-        {
-          'isOccupied': true,
-          'bed': 'Bed C',
-          'name': 'Vikram Rao',
-          'initials': 'VR',
-          'status': 'Notice',
-          'phone': '9733445566',
-          'work': 'TCS',
-          'rent': '7500',
-          'deposit': '15000',
-          'docs': 'Notice Period (Vacating in 12 days)',
-          'docsVerified': false,
-        },
-      ],
-    },
-    {
-      'room': 'Room 103',
-      'floor': '1st',
-      'floorLabel': '1st Floor',
-      'type': '2-Sharing',
-      'occupied': 1,
-      'total': 2,
-      'beds': [
-        {
-          'isOccupied': true,
-          'bed': 'Bed A',
-          'name': 'Praveen Kumar',
-          'initials': 'PK',
-          'status': 'Active',
-          'phone': '9845012345',
-          'work': 'Accenture',
-          'rent': '8500',
-          'deposit': '15000',
-          'docs': 'Aadhaar Verified',
-          'docsVerified': true,
-        },
-        {
-          'isOccupied': false,
-          'bed': 'Bed B',
-          'title': 'Vacant Bed B — Available',
-          'sub': '₹8,500/mo • Ready for Walk-In',
-          'rent': '8500',
-          'deposit': '15000',
-        },
-      ],
-    },
-    {
-      'room': 'Room 201',
-      'floor': '2nd',
-      'floorLabel': '2nd Floor',
-      'type': '2-Sharing',
-      'occupied': 2,
-      'total': 2,
-      'beds': [
-        {
-          'isOccupied': true,
-          'bed': 'Bed A',
-          'name': 'Karthik Raja',
-          'initials': 'KR',
-          'status': 'Active',
-          'phone': '9741234567',
-          'work': 'Swiggy',
-          'rent': '9000',
-          'deposit': '18000',
-          'docs': 'KYC Verified ✓',
-          'docsVerified': true,
-        },
-        {
-          'isOccupied': true,
-          'bed': 'Bed B',
-          'name': 'Deepak Joshi',
-          'initials': 'DJ',
-          'status': 'Active',
-          'phone': '9819876543',
-          'work': 'Dell',
-          'rent': '9000',
-          'deposit': '18000',
-          'docs': 'KYC Verified ✓',
-          'docsVerified': true,
-        },
-      ],
-    },
-    {
-      'room': 'Room 301',
-      'floor': '3rd',
-      'floorLabel': '3rd Floor',
-      'type': 'Single Private',
-      'occupied': 0,
-      'total': 1,
-      'beds': [
-        {
-          'isOccupied': false,
-          'bed': 'Private Room',
-          'title': 'Vacant Private Room 301',
-          'sub': '₹14,000/mo • Attached Balcony',
-          'rent': '14000',
-          'deposit': '25000',
-        },
-      ],
-    },
-    {
-      'room': 'Room G-01',
-      'floor': 'ground',
-      'floorLabel': 'Ground Floor',
-      'type': '2-Sharing',
-      'occupied': 2,
-      'total': 2,
-      'beds': [
-        {
-          'isOccupied': true,
-          'bed': 'Bed A',
-          'name': 'Suresh Gowda',
-          'initials': 'SG',
-          'status': 'Active',
-          'phone': '9844001122',
-          'work': 'Flipkart',
-          'rent': '8000',
-          'deposit': '15000',
-          'docs': 'Aadhaar Verified',
-          'docsVerified': true,
-        },
-        {
-          'isOccupied': true,
-          'bed': 'Bed B',
-          'name': 'Manoj Hegde',
-          'initials': 'MH',
-          'status': 'Active',
-          'phone': '9900112233',
-          'work': 'Amazon',
-          'rent': '8000',
-          'deposit': '15000',
-          'docs': 'Aadhaar Verified',
-          'docsVerified': true,
-        },
-      ],
-    },
-  ];
 
   @override
   void dispose() {
@@ -1531,7 +1357,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 ),
               ),
               Text(
-                'Greenview PG • Koramangala',
+                '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • ${OwnerAppState.instance.activePropertyLocation.isNotEmpty ? OwnerAppState.instance.activePropertyLocation : "Bengaluru"}',
                 style: GoogleFonts.outfit(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w500,
@@ -1594,13 +1420,26 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   // 3. HORIZONTAL FLOOR SWITCHER CHIPS
   // ===========================================================================
   Widget _buildFloorChipsScroll() {
-    final floors = [
-      {'id': 'all', 'label': 'All Floors (35 Beds)'},
-      {'id': '1st', 'label': '1st Floor (101-104)'},
-      {'id': '2nd', 'label': '2nd Floor (201-204)'},
-      {'id': '3rd', 'label': '3rd Floor (301-304)'},
-      {'id': 'ground', 'label': 'Ground Floor (G01-G04)'},
+    int totalCapacity = 0;
+    for (final r in _rooms) {
+      final beds = (r['beds'] as List?) ?? [];
+      totalCapacity += (r['total'] as num?)?.toInt() ?? beds.length;
+    }
+    if (totalCapacity == 0) totalCapacity = OwnerAppState.instance.totalBeds;
+
+    final List<Map<String, String>> floors = [
+      {'id': 'all', 'label': 'All Floors ($totalCapacity Beds)'},
     ];
+
+    final Set<String> addedFloorIds = {};
+    for (final r in _rooms) {
+      final fId = r['floor']?.toString() ?? '1st';
+      final fLabel = r['floorLabel']?.toString() ?? '${r['floor']} Floor';
+      if (!addedFloorIds.contains(fId)) {
+        addedFloorIds.add(fId);
+        floors.add({'id': fId, 'label': fLabel});
+      }
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1643,15 +1482,34 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   }
 
   // ===========================================================================
-  // 4. 3-PILL STAT STRIP (Interactive Filter: 31 Total, 4 Vacant, 1 Notice)
+  // 4. 3-PILL STAT STRIP (Dynamic: Occupied, Vacant, Notice)
   // ===========================================================================
   Widget _buildStatsStrip() {
+    int totalCapacity = 0;
+    int occupiedCount = 0;
+    int noticeCount = 0;
+
+    for (final r in _rooms) {
+      final beds = (r['beds'] as List?) ?? [];
+      totalCapacity += (r['total'] as num?)?.toInt() ?? beds.length;
+      for (final b in beds) {
+        if (b['isOccupied'] == true) {
+          occupiedCount++;
+          if (b['status'] == 'Notice') noticeCount++;
+        }
+      }
+    }
+
+    if (totalCapacity == 0) totalCapacity = OwnerAppState.instance.totalBeds;
+    if (occupiedCount == 0) occupiedCount = OwnerAppState.instance.occupiedBeds;
+    final vacantCount = (totalCapacity - occupiedCount).clamp(0, totalCapacity);
+
     return Row(
       children: [
         // Total Tenants (Green)
         Expanded(
           child: _buildStatTile(
-            '31',
+            '$occupiedCount',
             'Total Tenants',
             AppColors.greenDark,
             isSelected: _selectedFilter == 'tenants',
@@ -1661,7 +1519,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     _selectedFilter == 'tenants' ? 'all' : 'tenants';
               });
               _showToast(_selectedFilter == 'tenants'
-                  ? 'Showing Active Tenants (31)'
+                  ? 'Showing Active Tenants ($occupiedCount)'
                   : 'Showing All Beds');
             },
           ),
@@ -1671,7 +1529,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
         // Vacant Beds (Green)
         Expanded(
           child: _buildStatTile(
-            '4',
+            '$vacantCount',
             'Vacant Beds',
             AppColors.greenDark,
             isSelected: _selectedFilter == 'vacant',
@@ -1681,7 +1539,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     _selectedFilter == 'vacant' ? 'all' : 'vacant';
               });
               _showToast(_selectedFilter == 'vacant'
-                  ? 'Showing Vacant Beds (4)'
+                  ? 'Showing Vacant Beds ($vacantCount)'
                   : 'Showing All Beds');
             },
           ),
@@ -1691,7 +1549,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
         // Notice Period (Green)
         Expanded(
           child: _buildStatTile(
-            '1',
+            '$noticeCount',
             'Notice Period',
             AppColors.greenDark,
             isSelected: _selectedFilter == 'notice',
@@ -1701,7 +1559,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     _selectedFilter == 'notice' ? 'all' : 'notice';
               });
               _showToast(_selectedFilter == 'notice'
-                  ? 'Showing Notice Period Tenants (1)'
+                  ? 'Showing Notice Period Tenants ($noticeCount)'
                   : 'Showing All Beds');
             },
           ),

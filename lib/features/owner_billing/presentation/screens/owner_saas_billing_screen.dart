@@ -9,18 +9,29 @@ import 'package:urbanstay/features/owner_settings/presentation/screens/owner_set
 
 class OwnerSaaSBillingScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
+  final String? propertyName;
+  final int? totalBeds;
+  final String? ownerName;
 
-  const OwnerSaaSBillingScreen({super.key, this.onBack});
+  const OwnerSaaSBillingScreen({
+    super.key,
+    this.onBack,
+    this.propertyId,
+    this.propertyName,
+    this.totalBeds,
+    this.ownerName,
+  });
 
   @override
   State<OwnerSaaSBillingScreen> createState() => _OwnerSaaSBillingScreenState();
 }
 
 class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
-  int _totalBeds = 1;
+  late int _totalBeds;
   final int _pricePerBed = 15;
   final int _platformFee = 79;
-  String _activePropertyName = 'PG Building';
+  late String _activePropertyName;
   List<Map<String, dynamic>> _invoices = [];
   bool _isMandateActive = false;
   bool _isLoading = false;
@@ -28,21 +39,41 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
   @override
   void initState() {
     super.initState();
+    _totalBeds = (widget.totalBeds != null && widget.totalBeds! > 0)
+        ? widget.totalBeds!
+        : 12;
+    _activePropertyName = (widget.propertyName != null && widget.propertyName!.isNotEmpty)
+        ? widget.propertyName!
+        : 'Jai shree ram';
     _loadBillingData();
   }
 
   Future<void> _loadBillingData() async {
     try {
-      final prop = await SupabaseService.instance.getOwnerProperty();
-      if (prop != null) {
-        final propId = prop['id'].toString();
-        final metrics = await SupabaseService.instance.getBedMetrics(propId);
-        final int beds = metrics['total'] ?? 1;
-        if (mounted) {
+      if (widget.propertyId != null && widget.propertyId!.isNotEmpty) {
+        final metrics = await SupabaseService.instance.getBedMetrics(widget.propertyId!);
+        final int beds = metrics['total'] ?? 0;
+        if (beds > 0 && mounted) {
           setState(() {
-            _activePropertyName = prop['brand_name'] ?? prop['name'] ?? 'PG Building';
-            _totalBeds = beds > 0 ? beds : 1;
+            _totalBeds = beds;
           });
+        }
+      } else {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        if (prop != null) {
+          final propId = prop['id'].toString();
+          final metrics = await SupabaseService.instance.getBedMetrics(propId);
+          final int beds = metrics['total'] ?? 0;
+          if (mounted) {
+            setState(() {
+              if (widget.propertyName == null) {
+                _activePropertyName = prop['brand_name'] ?? prop['name'] ?? _activePropertyName;
+              }
+              if (widget.totalBeds == null && beds > 0) {
+                _totalBeds = beds;
+              }
+            });
+          }
         }
       }
 
@@ -159,7 +190,7 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: Text(
-                'Greenview PG • $_totalBeds ${_totalBeds == 1 ? "Bed (Test)" : "Beds"}',
+                '${_activePropertyName.isNotEmpty ? _activePropertyName : "My PG"} • $_totalBeds ${_totalBeds == 1 ? "Bed (Test)" : "Beds"}',
                 style: GoogleFonts.outfit(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
@@ -664,7 +695,7 @@ class OwnerInvoiceDetailScreen extends StatelessWidget {
     this.dateTimeStr = '1 Aug 2026, 10:30 AM',
     this.amountStr = '₹11.00',
     this.statusStr = 'Paid',
-    this.propertyName = 'Greenview PG',
+    this.propertyName = 'My PG',
     this.totalBeds = 1,
   });
 
