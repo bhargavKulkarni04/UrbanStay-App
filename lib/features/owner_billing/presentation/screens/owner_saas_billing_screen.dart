@@ -1,16 +1,11 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/cashfree_launcher.dart';
 import 'package:urbanstay/features/owner_settings/presentation/screens/owner_settings_screen.dart';
 
-/// Screen 13: Owner B2B SaaS Plan & Billing Screen.
-/// Clean 4-card UI:
-/// 1. Payment Breakdown (₹999 + ₹49 = ₹1,048 in green, green Pay button)
-/// 2. Current Plan (₹999 under 200 beds)
-/// 3. Upgrade Capacity (200-400, 400-600, 600+ beds in green + Explore button)
-/// 4. Payment History (Month, Year, Paid Date, green amount)
-/// + Interactive Swiggy/Zepto-style UPI Checkout Sheet with inline expanding Pay button
 class OwnerSaaSBillingScreen extends StatefulWidget {
   final VoidCallback? onBack;
 
@@ -21,1098 +16,85 @@ class OwnerSaaSBillingScreen extends StatefulWidget {
 }
 
 class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
-  bool _isAnnual = false;
-  final int _currentTierIndex = 0; // 0: Up to 200 Beds (Active)
+  final int _totalBeds = 1;
+  final int _pricePerBed = 10;
+  final int _platformFee = 1;
+  bool _isMandateActive = false;
+  bool _isLoading = false;
 
-  final List<Map<String, dynamic>> _tiers = [
-    {
-      'id': 'tier_200',
-      'title': 'Starter PG',
-      'beds': 'Up to 200 Beds',
-      'monthlyPrice': 999,
-      'annualPrice': 9990,
-      'desc': 'Single or dual property operations with under 200 residents.',
-      'features': [
-        'Up to 200 Total Beds',
-        '0% Direct Bank UPI Rent Settlements',
-        '300 Automated WhatsApp Reminders / mo',
-        'Tenant Aadhaar KYC & Room Damage Audit',
-        'Warden Cash Ledger Audit',
-        '50ms Offline PDF Rent Receipts',
-      ],
-      'isCurrent': true,
-    },
-    {
-      'id': 'tier_400',
-      'title': 'Scale PG',
-      'beds': '200 to 400 Beds',
-      'monthlyPrice': 1399,
-      'annualPrice': 13990,
-      'desc': 'Multi-building PG networks with distributed property managers.',
-      'features': [
-        '200 to 400 Total Beds',
-        'Multi-Property Building Switcher',
-        'Granular Staff & Manager Permissions',
-        '600 Automated WhatsApp Messages / mo',
-        'CA Financial Statement & P&L Export',
-        'Priority Technical Support',
-      ],
-      'isCurrent': false,
-    },
-    {
-      'id': 'tier_600',
-      'title': 'Enterprise Hub',
-      'beds': '400 to 600 Beds',
-      'monthlyPrice': 1899,
-      'annualPrice': 18990,
-      'desc': 'Large coliving and hostel clusters across multiple zones.',
-      'features': [
-        '400 to 600 Total Beds',
-        'Everything in Scale PG',
-        '1,000 Automated WhatsApp Messages / mo',
-        'Custom Standee QR with Your PG Branding',
-        'Priority Direct Phone Support',
-      ],
-      'isCurrent': false,
-    },
-    {
-      'id': 'tier_mega',
-      'title': 'Mega Network',
-      'beds': '600+ Beds',
-      'monthlyPrice': 2499,
-      'annualPrice': 24990,
-      'desc': 'Institutional student living networks and multi-city PG chains.',
-      'features': [
-        '600+ Beds (Unlimited)',
-        'Multi-City Property Isolation',
-        'Dedicated Account Manager',
-        'Custom ERP & Bank API Webhooks',
-      ],
-      'isCurrent': false,
-    },
-  ];
+  int get _bedLicenseCost => _totalBeds * _pricePerBed;
+  int get _totalDue => _bedLicenseCost + _platformFee;
 
-  void _showToast(String msg) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  Future<void> _activateMandate() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // Calls Cloudflare Pages backend function which securely talks to Cashfree
+      final res = await http.post(
+        Uri.parse('https://urbanstay.living/api/cashfree-order'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'amount': _totalDue,
+          'customer_id': 'owner_bhargav',
+          'phone': '9876543210',
+          'name': 'Bhargav Kulkarni',
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final sessionId = data['payment_session_id'];
+        if (sessionId != null && sessionId.toString().isNotEmpty) {
+          // Launch OFFICIAL Cashfree Checkout Web SDK
+          final mode = data['environment'] ?? 'production';
+          launchCashfreeWebCheckout(sessionId.toString(), mode: mode.toString());
+        } else {
+          _showError('Order created but payment_session_id missing: ${res.body}');
+        }
+      } else {
+        String msg = 'Cashfree Order Failed (${res.statusCode})';
+        try {
+          final errData = jsonDecode(res.body);
+          msg = errData['error'] ?? errData['message'] ?? res.body;
+        } catch (_) {
+          msg = res.body;
+        }
+        _showError(msg);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showError('Cashfree API error: $e\nEnsure functions/api/cashfree-order.js is deployed on Cloudflare Pages with CF_APP_ID & CF_SECRET_KEY.');
+      }
+    }
+  }
+
+  void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          msg,
-          style: GoogleFonts.outfit(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
+          message,
+          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
         ),
-        backgroundColor: AppColors.ink,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        backgroundColor: const Color(0xFFDC2626),
+        duration: const Duration(seconds: 6),
       ),
     );
   }
 
-  void _navigateToScaleCapacity() {
+
+
+
+  void _navigateToSettings() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => OwnerSettingsScreen(
-          initialView: 'scale_capacity',
-          onBack: () => Navigator.of(context).pop(),
-        ),
+        builder: (_) => const OwnerSettingsScreen(initialView: 'property'),
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FA),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Card 1: Payment Breakdown
-                    _buildPaymentBreakdownCard(),
-                    const SizedBox(height: 18),
-
-                    // Card 2: Current Plan
-                    _buildCurrentPlanCard(),
-                    const SizedBox(height: 18),
-
-                    // Card 3: Upgrade Capacity
-                    _buildUpgradeCapacityCard(),
-                    const SizedBox(height: 18),
-
-                    // Card 4: Payment History
-                    _buildPaymentHistoryCard(),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // TOP HEADER
-  // ===========================================================================
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border:
-            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.0)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              if (widget.onBack != null)
-                InkWell(
-                  onTap: widget.onBack,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    margin: const EdgeInsets.only(right: 12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF9FAFB),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
-                    ),
-                    child: const Icon(Icons.arrow_back_rounded,
-                        size: 18, color: AppColors.ink),
-                  ),
-                ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Plan & Billing',
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Greenview PG • BTM Layout',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.greenLight,
-              borderRadius: BorderRadius.circular(99),
-              border:
-                  Border.all(color: AppColors.green.withValues(alpha: 0.25)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    color: AppColors.green,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  'Active',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.greenDark,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // 1. PAYMENT BREAKDOWN (GREEN TOTAL + GREEN BUTTON)
-  // ===========================================================================
-  Widget _buildPaymentBreakdownCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x04000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Payment Breakdown',
-            style: GoogleFonts.outfit(
-              fontSize: 14.5,
-              fontWeight: FontWeight.w800,
-              color: AppColors.ink,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _buildLineItem('Property License (Under 200 Beds)', '₹999'),
-          const SizedBox(height: 10),
-          _buildLineItem('Platform Fee', '₹49'),
-          const SizedBox(height: 14),
-          const Divider(height: 1, color: Color(0xFFEEF0F2)),
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Total Amount Payable',
-                style: GoogleFonts.outfit(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
-                ),
-              ),
-              Text(
-                '₹1,048',
-                style: GoogleFonts.outfit(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.6,
-                  color: AppColors.greenDark, // Vibrant Green
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Next billing date: 30 September 2026',
-            style: GoogleFonts.outfit(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: AppColors.muted,
-            ),
-          ),
-          const SizedBox(height: 18),
-          ElevatedButton(
-            onPressed: () => _openCheckoutModal(
-              planName: 'Starter PG (Under 200 Beds)',
-              basePrice: 999,
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.green, // Solid Green
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(50),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Pay ₹1,048',
-                  style: GoogleFonts.outfit(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white, // White Text
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(Icons.arrow_forward_rounded,
-                    size: 16, color: Colors.white),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // 2. CURRENT PROPERTY PLAN (GREEN PRICE)
-  // ===========================================================================
-  Widget _buildCurrentPlanCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Current Plan',
-                style: GoogleFonts.outfit(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
-                decoration: BoxDecoration(
-                  color: AppColors.greenLight,
-                  borderRadius: BorderRadius.circular(6),
-                  border:
-                      Border.all(color: AppColors.green.withValues(alpha: 0.2)),
-                ),
-                child: Text(
-                  'Monthly Billing',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.greenDark,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.baseline,
-            textBaseline: TextBaseline.alphabetic,
-            children: [
-              Text(
-                '₹999',
-                style: GoogleFonts.outfit(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.greenDark, // Green
-                ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '/ month for properties with under 200 beds',
-                style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ink,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Current configuration: 31 / 35 Beds configured in property setup.',
-            style: GoogleFonts.outfit(
-              fontSize: 12,
-              color: AppColors.muted,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // 3. UPGRADE CAPACITY (GREEN PRICES + EXPLORE MODAL)
-  // ===========================================================================
-  Widget _buildUpgradeCapacityCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Upgrade Capacity',
-                style: GoogleFonts.outfit(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
-                ),
-              ),
-              Text(
-                'Higher Tiers',
-                style: GoogleFonts.outfit(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.muted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          InkWell(
-            onTap: _navigateToScaleCapacity,
-            borderRadius: BorderRadius.circular(12),
-            child: _buildUpgradeTierRow('200 to 400 Beds', '₹1,399', '/ month'),
-          ),
-          const SizedBox(height: 10),
-          InkWell(
-            onTap: _navigateToScaleCapacity,
-            borderRadius: BorderRadius.circular(12),
-            child: _buildUpgradeTierRow('400 to 600 Beds', '₹1,899', '/ month'),
-          ),
-          const SizedBox(height: 10),
-          InkWell(
-            onTap: _navigateToScaleCapacity,
-            borderRadius: BorderRadius.circular(12),
-            child: _buildUpgradeTierRow('600+ Beds', '₹2,499', '/ month'),
-          ),
-          const SizedBox(height: 18),
-          OutlinedButton(
-            onPressed: _openPlansUpgradeModal,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.ink,
-              minimumSize: const Size.fromHeight(46),
-              side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.2),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Explore & Upgrade Plans',
-                  style: GoogleFonts.outfit(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.ink,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Icon(Icons.arrow_forward_rounded,
-                    size: 15, color: AppColors.ink),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // 4. PAYMENT HISTORY (MONTH, YEAR, DATE, GREEN AMOUNT)
-  // ===========================================================================
-  Widget _buildPaymentHistoryCard() {
-    final payments = [
-      {
-        'monthYear': 'August 2026',
-        'paidDate': 'Paid on 1 Aug 2026 • 10:45 AM',
-        'amount': '₹1,048',
-        'ref': 'UPI Ref: 421890241829',
-        'invoice': 'INV-2026-08',
-      },
-      {
-        'monthYear': 'July 2026',
-        'paidDate': 'Paid on 1 Jul 2026 • 11:20 AM',
-        'amount': '₹1,048',
-        'ref': 'UPI Ref: 418902189342',
-        'invoice': 'INV-2026-07',
-      },
-      {
-        'monthYear': 'June 2026',
-        'paidDate': 'Paid on 1 Jun 2026 • 09:15 AM',
-        'amount': '₹1,048',
-        'ref': 'UPI Ref: 415890123849',
-        'invoice': 'INV-2026-06',
-      },
-    ];
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Payment History',
-                style: GoogleFonts.outfit(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.ink,
-                ),
-              ),
-              Text(
-                '${payments.length} Payments',
-                style: GoogleFonts.outfit(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.muted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: payments.length,
-            separatorBuilder: (_, __) =>
-                const Divider(height: 20, color: Color(0xFFEEF0F2)),
-            itemBuilder: (context, idx) {
-              final p = payments[idx];
-              return Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        p['monthYear']!,
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.ink,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        p['paidDate']!,
-                        style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        p['ref']!,
-                        style: GoogleFonts.outfit(
-                          fontSize: 11,
-                          color: const Color(0xFF9CA3AF),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Text(
-                        p['amount']!,
-                        style: GoogleFonts.outfit(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.greenDark, // Green Color
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      InkWell(
-                        onTap: () => _showToast(
-                            'Downloading Invoice ${p['invoice']}...'),
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 9, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF9FAFB),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
-                          ),
-                          child: const Icon(Icons.download_rounded,
-                              size: 14, color: AppColors.ink),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // FULL-PAGE CHECKOUT — Stripe-style minimal fintech
-  // ===========================================================================
-  void _openCheckoutModal({
-    required String planName,
-    required int basePrice,
-    bool isAnnual = false,
-  }) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _CheckoutPage(
-          planName: planName,
-          basePrice: basePrice,
-          onToast: _showToast,
-        ),
-      ),
-    );
-  }
-
-  // _buildInteractiveUPIOption is no longer needed (moved inside _CheckoutPage)
-  // kept as a no-op stub so callers in tests don't break
-  Widget _buildInteractiveUPIOption({
-    required String id,
-    required String title,
-    required String svgAsset,
-    required String selectedId,
-    required int totalAmount,
-    required VoidCallback onSelect,
-    required VoidCallback onPay,
-    bool isFirst = false,
-    bool isLast = false,
-  }) =>
-      const SizedBox.shrink();
-
-  // ===========================================================================
-  // EXPLORE & UPGRADE PLANS MODAL
-  // ===========================================================================
-  void _openPlansUpgradeModal() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (modalCtx, setModalState) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.88,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 38,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE5E7EB),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Upgrade Property Plan',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.ink,
-                            ),
-                          ),
-                          Text(
-                            'Select capacity based on total property beds',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                        ],
-                      ),
-                      InkWell(
-                        onTap: () => Navigator.of(ctx).pop(),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF3F4F6),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                              child: Icon(Icons.close,
-                                  size: 16, color: AppColors.muted)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F4F6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildCycleButton(
-                              'Monthly Billing', !_isAnnual, () {
-                            setModalState(() => _isAnnual = false);
-                            setState(() => _isAnnual = false);
-                          }),
-                        ),
-                        Expanded(
-                          child: _buildCycleButton(
-                              'Annual (2 Months FREE)', _isAnnual, () {
-                            setModalState(() => _isAnnual = true);
-                            setState(() => _isAnnual = true);
-                          }),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: _tiers.length,
-                      itemBuilder: (context, idx) {
-                        final t = _tiers[idx];
-                        final isCurrent = idx == _currentTierIndex;
-                        final isHigher = idx > _currentTierIndex;
-
-                        int price = _isAnnual
-                            ? (t['annualPrice'] as int)
-                            : (t['monthlyPrice'] as int);
-                        String priceText = _isAnnual
-                            ? '₹${price.toString()} / year'
-                            : '₹${price.toString()} / month';
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 14),
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color:
-                                isCurrent ? AppColors.greenLight : Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isCurrent
-                                  ? AppColors.green
-                                  : const Color(0xFFE5E7EB),
-                              width: isCurrent ? 1.8 : 1.0,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        t['title'] as String,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w800,
-                                          color: isCurrent
-                                              ? AppColors.greenDark
-                                              : AppColors.ink,
-                                        ),
-                                      ),
-                                      if (isCurrent) ...[
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 7, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.green,
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            'ACTIVE',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  Text(
-                                    priceText,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                      color: isCurrent
-                                          ? AppColors.greenDark
-                                          : AppColors.ink,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${t['beds']} • ${t['desc']}',
-                                style: GoogleFonts.outfit(
-                                    fontSize: 12, color: AppColors.muted),
-                              ),
-                              const SizedBox(height: 12),
-                              ...((t['features'] as List<String>).map((f) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle_rounded,
-                                        size: 14,
-                                        color: AppColors.green,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          f,
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: AppColors.ink,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              })),
-                              const SizedBox(height: 14),
-                              if (isCurrent)
-                                Container(
-                                  width: double.infinity,
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 10),
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color:
-                                        AppColors.green.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    'Current Active Plan',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.greenDark,
-                                    ),
-                                  ),
-                                )
-                              else if (isHigher)
-                                ElevatedButton(
-                                  onPressed: () {
-                                    Navigator.of(ctx).pop();
-                                    _navigateToScaleCapacity();
-                                  },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.green,
-                                    foregroundColor: Colors.white,
-                                    minimumSize: const Size.fromHeight(42),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(10)),
-                                    elevation: 0,
-                                  ),
-                                  child: Text(
-                                    'Upgrade to ${t['title']}',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildCycleButton(String label, bool isSelected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: isSelected
-              ? const [
-                  BoxShadow(
-                      color: Color(0x06000000),
-                      blurRadius: 4,
-                      offset: Offset(0, 1))
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-            color: isSelected ? AppColors.greenDark : AppColors.muted,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // HELPERS
-  // ===========================================================================
-  Widget _buildLineItem(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 13,
-            color: AppColors.muted,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Text(
-          value,
-          style: GoogleFonts.outfit(
-            fontSize: 13.5,
-            color: AppColors.ink,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildUpgradeTierRow(String beds, String price, String suffix) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F2)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.arrow_forward_ios_rounded,
-                  size: 12, color: AppColors.muted),
-              const SizedBox(width: 8),
-              Text(
-                beds,
-                style: GoogleFonts.outfit(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
-                ),
-              ),
-            ],
-          ),
-          Row(
-            children: [
-              Text(
-                price,
-                style: GoogleFonts.outfit(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.greenDark,
-                ),
-              ),
-              const SizedBox(width: 3),
-              Text(
-                suffix,
-                style: GoogleFonts.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.muted,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// FULL-PAGE CHECKOUT — Pure white, Stripe-level minimal fintech
-// =============================================================================
-class _CheckoutPage extends StatefulWidget {
-  final String planName;
-  final int basePrice;
-  final void Function(String) onToast;
-
-  const _CheckoutPage({
-    required this.planName,
-    required this.basePrice,
-    required this.onToast,
-  });
-
-  @override
-  State<_CheckoutPage> createState() => _CheckoutPageState();
-}
-
-class _CheckoutPageState extends State<_CheckoutPage> {
-  String _selectedApp = 'phonepe';
-
-  static const _upiApps = [
-    {'id': 'phonepe', 'title': 'PhonePe', 'asset': 'assets/images/phonepe.svg'},
-    {'id': 'gpay',    'title': 'Google Pay', 'asset': 'assets/images/gpay.svg'},
-    {'id': 'paytm',   'title': 'Paytm UPI', 'asset': 'assets/images/paytm.svg'},
-    {'id': 'whatsapp','title': 'WhatsApp Pay','asset':'assets/images/whatsapp.svg'},
-  ];
-
-  int get _platformFee => 49;
-  int get _total => widget.basePrice + _platformFee;
 
   @override
   Widget build(BuildContext context) {
@@ -1121,278 +103,707 @@ class _CheckoutPageState extends State<_CheckoutPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              size: 18, color: AppColors.ink),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        scrolledUnderElevation: 0,
+        leading: widget.onBack != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back, color: Color(0xFF111111), size: 20),
+                onPressed: widget.onBack,
+              )
+            : null,
         title: Text(
-          'Checkout',
+          'UrbanStay',
           style: GoogleFonts.outfit(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: AppColors.ink,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+            color: const Color(0xFF111111),
           ),
         ),
-        centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                'Greenview PG • $_totalBeds ${_totalBeds == 1 ? "Bed (Test)" : "Beds"}',
+                style: GoogleFonts.outfit(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF6B7280),
+                ),
+              ),
+            ),
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: const Color(0xFFF0F0F0)),
+          child: Container(
+            color: const Color(0xFFE5E7EB),
+            height: 1,
+          ),
         ),
       ),
-      body: SafeArea(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // ── Order Summary ──────────────────────────────────────
-                    Text(
-                      'Order Summary',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.muted,
-                        letterSpacing: 0.8,
+            // -------------------------------------------------------------
+            // 1. TRIAL STATUS CARD
+            // -------------------------------------------------------------
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'TRIAL STATUS',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: const Color(0xFF6B7280),
+                        ),
+                      ),
+                      Text(
+                        _isMandateActive ? 'Mandate Active' : 'Active',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '12 Days Remaining in Free Trial',
+                    style: GoogleFonts.outfit(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                      color: const Color(0xFF111111),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Free access until 1 September 2026',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(2),
+                    child: const LinearProgressIndicator(
+                      value: 0.62,
+                      minHeight: 4,
+                      backgroundColor: Color(0xFFE5E7EB),
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.green),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+
+            // -------------------------------------------------------------
+            // 2. UPCOMING BILLING SUMMARY
+            // -------------------------------------------------------------
+            Text(
+              'UPCOMING BILLING SUMMARY',
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.green,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildSummaryRow('First Invoice Date', '1 Sep 2026'),
+                  const SizedBox(height: 10),
+                  _buildSummaryRow('Billing Period', '1 Sep 2026 – 30 Sep 2026'),
+                  const SizedBox(height: 10),
+                  _buildSummaryRow('Total Beds', '$_totalBeds Beds'),
+                  const SizedBox(height: 14),
+                  const Divider(color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+                  const SizedBox(height: 14),
+                  Text(
+                    'ITEM BREAKDOWN',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.6,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSummaryRow(
+                    'Bed Operating License ($_totalBeds Beds × ₹$_pricePerBed/bed)',
+                    '₹$_bedLicenseCost.00',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSummaryRow('Platform Fee', '₹$_platformFee.00'),
+                  const SizedBox(height: 14),
+                  const Divider(color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+                  const SizedBox(height: 14),
+                  _buildSummaryRow(
+                    'Total Due on 1st of Month',
+                    '₹$_totalDue.00',
+                    fontSize: 14,
+                    isTotal: true,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+
+            // -------------------------------------------------------------
+            // 3. PAYMENT MANDATE SETUP
+            // -------------------------------------------------------------
+            Text(
+              'PAYMENT MANDATE SETUP',
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.green,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _isMandateActive
+                        ? 'Mandate Status: Active'
+                        : 'Mandate Status: Pending Setup',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF111111),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Set up your payment mandate before trial ends to continue using property operations, staff access and receipts.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w400,
+                      color: const Color(0xFF4B5563),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Button 1: ACTIVATE SUBSCRIPTION & PAY ₹604 (Solid Green Bar, White Text)
+             SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _activateMandate,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: AppColors.green.withOpacity(0.7),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        'ACTIVATE SUBSCRIPTION & PAY ₹$_totalDue',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                          color: Colors.white,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(height: 26),
+
+            // -------------------------------------------------------------
+            // 4. PROPERTY SCALING
+            // -------------------------------------------------------------
+            Text(
+              'PROPERTY SCALING',
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.green,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Add more rooms or floors to your property:',
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF111111),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Button 2: Scale Property & Add Beds (Settings) (Solid Green Bar, White Text)
+                  SizedBox(
+                    height: 46,
+                    child: ElevatedButton(
+                      onPressed: _navigateToSettings,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.green,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text(
+                        'Scale Property & Add Beds (Settings)',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Opens Settings → Property Settings → Floors & Bed Capacity',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 26),
+
+            // -------------------------------------------------------------
+            // 5. INVOICES
+            // -------------------------------------------------------------
+            Text(
+              'INVOICES',
+              style: GoogleFonts.outfit(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.green,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const OwnerInvoiceDetailScreen(
+                        invoiceNumber: 'US-2026-0891',
+                        dateTimeStr: '1 Aug 2026, 10:30 AM',
+                        amountStr: '₹11.00',
+                        statusStr: 'Paid',
+                        propertyName: 'Greenview PG',
+                        totalBeds: 1,
                       ),
-                      child: Column(
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Left Side: UrbanStay & Date Time
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _lineRow(widget.planName, '₹${widget.basePrice}',
-                              isBold: false),
-                          const SizedBox(height: 10),
-                          _lineRow('Platform Fee', '₹$_platformFee',
-                              isBold: false),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            child: Divider(
-                                height: 1, color: Color(0xFFF0F0F0)),
+                          Text(
+                            'UrbanStay',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF111111),
+                            ),
                           ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Total',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.ink,
-                                ),
-                              ),
-                              Text(
-                                '₹$_total',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.greenDark,
-                                ),
-                              ),
-                            ],
+                          const SizedBox(height: 3),
+                          Text(
+                            '1 Aug 2026, 10:30 AM',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF6B7280),
+                            ),
                           ),
                         ],
                       ),
-                    ),
 
-                    const SizedBox(height: 28),
-
-                    // ── Pay via UPI ───────────────────────────────────────
-                    Row(
-                      children: [
-                        SvgPicture.asset('assets/images/upi.svg',
-                            width: 20, height: 20),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Pay via UPI',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.muted,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // UPI option list
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: Column(
-                        children: _upiApps.asMap().entries.map((entry) {
-                          final i = entry.key;
-                          final app = entry.value;
-                          final isFirst = i == 0;
-                          final isLast = i == _upiApps.length - 1;
-                          final isSelected = _selectedApp == app['id'];
-
-                          return Column(
+                      // Right Side: Amount & Paid in Green
+                      Row(
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              if (!isFirst)
-                                const Divider(
-                                    height: 1,
-                                    indent: 60,
-                                    color: Color(0xFFF0F0F0)),
-                              InkWell(
-                                onTap: () =>
-                                    setState(() => _selectedApp = app['id']!),
-                                borderRadius: BorderRadius.vertical(
-                                  top: isFirst
-                                      ? const Radius.circular(16)
-                                      : Radius.zero,
-                                  bottom: isLast
-                                      ? const Radius.circular(16)
-                                      : Radius.zero,
+                              Text(
+                                '₹11.00',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF111111),
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 14),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          // App icon
-                                          Container(
-                                            width: 52,
-                                            height: 52,
-                                            padding: const EdgeInsets.all(6),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              border: Border.all(
-                                                  color: const Color(
-                                                      0xFFE5E7EB)),
-                                            ),
-                                            child: SvgPicture.asset(
-                                                app['asset']!,
-                                                fit: BoxFit.contain),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          Expanded(
-                                            child: Text(
-                                              app['title']!,
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 14.5,
-                                                fontWeight: FontWeight.w700,
-                                                color: AppColors.ink,
-                                              ),
-                                            ),
-                                          ),
-                                          // Radio dot
-                                          AnimatedContainer(
-                                            duration: const Duration(
-                                                milliseconds: 200),
-                                            width: 22,
-                                            height: 22,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: isSelected
-                                                  ? AppColors.green
-                                                  : Colors.transparent,
-                                              border: Border.all(
-                                                color: isSelected
-                                                    ? AppColors.green
-                                                    : const Color(0xFFD1D5DB),
-                                                width: 1.8,
-                                              ),
-                                            ),
-                                            child: isSelected
-                                                ? const Center(
-                                                    child: Icon(Icons.check,
-                                                        size: 13,
-                                                        color: Colors.white),
-                                                  )
-                                                : null,
-                                          ),
-                                        ],
-                                      ),
-                                      // Expand pay button when selected
-                                      AnimatedCrossFade(
-                                        duration:
-                                            const Duration(milliseconds: 220),
-                                        crossFadeState: isSelected
-                                            ? CrossFadeState.showSecond
-                                            : CrossFadeState.showFirst,
-                                        firstChild: const SizedBox.shrink(),
-                                        secondChild: Padding(
-                                          padding:
-                                              const EdgeInsets.only(top: 12),
-                                          child: ElevatedButton(
-                                            onPressed: () {
-                                              Navigator.of(context).pop();
-                                              widget.onToast(
-                                                  'Launching ${app['title']} for ₹$_total...');
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.green,
-                                              foregroundColor: Colors.white,
-                                              minimumSize:
-                                                  const Size.fromHeight(46),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                              elevation: 0,
-                                            ),
-                                            child: Text(
-                                              'Pay ₹$_total via ${app['title']}',
-                                              style: GoogleFonts.outfit(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w800,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Paid',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.green,
                                 ),
                               ),
                             ],
-                          );
-                        }).toList(),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 18,
+                            color: Color(0xFF9CA3AF),
+                          ),
+                        ],
                       ),
-                    ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
 
-                    const SizedBox(height: 24),
+  Widget _buildSummaryRow(String label, String value, {double fontSize = 13, bool isTotal = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: fontSize,
+              fontWeight: isTotal ? FontWeight.w700 : FontWeight.w500,
+              color: isTotal ? const Color(0xFF111111) : const Color(0xFF4B5563),
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.outfit(
+            fontSize: isTotal ? 16 : fontSize,
+            fontWeight: isTotal ? FontWeight.w800 : FontWeight.w600,
+            letterSpacing: isTotal ? -0.3 : 0,
+            color: const Color(0xFF111111),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
-                    // ── Security note ─────────────────────────────────────
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.lock_outline_rounded,
-                            size: 12, color: AppColors.muted),
-                        const SizedBox(width: 4),
-                        Text(
-                          '256-bit encrypted • 0% gateway fee • Direct bank settlement',
+// ==============================================================================
+// DEDICATED FULL-SCREEN: OWNER INVOICE & RECEIPT SCREEN
+// ==============================================================================
+class OwnerInvoiceDetailScreen extends StatelessWidget {
+  final String invoiceNumber;
+  final String dateTimeStr;
+  final String amountStr;
+  final String statusStr;
+  final String propertyName;
+  final int totalBeds;
+
+  const OwnerInvoiceDetailScreen({
+    super.key,
+    this.invoiceNumber = 'US-2026-0891',
+    this.dateTimeStr = '1 Aug 2026, 10:30 AM',
+    this.amountStr = '₹11.00',
+    this.statusStr = 'Paid',
+    this.propertyName = 'Greenview PG',
+    this.totalBeds = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF111111), size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Invoice #$invoiceNumber',
+          style: GoogleFonts.outfit(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: const Color(0xFF111111),
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(
+            color: const Color(0xFFE5E7EB),
+            height: 1,
+          ),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Green Section Header as requested
+            Text(
+              'PAYMENT INVOICE & RECEIPT',
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.green,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Pure White Card with Hairline Border
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Header Row: Brand & Status Badge
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'UrbanStay Technologies',
+                            style: GoogleFonts.outfit(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF111111),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'B2B SaaS Platform Licensing',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEBF8EE),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFB9F1CA)),
+                        ),
+                        child: Text(
+                          statusStr.toUpperCase(),
                           style: GoogleFonts.outfit(
                             fontSize: 11,
-                            color: AppColors.muted,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                            color: AppColors.green,
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+                  const Divider(color: Color(0xFFE5E7EB), height: 1),
+                  const SizedBox(height: 14),
+
+                  // Metadata Key-Value Rows
+                  _buildDetailRow('Invoice Number', invoiceNumber),
+                  const SizedBox(height: 10),
+                  _buildDetailRow('Date & Time', dateTimeStr),
+                  const SizedBox(height: 10),
+                  _buildDetailRow('Billing Period', '1 Aug 2026 – 31 Aug 2026'),
+                  const SizedBox(height: 10),
+                  _buildDetailRow('Billed To', '$propertyName • Bhargav Kulkarni'),
+                  const SizedBox(height: 10),
+                  _buildDetailRow('Payment Mode', 'Direct UPI AutoPay (Cashfree Verified)'),
+                  const SizedBox(height: 10),
+                  _buildDetailRow('Transaction Ref / UTR', 'CF-984210385912'),
+
+                  const SizedBox(height: 16),
+                  const Divider(color: Color(0xFFE5E7EB), height: 1),
+                  const SizedBox(height: 14),
+
+                  // Itemized Breakdown
+                  _buildDetailRow('Bed Licensing ($totalBeds Bed × ₹10)', '₹10.00'),
+                  const SizedBox(height: 10),
+                  _buildDetailRow('Platform & WhatsApp Alerts', '₹1.00'),
+                  const SizedBox(height: 10),
+                  _buildDetailRow('GST (SAC 998315 @ 0% Micro-exempt)', '₹0.00'),
+
+                  const SizedBox(height: 16),
+                  const Divider(color: Color(0xFFE5E7EB), height: 1),
+                  const SizedBox(height: 14),
+
+                  // Total Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total Amount Paid',
+                        style: GoogleFonts.outfit(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF111111),
+                        ),
+                      ),
+                      Text(
+                        amountStr,
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.4,
+                          color: const Color(0xFF111111),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Solid Green Download PDF Button
+            SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Tax Invoice $invoiceNumber PDF downloaded successfully',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      backgroundColor: AppColors.green,
+                      duration: const Duration(seconds: 3),
                     ),
-                    const SizedBox(height: 32),
-                  ],
+                  );
+                },
+                icon: const Icon(Icons.download_rounded, color: Colors.white, size: 18),
+                label: Text(
+                  'DOWNLOAD TAX INVOICE (PDF)',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                    color: Colors.white,
+                  ),
                 ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 14),
+            Text(
+              'UrbanStay Technologies Pvt. Ltd. • MSME Registered • SAC Code 998315\nGST Exempt under small business threshold',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF9CA3AF),
+                height: 1.4,
               ),
             ),
           ],
@@ -1401,27 +812,37 @@ class _CheckoutPageState extends State<_CheckoutPage> {
     );
   }
 
-  Widget _lineRow(String label, String value, {bool isBold = true}) {
+  Widget _buildDetailRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 13.5,
-            fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: isBold ? AppColors.ink : AppColors.muted,
+        Expanded(
+          flex: 4,
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: const Color(0xFF6B7280),
+            ),
           ),
         ),
-        Text(
-          value,
-          style: GoogleFonts.outfit(
-            fontSize: 13.5,
-            fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
-            color: AppColors.ink,
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 5,
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: GoogleFonts.outfit(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF111111),
+            ),
           ),
         ),
       ],
     );
   }
 }
+

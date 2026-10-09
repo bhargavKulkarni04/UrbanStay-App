@@ -31,6 +31,28 @@
 
   <title>urbanstay</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Google Fonts (UrbanStay In-House Brand Font: Outfit) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Cashfree Official Web SDK v3 -->
+  <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+  <script>
+    window.launchCashfreeCheckout = function(sessionId, mode) {
+      if (!window.Cashfree) {
+        alert("Cashfree SDK failed to load. Please check internet connection.");
+        return;
+      }
+      const cfMode = mode || "production";
+      const cashfree = Cashfree({ mode: cfMode });
+      cashfree.checkout({
+        paymentSessionId: sessionId,
+        redirectTarget: "_modal"
+      });
+    };
+  </script>
 </head>
 <body>
   <!--

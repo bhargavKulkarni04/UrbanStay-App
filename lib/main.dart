@@ -63,6 +63,7 @@ class UrbanStayApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: Colors.white,
+        fontFamily: GoogleFonts.outfit().fontFamily,
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.green,
           primary: AppColors.green,
