@@ -13,11 +13,23 @@ import 'features/tenant_dashboard/presentation/screens/tenant_dashboard_screen.d
 import 'features/tenant_payments/presentation/screens/rent_payment_screen.dart';
 import 'features/tenant_profile/presentation/screens/profile_settings_screen.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/config/supabase_config.dart';
 import 'features/owner_billing/presentation/screens/owner_saas_billing_screen.dart';
 import 'features/auth/presentation/screens/role_selector_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await SupabaseConfig.init();
+    await Supabase.initialize(
+      url: SupabaseConfig.supabaseUrl,
+      anonKey: SupabaseConfig.supabaseAnonKey,
+    );
+  } catch (e) {
+    debugPrint('Supabase initialization warning: $e');
+  }
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

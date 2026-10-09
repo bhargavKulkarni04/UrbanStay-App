@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_responsive.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../owner_dashboard/presentation/screens/owner_dashboard_screen.dart';
 
 /// Screen 4: 4-Step PG Owner Onboarding & Property Setup Wizard.
@@ -782,47 +783,120 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         '💬 WhatsApp invite message copied to clipboard! Ready to share.');
   }
 
-  void _launchDashboard() {
-    setState(() => _showCelebrationModal = false);
-    if (widget.onPropertyCreated != null) {
+  Future<void> _persistPropertyToSupabase({required int calcBeds, required int calcRooms}) async {
+    try {
       final brand = _pgBrandNameController.text.trim().isNotEmpty
           ? _pgBrandNameController.text.trim()
           : 'New PG Building';
-      final loc = _areaLocalityController.text.trim().isNotEmpty
-          ? '${_areaLocalityController.text.trim()}, ${_selectedCity.isNotEmpty ? _selectedCity : 'Bengaluru'}'
-          : (_selectedCity.isNotEmpty ? _selectedCity : 'Bengaluru');
-      final calcRooms = _calculateTotalRooms();
-      int calcBeds = 0;
-      if (_propertyStructure == 'Apartment Units') {
-        _bhkAssignedFlats.forEach((bhk, flats) {
-          final occ = _bhkOccupancy[bhk] ?? {};
-          final bedsInFlat = ((occ['Hall (3-Sharing)'] ?? 0) * 3) +
-              ((occ['Bedroom (2-Sharing)'] ?? 0) * 2) +
-              ((occ['Master Room'] ?? 0) * 1);
-          calcBeds += (bedsInFlat * flats.length);
-        });
-        if (calcBeds == 0) calcBeds = calcRooms * 2;
-      } else {
-        _sharingAssignedRooms.forEach((sharing, rooms) {
-          int mult = 2;
-          if (sharing.startsWith('1')) {
-            mult = 1;
-          } else if (sharing.startsWith('2')) {
-            mult = 2;
-          } else if (sharing.startsWith('3')) {
-            mult = 3;
-          } else if (sharing.startsWith('4')) {
-            mult = 4;
-          } else if (sharing.startsWith('5')) {
-            mult = 5;
-          } else if (sharing.startsWith('6')) {
-            mult = 6;
-          }
-          calcBeds += (rooms.length * mult);
-        });
-        if (calcBeds == 0) calcBeds = calcRooms * 2;
+
+      final List<Map<String, dynamic>> roomsData = [];
+      final floors = _getFloorNames();
+      for (int fIndex = 0; fIndex < floors.length; fIndex++) {
+        final floorName = floors[fIndex];
+        final count =
+            int.tryParse(_floorRoomsControllers[floorName]?.text.trim() ?? '') ??
+                0;
+        for (int r = 1; r <= count; r++) {
+          final roomNumber = floorName == 'Ground Floor'
+              ? 'G-${r.toString().padLeft(2, '0')}'
+              : '${fIndex}${r.toString().padLeft(2, '0')}';
+          roomsData.add({
+            'floor_number': fIndex,
+            'floor_label': floorName,
+            'room_number': roomNumber,
+            'sharing_type': '2-Sharing',
+            'total_beds': 2,
+            'rent_per_bed': 8000.0,
+            'deposit_per_bed': 15000.0,
+          });
+        }
       }
 
+      await SupabaseService.instance.createFullProperty(
+        brandName: brand,
+        propertyCode: _generatedPropertyCode,
+        genderCategory: _genderCategory ?? 'Coliving',
+        propertyStructure: _propertyStructure ?? 'Standard PG',
+        streetAddress: _streetAddressController.text.trim().isNotEmpty
+            ? _streetAddressController.text.trim()
+            : 'Main Road',
+        areaLocality: _areaLocalityController.text.trim().isNotEmpty
+            ? _areaLocalityController.text.trim()
+            : 'Locality',
+        landmark: _landmarkController.text.trim(),
+        city: _selectedCity.isNotEmpty ? _selectedCity : 'Bengaluru',
+        state: _selectedState.isNotEmpty ? _selectedState : 'Karnataka',
+        pincode: _pincodeController.text.trim().isNotEmpty
+            ? _pincodeController.text.trim()
+            : '560001',
+        mapsUrl: _mapsUrlController.text.trim(),
+        liftCount: _liftCount,
+        powerBackup: _powerBackup,
+        upiVpa: _upiIdController.text.trim().isNotEmpty
+            ? _upiIdController.text.trim()
+            : 'urbanstay@upi',
+        bankName: _bankNameController.text.trim().isNotEmpty
+            ? _bankNameController.text.trim()
+            : 'HDFC Bank',
+        bankHolderName: _bankHolderNameController.text.trim().isNotEmpty
+            ? _bankHolderNameController.text.trim()
+            : 'Owner',
+        creditingPhone: _creditingPhoneController.text.trim(),
+        rentDueDay: _dueDay,
+        gracePeriod: _gracePeriod,
+        lateFee: _lateFee,
+        noticePeriod: _noticePeriod,
+        roomsData: roomsData,
+      );
+    } catch (e) {
+      debugPrint('Supabase auto-save note (offline or schema fallback): $e');
+    }
+  }
+
+  Future<void> _launchDashboard() async {
+    setState(() => _showCelebrationModal = false);
+    final brand = _pgBrandNameController.text.trim().isNotEmpty
+        ? _pgBrandNameController.text.trim()
+        : 'New PG Building';
+    final loc = _areaLocalityController.text.trim().isNotEmpty
+        ? '${_areaLocalityController.text.trim()}, ${_selectedCity.isNotEmpty ? _selectedCity : 'Bengaluru'}'
+        : (_selectedCity.isNotEmpty ? _selectedCity : 'Bengaluru');
+    final calcRooms = _calculateTotalRooms();
+    int calcBeds = 0;
+    if (_propertyStructure == 'Apartment Units') {
+      _bhkAssignedFlats.forEach((bhk, flats) {
+        final occ = _bhkOccupancy[bhk] ?? {};
+        final bedsInFlat = ((occ['Hall (3-Sharing)'] ?? 0) * 3) +
+            ((occ['Bedroom (2-Sharing)'] ?? 0) * 2) +
+            ((occ['Master Room'] ?? 0) * 1);
+        calcBeds += (bedsInFlat * flats.length);
+      });
+      if (calcBeds == 0) calcBeds = calcRooms * 2;
+    } else {
+      _sharingAssignedRooms.forEach((sharing, rooms) {
+        int mult = 2;
+        if (sharing.startsWith('1')) {
+          mult = 1;
+        } else if (sharing.startsWith('2')) {
+          mult = 2;
+        } else if (sharing.startsWith('3')) {
+          mult = 3;
+        } else if (sharing.startsWith('4')) {
+          mult = 4;
+        } else if (sharing.startsWith('5')) {
+          mult = 5;
+        } else if (sharing.startsWith('6')) {
+          mult = 6;
+        }
+        calcBeds += (rooms.length * mult);
+      });
+      if (calcBeds == 0) calcBeds = calcRooms * 2;
+    }
+
+    // Persist to Supabase in background
+    _persistPropertyToSupabase(calcBeds: calcBeds, calcRooms: calcRooms);
+
+    if (widget.onPropertyCreated != null) {
       final newProp = <String, dynamic>{
         'id': 'prop_${DateTime.now().millisecondsSinceEpoch}',
         'name': brand,

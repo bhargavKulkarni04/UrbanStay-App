@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen 8: Rent Collection Hub & WhatsApp Dues Chaser.
 /// 3-Tier Hierarchy: Floor -> Room (Sharing Type & Rent Total) -> Beds & Resident Cards.
@@ -67,6 +68,82 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
     'Arun Kumar (Co-Owner)',
     'Bhargav S Kulkarni (Owner)',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRentLedgerFromSupabase();
+  }
+
+  Future<void> _loadRentLedgerFromSupabase() async {
+    try {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      if (prop != null) {
+        final propId = prop['id'].toString();
+        final ledger = await SupabaseService.instance.getMonthlyRentLedger(propId);
+        if (ledger.isNotEmpty && mounted) {
+          final Map<String, Map<String, List<Map<String, dynamic>>>> floorMap = {};
+          for (final row in ledger) {
+            final tenant = row['tenants'] as Map<String, dynamic>?;
+            final roomNum = tenant?['room_number'] ?? 'Room 101';
+            final floorName = roomNum.startsWith('G') ? 'Ground Floor' : '${roomNum[0]}st Floor';
+            final floorId = floorName.split(' ').first.toLowerCase();
+
+            floorMap.putIfAbsent(floorId, () => {});
+            floorMap[floorId]!.putIfAbsent(roomNum, () => []);
+
+            final status = (row['status'] ?? 'PENDING').toString().toLowerCase();
+            final isPaid = status == 'paid';
+            floorMap[floorId]![roomNum]!.add({
+              'id': row['id'].toString(),
+              'name': tenant?['full_name'] ?? 'Resident',
+              'initials': 'TN',
+              'bed': tenant?['bed_number'] ?? 'Bed A',
+              'room': roomNum,
+              'roomNum': roomNum,
+              'floor': floorId,
+              'work': 'Resident',
+              'phone': tenant?['phone'] ?? '',
+              'amount': (row['amount'] as num?)?.toInt() ?? 8000,
+              'status': isPaid ? 'paid' : 'overdue',
+              'paidLabel': isPaid ? 'Paid (Direct UPI)' : null,
+              'tag': isPaid ? 'Settled 0% Fee' : null,
+              'ref': row['transaction_ref'] ?? 'UPI-REF',
+              'paidDate': row['paid_at'] != null ? row['paid_at'].toString().split('T').first : null,
+              'overdueDays': !isPaid ? 'Payment Pending' : null,
+              'dueLabel': !isPaid ? 'Due this month' : null,
+            });
+          }
+
+          final List<Map<String, dynamic>> loadedFloors = [];
+          floorMap.forEach((fId, roomsMap) {
+            final List<Map<String, dynamic>> roomsList = [];
+            roomsMap.forEach((rNum, beds) {
+              roomsList.add({
+                'room': rNum,
+                'type': '2-Sharing',
+                'monthlyExpected': beds.fold<int>(0, (acc, b) => acc + (b['amount'] as int)),
+                'beds': beds,
+              });
+            });
+            loadedFloors.add({
+              'id': fId,
+              'title': '$fId Floor',
+              'roomsSubtitle': '${roomsList.length} Rooms • ${roomsList.fold<int>(0, (acc, r) => acc + (r['beds'] as List).length)} Beds',
+              'rooms': roomsList,
+            });
+          });
+
+          setState(() {
+            _floorsData.clear();
+            _floorsData.addAll(loadedFloors);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading rent ledger from Supabase: $e');
+    }
+  }
 
   // Master Floor, Room & Bed Hierarchy Data
   final List<Map<String, dynamic>> _floorsData = [

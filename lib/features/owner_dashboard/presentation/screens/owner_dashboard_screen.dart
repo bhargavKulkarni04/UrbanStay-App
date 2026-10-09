@@ -20,6 +20,7 @@ import '../../../owner_rent/presentation/screens/owner_day_collection_screen.dar
 import '../../../owner_food_menu/presentation/screens/owner_food_menu_screen.dart';
 import '../../../owner_tenant_controls/presentation/screens/owner_tenant_controls_screen.dart';
 import '../../../owner_setup/presentation/screens/owner_setup_screen.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen 5: Owner Command Center Dashboard.
 /// 1-to-1 exact translation of `ProductionCode/owner_dashboard.html`.
@@ -237,6 +238,56 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // Expense Form Controllers
   final _expenseAmountController = TextEditingController();
   final _expenseCategoryController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPropertiesFromSupabase();
+  }
+
+  Future<void> _loadPropertiesFromSupabase() async {
+    try {
+      final uid = SupabaseService.instance.currentUserId;
+      var query = SupabaseService.instance.client.from('properties').select('*');
+      if (uid != null) {
+        query = query.eq('owner_id', uid);
+      }
+      final List res = await query.order('created_at', ascending: false);
+      if (res.isNotEmpty && mounted) {
+        final List<Map<String, dynamic>> loaded = [];
+        for (final p in res) {
+          final propId = p['id'].toString();
+          final metrics = await SupabaseService.instance.getBedMetrics(propId);
+          final total = metrics['total'] ?? 0;
+          final occupied = metrics['occupied'] ?? 0;
+          final pct = total > 0 ? '${((occupied / total) * 100).round()}% Full' : '0% Full';
+          loaded.add({
+            'id': propId,
+            'name': p['brand_name'] ?? p['name'] ?? 'PG Property',
+            'location': '${p['area_locality'] ?? ''}, ${p['city'] ?? ''}'.trim(),
+            'code': p['property_code'] ?? '',
+            'occupiedBeds': occupied,
+            'totalBeds': total > 0 ? total : 0,
+            'occupancyPct': pct,
+            'vacantBeds': (total - occupied) > 0 ? (total - occupied) : 0,
+            'noticeBeds': 0,
+            'monthlyCollected': '₹0',
+            'collectedRatio': '$occupied/$total Beds',
+            'paidCount': 0,
+            'pendingCount': occupied,
+            'staffCount': 0,
+          });
+        }
+        setState(() {
+          _properties.clear();
+          _properties.addAll(loaded);
+          _activePropertyIndex = 0;
+        });
+      }
+    } catch (e) {
+      debugPrint('Supabase properties load note: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -461,7 +512,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // 1. ELEVATED SOLID WHITE HEADER BANNER CONTAINER
   // ===========================================================================
   Widget _buildTopBrandHeader() {
-    final prop = _properties[_activePropertyIndex];
+    final prop = _properties.isNotEmpty
+        ? _properties[_activePropertyIndex]
+        : {
+            'name': 'No Property Set Up',
+            'occupiedBeds': 0,
+            'totalBeds': 0,
+            'location': 'Bengaluru',
+            'code': '',
+          };
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -640,8 +699,95 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // 2. PROPERTY & BED OCCUPANCY HERO CARD (Apple-Style Circular Radial Arc)
   // ===========================================================================
   Widget _buildPropertyHeroCard() {
+    if (_properties.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFEEF0F2), width: 1.2),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x06000000),
+              blurRadius: 10,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: const BoxDecoration(
+                color: AppColors.greenLight,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.home_work_rounded, color: AppColors.green, size: 26),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'No PG Building Configured',
+              style: GoogleFonts.outfit(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Set up your building rooms, floors & 0% Direct UPI account in 2 minutes.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: AppColors.muted,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => OwnerSetupScreen(
+                        onPropertyCreated: (newProp) {
+                          setState(() {
+                            _properties.insert(0, newProp);
+                            _activePropertyIndex = 0;
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                label: Text(
+                  'Set Up First PG Building',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final prop = _properties[_activePropertyIndex];
-    final occPct = ((prop['occupiedBeds'] as int) / (prop['totalBeds'] as int));
+    final totalBeds = (prop['totalBeds'] as int?) ?? 1;
+    final occupiedBeds = (prop['occupiedBeds'] as int?) ?? 0;
+    final occPct = totalBeds > 0 ? (occupiedBeds / totalBeds) : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(18),

@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen 7: 0% Direct UPI Payment Approvals & Verification Hub with Audit History.
 /// Design System: Pure enterprise UrbanStay aesthetic (Stripe/Linear precision),
@@ -21,91 +22,67 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   int _selectedTabIndex = 0; // 0: Pending Approvals, 1: Approval History
   String _selectedFloor = 'all'; // 'all', '1st', '2nd', '3rd', 'ground'
 
-  // Active Pending Approvals
-  final List<Map<String, dynamic>> _pendingApprovals = [
-    {
-      'id': 'appr_1',
-      'name': 'Rahul Sharma',
-      'initials': 'RS',
-      'room': 'Room 101',
-      'floor': '1st',
-      'amount': 8500,
-      'phone': '9876543210',
-      'utr': '4231 8976 5412',
-      'time': '18 Aug • 2:34 PM',
-      'app': 'Google Pay to HDFC',
-      'proofFile': 'gpay_hdfc_transfer_proof.jpg',
-    },
-    {
-      'id': 'appr_2',
-      'name': 'Amit Verma',
-      'initials': 'AV',
-      'room': 'Room 101',
-      'floor': '1st',
-      'amount': 8500,
-      'phone': '9988776655',
-      'utr': '8891 2345 0912',
-      'time': '18 Aug • 3:12 PM',
-      'app': 'PhonePe Transfer',
-      'proofFile': 'phonepe_hdfc_receipt.png',
-    },
-    {
-      'id': 'appr_3',
-      'name': 'Priya Nair',
-      'initials': 'PN',
-      'room': 'Room 201',
-      'floor': '2nd',
-      'amount': 9000,
-      'phone': '9819876543',
-      'utr': '9912 0045 8812',
-      'time': '18 Aug • 4:05 PM',
-      'app': 'Paytm UPI to HDFC',
-      'proofFile': 'paytm_hdfc_transfer.png',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadApprovalsFromSupabase();
+  }
 
-  // Settled & Rejected Approval History
-  final List<Map<String, dynamic>> _approvalHistory = [
-    {
-      'id': 'hist_1',
-      'name': 'Karthik Raja',
-      'initials': 'KR',
-      'room': 'Room 201',
-      'floor': '2nd',
-      'amount': 9000,
-      'phone': '9741234567',
-      'utr': '9912 0045 8812',
-      'settledTime': '18 Aug • 1:15 PM',
-      'status': 'approved',
-      'receiptNo': 'REC-8901',
-    },
-    {
-      'id': 'hist_2',
-      'name': 'Suresh Gowda',
-      'initials': 'SG',
-      'room': 'Room G-01',
-      'floor': 'ground',
-      'amount': 8000,
-      'phone': '9844001122',
-      'utr': '3388 1122 9900',
-      'settledTime': '17 Aug • 6:40 PM',
-      'status': 'approved',
-      'receiptNo': 'REC-8899',
-    },
-    {
-      'id': 'hist_3',
-      'name': 'Tanmay Bhat',
-      'initials': 'TB',
-      'room': 'Room G-01',
-      'floor': 'ground',
-      'amount': 8000,
-      'phone': '9855112233',
-      'utr': '1122 3344 5566',
-      'settledTime': '16 Aug • 11:20 AM',
-      'status': 'rejected',
-      'rejectReason': 'Incorrect UTR number provided',
-    },
-  ];
+  Future<void> _loadApprovalsFromSupabase() async {
+    try {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      if (prop != null) {
+        final propId = prop['id'].toString();
+        final res = await SupabaseService.instance.client
+            .from('upi_payment_submissions')
+            .select('*, tenants(full_name, phone, room_number)')
+            .eq('property_id', propId)
+            .eq('status', 'PENDING_APPROVAL')
+            .order('created_at', ascending: false);
+
+        if (res.isNotEmpty && mounted) {
+          final List<Map<String, dynamic>> loaded = [];
+          for (final item in res) {
+            final tenant = item['tenants'] as Map<String, dynamic>?;
+            final name = tenant?['full_name'] ?? 'Resident';
+            final initials = name
+                .split(' ')
+                .map((p) => p.isNotEmpty ? p[0] : '')
+                .take(2)
+                .join('')
+                .toUpperCase();
+            loaded.add({
+              'id': item['id'].toString(),
+              'name': name,
+              'initials': initials.isNotEmpty ? initials : 'TN',
+              'room': tenant?['room_number'] ?? 'Room',
+              'floor': '1st',
+              'amount': (item['amount'] as num?)?.toInt() ?? 0,
+              'phone': tenant?['phone'] ?? '',
+              'utr': item['utr_number'] ?? '',
+              'time': item['created_at'] != null
+                  ? item['created_at'].toString().split('T').first
+                  : 'Recent',
+              'app': 'Direct UPI Transfer',
+              'proofFile': item['screenshot_url'] ?? '',
+            });
+          }
+          setState(() {
+            _pendingApprovals.clear();
+            _pendingApprovals.addAll(loaded);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading UPI approvals from Supabase: $e');
+    }
+  }
+
+  // Active Pending Approvals (Populated live from Supabase)
+  final List<Map<String, dynamic>> _pendingApprovals = [];
+
+  // Settled & Rejected Approval History (Populated live from Supabase)
+  final List<Map<String, dynamic>> _approvalHistory = [];
 
   void _showToast(String msg) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -1457,7 +1434,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                       style: GoogleFonts.outfit(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w800,
-                        color: isApproved ? AppColors.greenDark : AppColors.danger,
+                        color:
+                            isApproved ? AppColors.greenDark : AppColors.danger,
                       ),
                     ),
                   ],

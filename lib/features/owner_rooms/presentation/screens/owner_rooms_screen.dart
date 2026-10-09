@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
+import '../../../../core/services/supabase_service.dart';
 import 'shift_bed_screen.dart';
 
 /// Screen 6: Tenants & Rooms Matrix.
@@ -58,6 +59,64 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   List<Contact>? _deviceContacts;
   bool _isLoadingContacts = false;
   bool _contactsPermissionDenied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRoomsFromSupabase();
+  }
+
+  Future<void> _loadRoomsFromSupabase() async {
+    try {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      if (prop != null) {
+        final propId = prop['id'].toString();
+        final roomsWithBeds = await SupabaseService.instance.getRoomsWithBeds(propId);
+        if (roomsWithBeds.isNotEmpty && mounted) {
+          final List<Map<String, dynamic>> loadedRooms = [];
+          for (final r in roomsWithBeds) {
+            final List bedsList = (r['beds'] as List?) ?? [];
+            final int occupiedCount = bedsList.where((b) => b['is_occupied'] == true).length;
+            final formattedBeds = bedsList.map((b) {
+              final isOcc = b['is_occupied'] == true;
+              return {
+                'isOccupied': isOcc,
+                'bed': b['bed_code'] ?? 'Bed A',
+                'name': isOcc ? (b['tenant_name'] ?? 'Resident') : null,
+                'initials': isOcc ? 'RS' : null,
+                'status': b['status'] ?? (isOcc ? 'Active' : 'Vacant'),
+                'phone': b['tenant_phone'] ?? '',
+                'work': b['workplace'] ?? '',
+                'rent': (r['rent_per_bed'] ?? 8000).toString(),
+                'deposit': (r['deposit_per_bed'] ?? 15000).toString(),
+                'docs': 'Aadhaar Verified',
+                'docsVerified': true,
+                'title': !isOcc ? 'Vacant ${b['bed_code']} — Available' : null,
+                'sub': !isOcc ? '₹${r['rent_per_bed'] ?? 8000}/mo • Ready for Walk-In' : null,
+              };
+            }).toList();
+
+            loadedRooms.add({
+              'room': r['room_number'] ?? 'Room 101',
+              'floor': r['floor_label']?.toString().split(' ').first.toLowerCase() ?? '1st',
+              'floorLabel': r['floor_label'] ?? '1st Floor',
+              'type': r['sharing_type'] ?? '2-Sharing',
+              'occupied': occupiedCount,
+              'total': r['total_beds'] ?? 2,
+              'beds': formattedBeds,
+            });
+          }
+
+          setState(() {
+            _rooms.clear();
+            _rooms.addAll(loadedRooms);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading rooms from Supabase: $e');
+    }
+  }
 
   Future<void> _fetchDeviceContacts(
       [void Function(void Function())? setModalState]) async {
@@ -144,8 +203,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
     }
   }
 
-  // Master Room & Bed Data
-  final List<Map<String, dynamic>> _rooms = [
+  // Master Room & Bed Data (Populated live from Supabase)
+  final List<Map<String, dynamic>> _rooms = [];
+  final List<Map<String, dynamic>> _legacyMockRooms = [
     {
       'room': 'Room 101',
       'floor': '1st',
@@ -2152,19 +2212,38 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   }
 
   Widget _buildEmptyState() {
+    final bool isSearch =
+        _searchQuery.isNotEmpty || _selectedFloor != 'all' || _selectedFilter != 'all';
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 48),
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       child: Center(
         child: Column(
           children: [
-            const Icon(Icons.search_off_rounded,
-                size: 40, color: AppColors.muted),
+            Icon(
+              isSearch ? Icons.search_off_rounded : Icons.bed_outlined,
+              size: 44,
+              color: AppColors.muted,
+            ),
             const SizedBox(height: 12),
             Text(
-              'No rooms or residents match your search',
+              isSearch
+                  ? 'No rooms or residents match your search'
+                  : 'No Rooms Added Yet',
               style: GoogleFonts.outfit(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: AppColors.ink,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isSearch
+                  ? 'Try a different room number or resident name'
+                  : 'Tap the + button below to add your first room and beds.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
                 color: AppColors.muted,
               ),
             ),

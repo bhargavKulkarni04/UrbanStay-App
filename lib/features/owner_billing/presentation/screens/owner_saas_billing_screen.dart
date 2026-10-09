@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/cashfree_launcher.dart';
+import '../../../../core/services/supabase_service.dart';
 import 'package:urbanstay/features/owner_settings/presentation/screens/owner_settings_screen.dart';
 
 class OwnerSaaSBillingScreen extends StatefulWidget {
@@ -16,11 +17,45 @@ class OwnerSaaSBillingScreen extends StatefulWidget {
 }
 
 class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
-  final int _totalBeds = 1;
-  final int _pricePerBed = 10;
-  final int _platformFee = 1;
+  int _totalBeds = 1;
+  final int _pricePerBed = 15;
+  final int _platformFee = 79;
+  String _activePropertyName = 'PG Building';
+  List<Map<String, dynamic>> _invoices = [];
   bool _isMandateActive = false;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBillingData();
+  }
+
+  Future<void> _loadBillingData() async {
+    try {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      if (prop != null) {
+        final propId = prop['id'].toString();
+        final metrics = await SupabaseService.instance.getBedMetrics(propId);
+        final int beds = metrics['total'] ?? 1;
+        if (mounted) {
+          setState(() {
+            _activePropertyName = prop['brand_name'] ?? prop['name'] ?? 'PG Building';
+            _totalBeds = beds > 0 ? beds : 1;
+          });
+        }
+      }
+
+      final invoicesList = await SupabaseService.instance.getSaasInvoices();
+      if (mounted) {
+        setState(() {
+          _invoices = invoicesList;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading billing data: $e');
+    }
+  }
 
   int get _bedLicenseCost => _totalBeds * _pricePerBed;
   int get _totalDue => _bedLicenseCost + _platformFee;
@@ -444,96 +479,139 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              child: InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const OwnerInvoiceDetailScreen(
-                        invoiceNumber: 'US-2026-0891',
-                        dateTimeStr: '1 Aug 2026, 10:30 AM',
-                        amountStr: '₹11.00',
-                        statusStr: 'Paid',
-                        propertyName: 'Greenview PG',
-                        totalBeds: 1,
+            if (_invoices.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.receipt_long_outlined, size: 28, color: Color(0xFF9CA3AF)),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No Past Invoices Yet',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF111111),
                       ),
                     ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Left Side: UrbanStay & Date Time
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'UrbanStay',
-                            style: GoogleFonts.outfit(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF111111),
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            '1 Aug 2026, 10:30 AM',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: const Color(0xFF6B7280),
-                            ),
-                          ),
-                        ],
+                    const SizedBox(height: 3),
+                    Text(
+                      'Monthly tax invoices will appear here after automated payment settlements.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF6B7280),
                       ),
-
-                      // Right Side: Amount & Paid in Green
-                      Row(
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '₹11.00',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: const Color(0xFF111111),
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                'Paid',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.green,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.chevron_right,
-                            size: 18,
-                            color: Color(0xFF9CA3AF),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
+              )
+            else
+              ..._invoices.map((inv) {
+                final invNum = inv['invoice_number']?.toString() ?? 'US-INV-001';
+                final dateStr = inv['created_at'] != null
+                    ? inv['created_at'].toString().split('T').first
+                    : 'Recent';
+                final amount = '₹${inv['total_amount'] ?? '11.00'}';
+                final status = inv['status']?.toString() ?? 'Paid';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => OwnerInvoiceDetailScreen(
+                              invoiceNumber: invNum,
+                              dateTimeStr: dateStr,
+                              amountStr: amount,
+                              statusStr: status,
+                              propertyName: _activePropertyName,
+                              totalBeds: _totalBeds,
+                            ),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  invNum,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF111111),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  dateStr,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      amount,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF111111),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      status,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 8),
+                                const Icon(
+                                  Icons.chevron_right,
+                                  size: 18,
+                                  color: Color(0xFF9CA3AF),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
             const SizedBox(height: 40),
           ],
         ),
