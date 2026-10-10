@@ -209,13 +209,21 @@ class SupabaseService {
 
       final roomId = insertedRoom['id'] as String;
       final int totalBeds = (r['total_beds'] as int?) ?? 2;
+      final List<String>? customBedLabels = (r['bed_labels'] as List?)
+          ?.map((e) => e.toString())
+          .toList();
 
       final List<Map<String, dynamic>> bedsPayload = [];
       for (int b = 0; b < totalBeds; b++) {
         final bedLetter = String.fromCharCode(65 + b); // 'Bed A', 'Bed B'
+        final defaultLabel = 'Bed $bedLetter';
+        final bedLabel =
+            (customBedLabels != null && b < customBedLabels.length)
+                ? customBedLabels[b]
+                : defaultLabel;
         bedsPayload.add({
           'room_id': roomId,
-          'bed_label': 'Bed $bedLetter',
+          'bed_label': bedLabel,
           'is_occupied': false,
           'status': 'Vacant',
         });

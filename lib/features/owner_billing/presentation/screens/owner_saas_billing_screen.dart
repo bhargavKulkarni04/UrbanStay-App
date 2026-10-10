@@ -39,12 +39,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
   @override
   void initState() {
     super.initState();
-    _totalBeds = (widget.totalBeds != null && widget.totalBeds! > 0)
-        ? widget.totalBeds!
-        : 12;
-    _activePropertyName = (widget.propertyName != null && widget.propertyName!.isNotEmpty)
-        ? widget.propertyName!
-        : 'Jai shree ram';
+    _totalBeds = widget.totalBeds ?? 0;
+    _activePropertyName = widget.propertyName ?? '';
     _loadBillingData();
   }
 

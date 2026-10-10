@@ -27,75 +27,10 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   final TextEditingController _searchController = TextEditingController();
 
   // Master Pending Onboarding Requests List
-  final List<Map<String, dynamic>> _pendingList = [
-    {
-      'id': 'REQ-8821',
-      'name': 'Rahul Verma',
-      'initials': 'RV',
-      'phone': '9876543210',
-      'roomNumber': '101',
-      'sharingType': '2 Sharing',
-      'rent': 8500,
-      'deposit': 15000,
-      'appliedTime': '11:15 AM',
-      'moveInDate': '29 Aug 2026',
-    },
-    {
-      'id': 'REQ-8822',
-      'name': 'Priya Nair',
-      'initials': 'PN',
-      'phone': '9845112233',
-      'roomNumber': '203',
-      'sharingType': '3 Sharing',
-      'rent': 7500,
-      'deposit': 12000,
-      'appliedTime': '02:34 PM',
-      'moveInDate': '1 Sep 2026',
-    },
-  ];
+  final List<Map<String, dynamic>> _pendingList = [];
 
   // Master Onboarding History List
-  final List<Map<String, dynamic>> _historyList = [
-    {
-      'id': 'REQ-8790',
-      'name': 'Kunal Sharma',
-      'initials': 'KS',
-      'phone': '9880199221',
-      'roomNumber': '101',
-      'sharingType': '2 Sharing',
-      'rent': 8500,
-      'deposit': 15000,
-      'status': 'approved', // 'approved', 'rejected'
-      'processedDate': '15 Aug 2026',
-      'auditNote': 'Approved & Assigned Room 101 by Bhargav (Owner)',
-    },
-    {
-      'id': 'REQ-8785',
-      'name': 'Ananya Deshmukh',
-      'initials': 'AD',
-      'phone': '9741200334',
-      'roomNumber': '201',
-      'sharingType': '2 Sharing',
-      'rent': 8500,
-      'deposit': 15000,
-      'status': 'approved',
-      'processedDate': '10 Aug 2026',
-      'auditNote': 'Approved & Assigned Room 201 by Bhargav (Owner)',
-    },
-    {
-      'id': 'REQ-8772',
-      'name': 'Vikas Gupta',
-      'initials': 'VG',
-      'phone': '9611088771',
-      'roomNumber': '102',
-      'sharingType': '3 Sharing',
-      'rent': 7500,
-      'deposit': 12000,
-      'status': 'rejected',
-      'processedDate': '04 Aug 2026',
-      'auditNote': 'Rejected: Room already allotted to another resident',
-    },
-  ];
+  final List<Map<String, dynamic>> _historyList = [];
 
   @override
   void dispose() {

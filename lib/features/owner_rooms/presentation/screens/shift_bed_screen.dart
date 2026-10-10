@@ -28,12 +28,14 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
   int _selectedTab = 0;
 
   // State for Empty Room selection
+  String? _selectedEmptyBedKey;
   String? _selectedEmptyRoom;
   String? _selectedEmptyBed;
   int? _selectedEmptyRent;
   String _selectedFloorFilter = 'all';
 
   // State for Swap selection
+  String? _selectedSwapKey;
   Map<String, dynamic>? _selectedTargetResident;
   String? _selectedTargetRoom;
   String _swapSearchQuery = '';
@@ -74,7 +76,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
       final beds = room['beds'] as List<dynamic>;
       for (final bed in beds) {
         if (bed['isOccupied'] == false) {
+          final bKey = "${room['room']}_${bed['bed']}";
           vacant.add({
+            'key': bKey,
             'room': room['room'],
             'floor': room['floorLabel'] ?? room['floor'],
             'roomType': room['type'],
@@ -122,7 +126,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
             }
           }
 
+          final sKey = "${room['room']}_${bed['bed']}";
           residents.add({
+            'key': sKey,
             'room': room['room'],
             'floor': room['floorLabel'] ?? room['floor'],
             'roomType': room['type'],
@@ -158,14 +164,14 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
           if (b['bed'] == widget.resident['bed'] && b['isOccupied'] == true) {
             b['isOccupied'] = false;
             b['title'] = 'Vacant ${b['bed']} — Available';
-            b['sub'] = '₹${widget.resident['rent']}/mo • Ready for Walk-In';
-            b.remove('name');
-            b.remove('phone');
-            b.remove('work');
-            b.remove('initials');
-            b.remove('status');
-            b.remove('docs');
-            b.remove('docsVerified');
+            b['sub'] = '₹${widget.resident['rent'] ?? 8000}/mo • Ready for Walk-In';
+            b['name'] = null;
+            b['phone'] = '';
+            b['work'] = '';
+            b['initials'] = '';
+            b['status'] = 'Vacant';
+            b['docs'] = '';
+            b['docsVerified'] = false;
             break;
           }
         }
@@ -598,8 +604,7 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                         )
                       else
                         ...vacantBeds.map((bedItem) {
-                          final isSelected = _selectedEmptyRoom == bedItem['room'] &&
-                              _selectedEmptyBed == bedItem['bed'];
+                          final isSelected = _selectedEmptyBedKey == bedItem['key'];
                           final newRent = bedItem['rent'] as int;
 
                           return Padding(
@@ -607,6 +612,7 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                             child: InkWell(
                               onTap: () {
                                 setState(() {
+                                  _selectedEmptyBedKey = bedItem['key'];
                                   _selectedEmptyRoom = bedItem['room'];
                                   _selectedEmptyBed = bedItem['bed'];
                                   _selectedEmptyRent = newRent;
@@ -771,14 +777,14 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                           final tName = targetRes['name']?.toString() ?? 'Resident';
                           final tInitials = targetRes['initials']?.toString() ?? 'TR';
                           final tRent = targetRes['rent']?.toString() ?? '8500';
-                          final isSelected = _selectedTargetRoom == item['room'] &&
-                              _selectedTargetResident?['bed'] == item['bed'];
+                          final isSelected = _selectedSwapKey == item['key'];
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10),
                             child: InkWell(
                               onTap: () {
                                 setState(() {
+                                  _selectedSwapKey = item['key'];
                                   _selectedTargetResident = item;
                                   _selectedTargetRoom = item['room'];
                                   _swapRes1RentController.text = targetRes['rent']?.toString() ?? '8500';

@@ -54,6 +54,18 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
     'Bhargav S Kulkarni (Owner)',
   ];
 
+  List<String> get _cycleList {
+    final now = DateTime.now();
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return List.generate(6, (i) {
+      final d = DateTime(now.year, now.month - i, 1);
+      return '${months[d.month - 1]} ${d.year}';
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -439,8 +451,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       'name': tenant['name'],
       'room': tenant['bed'],
       'amount': '₹${tenant['amount']}',
-      'ref': tenant['ref'] ?? '423189765412',
-      'date': tenant['paidDate'] ?? '1 Aug 2026',
+      'ref': tenant['ref'] ?? 'UTR-${DateTime.now().millisecondsSinceEpoch}',
+      'date': tenant['paidDate'] ?? _selectedCycle,
     };
 
     showModalBottomSheet(
@@ -489,7 +501,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     _buildReceiptRow(
                         'Room / Bed:', 'Room ${_activeReceiptTarget['room']}'),
                     const SizedBox(height: 8),
-                    _buildReceiptRow('Month / Period:', 'August 2026'),
+                    _buildReceiptRow('Month / Period:', _selectedCycle),
                     const SizedBox(height: 8),
                     _buildReceiptRow(
                         'Amount Paid:', _activeReceiptTarget['amount'],
@@ -586,11 +598,11 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     _buildReceiptRow('Payment Mode:', 'Direct UPI / PhonePe'),
                     const SizedBox(height: 8),
                     _buildReceiptRow(
-                        'Submitted UTR / Ref:', tenant['ref'] ?? '423189765412',
+                        'Submitted UTR / Ref:', tenant['ref'] ?? 'Pending UTR',
                         isMonospace: true),
                     const SizedBox(height: 8),
                     _buildReceiptRow(
-                        'Submission Time:', '1 Aug 2026, 09:30 AM'),
+                        'Submission Time:', tenant['submissionTime'] ?? 'Today'),
                   ],
                 ),
               ),
@@ -649,13 +661,16 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.of(ctx).pop();
+                        final now = DateTime.now();
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        final dateStr = '${now.day} ${months[now.month - 1]} ${now.year}';
                         setState(() {
                           tenant['status'] = 'paid';
                           tenant['paidLabel'] =
-                              'Paid Early on 1 Aug (Verified by $_selectedStaffActor)';
+                              'Paid on ${now.day} ${months[now.month - 1]} (Verified by $_selectedStaffActor)';
                           tenant['tag'] = 'Direct UPI';
-                          tenant['ref'] = 'UTR-423189765412';
-                          tenant['paidDate'] = '1 Aug 2026';
+                          tenant['ref'] = tenant['ref'] ?? 'UTR-${now.millisecondsSinceEpoch}';
+                          tenant['paidDate'] = dateStr;
                           tenant['approvedBy'] = _selectedStaffActor;
                         });
                         _showToast(
@@ -1090,19 +1105,19 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
-                value: _selectedCycle,
+                value: _cycleList.contains(_selectedCycle)
+                    ? _selectedCycle
+                    : _cycleList.first,
                 style: GoogleFonts.outfit(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ink),
-                items: const [
-                  DropdownMenuItem(
-                      value: 'August 2026', child: Text('August 2026')),
-                  DropdownMenuItem(
-                      value: 'July 2026', child: Text('July 2026')),
-                  DropdownMenuItem(
-                      value: 'June 2026', child: Text('June 2026')),
-                ],
+                items: _cycleList.map((c) {
+                  return DropdownMenuItem<String>(
+                    value: c,
+                    child: Text(c),
+                  );
+                }).toList(),
                 onChanged: (val) {
                   if (val != null) {
                     setState(() => _selectedCycle = val);
@@ -1866,13 +1881,16 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   flex: 4,
                   child: ElevatedButton.icon(
                     onPressed: () {
+                      final now = DateTime.now();
+                      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      final dateStr = '${now.day} ${months[now.month - 1]} ${now.year}';
                       setState(() {
                         tenant['status'] = 'paid';
                         tenant['paidLabel'] =
-                            'Paid Early on 1 Aug (Verified by $_selectedStaffActor)';
+                            'Paid on ${now.day} ${months[now.month - 1]} (Verified by $_selectedStaffActor)';
                         tenant['tag'] = 'Direct UPI';
-                        tenant['ref'] = 'UTR-423189765412';
-                        tenant['paidDate'] = '1 Aug 2026';
+                        tenant['ref'] = tenant['ref'] ?? 'UTR-${now.millisecondsSinceEpoch}';
+                        tenant['paidDate'] = dateStr;
                         tenant['approvedBy'] = _selectedStaffActor;
                       });
                       _showToast(
@@ -1970,13 +1988,6 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           'label': f['title']?.toString() ?? '$fId Floor',
         });
       }
-    }
-    if (floors.length == 1) {
-      floors.addAll([
-        {'id': 'ground', 'label': 'Ground Floor'},
-        {'id': '1st', 'label': '1st Floor'},
-        {'id': '2nd', 'label': '2nd Floor'},
-      ]);
     }
 
     return SingleChildScrollView(
@@ -2758,13 +2769,16 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   flex: 4,
                   child: ElevatedButton.icon(
                     onPressed: () {
+                      final now = DateTime.now();
+                      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                      final dateStr = '${now.day} ${months[now.month - 1]} ${now.year}';
                       setState(() {
                         tenant['status'] = 'paid';
                         tenant['paidLabel'] =
-                            'Paid on 1 Aug (Verified by $_selectedStaffActor)';
+                            'Paid on ${now.day} ${months[now.month - 1]} (Verified by $_selectedStaffActor)';
                         tenant['tag'] = 'Direct UPI';
-                        tenant['ref'] = 'UTR-423189765412';
-                        tenant['paidDate'] = '1 Aug 2026';
+                        tenant['ref'] = tenant['ref'] ?? 'UTR-${now.millisecondsSinceEpoch}';
+                        tenant['paidDate'] = dateStr;
                         tenant['approvedBy'] = _selectedStaffActor;
                       });
                       _showToast(

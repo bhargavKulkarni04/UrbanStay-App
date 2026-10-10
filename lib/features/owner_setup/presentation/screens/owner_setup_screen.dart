@@ -264,65 +264,6 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     return _liveStatesMap[_selectedState] ?? [];
   }
 
-  Widget _buildDropdownField({
-    required String label,
-    required String value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    final effectiveValue =
-        items.contains(value) ? value : (items.isNotEmpty ? items.first : null);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.muted,
-          ),
-        ),
-        const SizedBox(height: 5),
-        Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE5E7EB), width: 1.0),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: effectiveValue,
-              isExpanded: true,
-              icon: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 20,
-                color: AppColors.ink,
-              ),
-              items: items.map((e) {
-                return DropdownMenuItem<String>(
-                  value: e,
-                  child: Text(
-                    e,
-                    style: GoogleFonts.outfit(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ink,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                );
-              }).toList(),
-              onChanged: onChanged,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   void dispose() {
     _legalNameController.dispose();
@@ -454,6 +395,21 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     return result;
   }
 
+  int _calculateBhkBeds(Map<String, int> occ, {bool allowZero = false}) {
+    final hall = occ['Hall (3-Sharing)'] ??
+        occ['Hall / Living Area'] ??
+        occ['Hall'] ??
+        0;
+    final bed = occ['Bedroom (2-Sharing)'] ??
+        occ['Common Bedroom'] ??
+        occ['Bedroom'] ??
+        0;
+    final master = occ['Master Room'] ?? occ['Master Bedroom'] ?? 0;
+    final total = hall + bed + master;
+    if (allowZero) return total;
+    return total > 0 ? total : 2;
+  }
+
   Widget _buildOccupancyRow({
     required String title,
     required int count,
@@ -500,7 +456,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             ),
             const SizedBox(height: 2),
             Text(
-              'Max $count People',
+              count == 0
+                  ? '0 Beds'
+                  : '$count ${count == 1 ? 'Bed' : 'Beds'} • Max $count ${count == 1 ? 'Person' : 'People'}',
               style: AppTypography.captionSmall.copyWith(
                 fontSize: 12,
                 color: AppColors.muted,
@@ -593,9 +551,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       if (_propertyStructure == 'Apartment Units') {
         _bhkAssignedFlats.forEach((bhk, flats) {
           final occ = _bhkOccupancy[bhk] ?? {};
-          final bedsInFlat = ((occ['Hall (3-Sharing)'] ?? 0) * 3) +
-              ((occ['Bedroom (2-Sharing)'] ?? 0) * 2) +
-              ((occ['Master Room'] ?? 0) * 1);
+          final bedsInFlat = _calculateBhkBeds(occ);
           calcBeds += (bedsInFlat * flats.length);
         });
         if (calcBeds == 0) calcBeds = calcRooms * 2;
@@ -624,7 +580,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         widget.onCapacityUpdated!(
           calcBeds,
           calcRooms,
-          int.tryParse(_floorCount ?? '4') ?? 4,
+          int.tryParse(_floorCount ?? '') ?? _getFloorNames().length,
         );
       }
 
@@ -708,14 +664,6 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         hasError = true;
       }
       if (hasError) return;
-      _triggerCelebrationLaunch();
-    }
-  }
-
-  void _handleSkip() {
-    if (_currentStep < 4) {
-      setState(() => _currentStep++);
-    } else {
       _triggerCelebrationLaunch();
     }
   }
@@ -810,6 +758,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
           int bedsCount = 2;
           double rent = 8500.0;
           double deposit = 15000.0;
+          Map<String, int>? breakdownMap;
+          final List<String> bedLabels = [];
 
           if (_propertyStructure == 'Apartment Units') {
             String? assignedBhk;
@@ -824,10 +774,37 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                 : '2 BHK';
             sharingType = assignedBhk;
             final occ = _bhkOccupancy[assignedBhk] ?? {};
-            bedsCount = ((occ['Hall (3-Sharing)'] ?? 0) * 3) +
-                ((occ['Bedroom (2-Sharing)'] ?? 0) * 2) +
-                ((occ['Master Room'] ?? 0) * 1);
+            final hallCount = occ['Hall (3-Sharing)'] ?? occ['Hall'] ?? 0;
+            final bedCount = occ['Bedroom (2-Sharing)'] ?? occ['Bedroom'] ?? 0;
+            final masterCount = occ['Master Room'] ?? 0;
+            bedsCount = hallCount + bedCount + masterCount;
             if (bedsCount <= 0) bedsCount = 2;
+
+            breakdownMap = {
+              'hall': hallCount,
+              'bedroom': bedCount,
+              'master': masterCount,
+            };
+
+            int letterIdx = 0;
+            for (int i = 0; i < hallCount; i++) {
+              bedLabels.add('Bed ${String.fromCharCode(65 + letterIdx)} (Hall)');
+              letterIdx++;
+            }
+            for (int i = 0; i < bedCount; i++) {
+              bedLabels.add('Bed ${String.fromCharCode(65 + letterIdx)} (Bedroom)');
+              letterIdx++;
+            }
+            for (int i = 0; i < masterCount; i++) {
+              bedLabels.add('Bed ${String.fromCharCode(65 + letterIdx)} (Master)');
+              letterIdx++;
+            }
+            if (bedLabels.isEmpty) {
+              for (int i = 0; i < bedsCount; i++) {
+                bedLabels.add('Bed ${String.fromCharCode(65 + i)}');
+              }
+            }
+
             rent = double.tryParse(
                     _rentControllers[assignedBhk]?.text.trim() ?? '') ??
                 12000.0;
@@ -876,26 +853,34 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             'total_beds': bedsCount,
             'rent_per_bed': rent,
             'deposit_per_bed': deposit,
+            if (breakdownMap != null) 'breakdown': breakdownMap,
+            if (bedLabels.isNotEmpty) 'bed_labels': bedLabels,
           });
         }
         fIndex++;
       }
 
-      int totalActualBeds = 0;
-      for (final r in roomsData) {
-        totalActualBeds += (r['total_beds'] as int? ?? 0);
-      }
-      final finalBedsCount = totalActualBeds > 0 ? totalActualBeds : calcBeds;
-
       final Map<String, dynamic> floorWiseRoomsJson = {};
       for (final entry in floorsMap.entries) {
         final floorName = entry.key;
-        final floorRoomsMap = <String, String>{};
+        final floorRoomsMap = <String, dynamic>{};
         final roomList =
             roomsData.where((r) => r['floor_label'] == floorName).toList();
         for (final r in roomList) {
-          floorRoomsMap[r['room_number'].toString()] =
-              r['sharing_type'].toString();
+          if (_propertyStructure == 'Apartment Units') {
+            floorRoomsMap[r['room_number'].toString()] = {
+              'type': r['sharing_type'].toString(),
+              'total_beds': r['total_beds'],
+              'breakdown': r['breakdown'] ?? {
+                'hall': 0,
+                'bedroom': 0,
+                'master': 0,
+              },
+            };
+          } else {
+            floorRoomsMap[r['room_number'].toString()] =
+                r['sharing_type'].toString();
+          }
         }
         floorWiseRoomsJson[floorName] = floorRoomsMap;
       }
@@ -938,7 +923,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             : _lateFee,
         noticePeriod: _noticePeriod,
         workingWashingMachines: int.tryParse(
-            _washingMachines?.replaceAll(RegExp(r'[^0-9]'), '') ?? '1'),
+            _washingMachines?.replaceAll(RegExp(r'[^0-9]'), '') ?? '0'),
         ownerLegalName: _legalNameController.text.trim(),
         ownerEmail: _emailController.text.trim(),
         ownerAadhaarNumber: _aadhaarController.text.trim(),
@@ -973,9 +958,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     if (_propertyStructure == 'Apartment Units') {
       _bhkAssignedFlats.forEach((bhk, flats) {
         final occ = _bhkOccupancy[bhk] ?? {};
-        final bedsInFlat = ((occ['Hall (3-Sharing)'] ?? 0) * 3) +
-            ((occ['Bedroom (2-Sharing)'] ?? 0) * 2) +
-            ((occ['Master Room'] ?? 0) * 1);
+        final bedsInFlat = _calculateBhkBeds(occ);
         calcBeds += (bedsInFlat * flats.length);
       });
       if (calcBeds == 0) calcBeds = calcRooms * 2;
@@ -1032,6 +1015,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       'staffCount': 0,
       'code': _generatedPropertyCode,
     };
+
+    if (!mounted) return;
 
     if (widget.onPropertyCreated != null) {
       widget.onPropertyCreated!(newProp);
@@ -2609,8 +2594,54 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                     }).toList(),
                   ),
                 ),
-                const SizedBox(height: 14),
-                // Row 1: Hall (3-Sharing)
+                // Real-Time BHK Bed Summary Badge
+                Builder(
+                  builder: (context) {
+                    final currentBhkOcc = _bhkOccupancy[_selectedBhkTab] ?? {};
+                    final totalBedsInThisBhk =
+                        _calculateBhkBeds(currentBhkOcc, allowZero: true);
+                    final endLetter = totalBedsInThisBhk > 0
+                        ? String.fromCharCode(64 +
+                            (totalBedsInThisBhk > 26 ? 26 : totalBedsInThisBhk))
+                        : 'A';
+
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(top: 14, bottom: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.green.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.bed_rounded,
+                              size: 18, color: AppColors.green),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              totalBedsInThisBhk == 0
+                                  ? 'Total: 0 Beds in $_selectedBhkTab (Set bed counts below)'
+                                  : (totalBedsInThisBhk == 1
+                                      ? 'Total: 1 Bed in $_selectedBhkTab (Bed A)'
+                                      : 'Total: $totalBedsInThisBhk Beds in $_selectedBhkTab (Bed A to Bed $endLetter)'),
+                              style: AppTypography.bodySemiBold.copyWith(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.greenDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                // Row 1: Hall / Living Area
                 _buildOccupancyRow(
                   title: 'Hall (3-Sharing)',
                   count:
@@ -2662,7 +2693,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                 const Divider(height: 24, color: Color(0xFFF0F0F0)),
                 // Row 3: Master Room
                 _buildOccupancyRow(
-                  title: 'Master Room',
+                  title: 'Master Bedroom',
                   isMaster: true,
                   count: _bhkOccupancy[_selectedBhkTab]?['Master Room'] ?? 0,
                   onDecrement: () {

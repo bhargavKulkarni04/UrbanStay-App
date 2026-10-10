@@ -24,10 +24,10 @@ class TenantDashboardScreen extends StatefulWidget {
 
   const TenantDashboardScreen({
     super.key,
-    this.tenantName = 'Bhargav S Kulkarni',
-    this.roomNumber = '104',
-    this.bedId = 'B',
-    this.pgName = 'UrbanStay Premium PG',
+    this.tenantName = '',
+    this.roomNumber = '',
+    this.bedId = '',
+    this.pgName = '',
   });
 
   @override
@@ -36,27 +36,40 @@ class TenantDashboardScreen extends StatefulWidget {
 
 class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   int _currentNavIndex = 0;
-  String _paymentStatus =
-      'DUE'; // 'DUE' | 'UNDER_REVIEW' | 'PAID_CYCLE_OCTOBER'
-  String _submittedUtr = '425689123456';
-  String _submittedPhone = '8618818322';
-  String _submittedScreenshot = 'gpay_receipt_room104.jpg';
-  String _currentCycleMonth = 'September 2026';
-  String _currentDueDate = '05 Sep';
-  final double _currentRentAmount = 8500.0;
+  String _paymentStatus = 'DUE'; // 'DUE' | 'UNDER_REVIEW' | 'PAID'
+  String _submittedUtr = '';
+  String _submittedPhone = '';
+  String _submittedScreenshot = '';
+  late String _currentCycleMonth;
+  late String _currentDueDate;
+  final double _currentRentAmount = 0.0;
   Map<String, dynamic>? _activeTicket;
   bool _isEatingDinner = true;
 
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const shortMonths = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    _currentCycleMonth = '${months[now.month - 1]} ${now.year}';
+    _currentDueDate = '05 ${shortMonths[now.month - 1]}';
+  }
+
   void _simulateOwnerApproval() {
     setState(() {
-      _paymentStatus = 'PAID_CYCLE_OCTOBER';
-      _currentCycleMonth = 'October 2026';
-      _currentDueDate = '05 Oct';
+      _paymentStatus = 'PAID';
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          '🎉 September 2026 rent approved by Arun Kumar! Next cycle updated to October 2026.',
+          '🎉 Rent payment verified and settled in bank account!',
           style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
         ),
         backgroundColor: AppColors.greenDark,

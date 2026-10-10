@@ -1595,10 +1595,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     _buildRow('Payment Mode:', 'Direct UPI / PhonePe'),
                     const SizedBox(height: 8),
                     _buildRow('Submitted UTR / Ref:',
-                        tenant['ref'] ?? 'UTR-423189765412',
+                        tenant['ref'] ?? 'Pending UTR',
                         isMonospace: true),
                     const SizedBox(height: 8),
-                    _buildRow('Submission Time:', '1 Aug 2026, 09:30 AM'),
+                    _buildRow('Submission Time:', tenant['time'] ?? 'Today'),
                   ],
                 ),
               ),
@@ -1657,22 +1657,30 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.of(ctx).pop();
+                        final now = DateTime.now();
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        final monthStr = months[now.month - 1];
+                        final dateStr = '${now.day} $monthStr ${now.year}';
+                        final hourStr = now.hour.toString().padLeft(2, '0');
+                        final minStr = now.minute.toString().padLeft(2, '0');
+                        final generatedRef = tenant['ref'] ?? 'UTR-${now.millisecondsSinceEpoch}';
+
                         setState(() {
                           tenant['status'] = 'paid';
                           tenant['paidLabel'] =
-                              'Paid on ${_selectedDay} Aug (Verified by $_selectedStaffActor)';
-                          tenant['ref'] = 'UTR-423189765412';
-                          tenant['paidDate'] = '${_selectedDay} Aug 2026';
+                              'Paid on ${now.day} $monthStr (Verified by $_selectedStaffActor)';
+                          tenant['ref'] = generatedRef;
+                          tenant['paidDate'] = dateStr;
                           tenant['approvedBy'] = _selectedStaffActor;
 
                           _historyLogs.insert(0, {
-                            'id': 'h_${DateTime.now().millisecondsSinceEpoch}',
+                            'id': 'h_${now.millisecondsSinceEpoch}',
                             'type': 'payment_verified',
                             'title': '₹${tenant['amount']} Direct UPI Verified',
                             'tenant': '${tenant['name']} (${tenant['bed']})',
                             'actor': _selectedStaffActor,
-                            'time': 'Just now',
-                            'ref': 'UTR-423189765412',
+                            'time': 'Today at $hourStr:$minStr',
+                            'ref': generatedRef,
                             'badge': 'Paid on Time',
                           });
                         });
@@ -2211,17 +2219,19 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     const SizedBox(height: 8),
                     _buildRow('Room / Bed:', tenant['bed']),
                     const SizedBox(height: 8),
-                    _buildRow('Month / Period:', 'August 2026'),
+                    _buildRow(
+                        'Month / Period:',
+                        '${const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][DateTime.now().month - 1]} ${DateTime.now().year}'),
                     const SizedBox(height: 8),
                     _buildRow('Amount Paid:', '₹${tenant['amount']}',
                         isBold: true, valueColor: AppColors.greenDark),
                     const SizedBox(height: 8),
                     _buildRow(
-                        'Transaction Ref:', tenant['ref'] ?? 'UTR-423189765412',
+                        'Transaction Ref:', tenant['ref'] ?? 'Pending UTR',
                         isMonospace: true),
                     const SizedBox(height: 8),
                     _buildRow('Date of Payment:',
-                        tenant['paidDate'] ?? '${_selectedDay} Aug 2026'),
+                        tenant['paidDate'] ?? '${DateTime.now().day} ${const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][DateTime.now().month - 1]} ${DateTime.now().year}'),
                     const SizedBox(height: 8),
                     _buildRow('Verified By:',
                         tenant['approvedBy'] ?? _selectedStaffActor),

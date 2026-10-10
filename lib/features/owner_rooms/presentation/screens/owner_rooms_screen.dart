@@ -108,11 +108,13 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 docsVerified = false;
               }
 
+              final bedLabel = b['bed_label'] ?? b['bed_code'] ?? 'Bed A';
               return {
+                'id': b['id']?.toString() ?? '',
                 'isOccupied': isOcc,
-                'bed': b['bed_code'] ?? 'Bed A',
+                'bed': bedLabel,
                 'name': isOcc ? tenantName : null,
-                'initials': initials,
+                'initials': initials ?? (isOcc ? 'RS' : ''),
                 'status': bedStatus,
                 'phone': b['tenant_phone'] ?? '',
                 'work': b['workplace'] ?? '',
@@ -120,7 +122,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 'deposit': (r['deposit_per_bed'] ?? 15000).toString(),
                 'docs': docsLabel,
                 'docsVerified': docsVerified,
-                'title': !isOcc ? 'Vacant ${b['bed_code']} — Available' : null,
+                'title': !isOcc ? 'Vacant $bedLabel — Available' : null,
                 'sub': !isOcc ? '₹${r['rent_per_bed'] ?? 8000}/mo • Ready for Walk-In' : null,
               };
             }).toList();
@@ -1719,10 +1721,10 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
           // Bed List in Room
           ...((room['beds'] as List).map((bed) {
-            if (bed['isOccupied'] == true) {
-              return _buildTenantCard(bed, room['room']);
+            if (bed['isOccupied'] == true && bed['name'] != null && bed['name'].toString().trim().isNotEmpty) {
+              return _buildTenantCard(bed, room['room']?.toString() ?? '');
             } else {
-              return _buildVacantBedCard(bed, room['room'], room['floorLabel']);
+              return _buildVacantBedCard(bed, room['room']?.toString() ?? '', room['floorLabel']?.toString() ?? '');
             }
           })),
         ],
@@ -1792,7 +1794,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   InkWell(
                     onTap: () => _openEditModal(tenant, roomName),
                     child: Text(
-                      tenant['name'],
+                      tenant['name']?.toString() ?? 'Resident',
                       style: GoogleFonts.outfit(
                         fontSize: 15.5,
                         fontWeight: FontWeight.w800,
@@ -1895,7 +1897,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   ),
                 ),
                 Text(
-                  '₹${tenant['rent']}',
+                  '₹${tenant['rent'] ?? ''}',
                   style: GoogleFonts.outfit(
                     fontSize: 15,
                     fontWeight: FontWeight.w900,
@@ -1915,7 +1917,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast(
-                      'Calling ${tenant['name']}: +91${tenant['phone']}'),
+                      'Calling ${tenant['name'] ?? 'Resident'}: +91${tenant['phone'] ?? ''}'),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     height: 38,
@@ -1940,7 +1942,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast(
-                      'Opening WhatsApp chat with ${tenant['name']} (+91${tenant['phone']}) ✓'),
+                      'Opening WhatsApp chat with ${tenant['name'] ?? 'Resident'} (+91${tenant['phone'] ?? ''}) ✓'),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     height: 38,

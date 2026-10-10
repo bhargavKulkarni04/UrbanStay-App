@@ -73,6 +73,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
 
   // 1-Tap Mark Resolved (Migrates from Active to History)
   void _markResolved(Map<String, dynamic> ticket) {
+    final now = DateTime.now();
+    final hourStr = now.hour.toString().padLeft(2, '0');
+    final minStr = now.minute.toString().padLeft(2, '0');
     setState(() {
       _activeTickets.remove(ticket);
       _historyTickets.insert(0, {
@@ -88,7 +91,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
         'categoryIcon': ticket['categoryIcon'],
         'issue': ticket['issue'],
         'reportedDate': ticket['reportedTime'] ?? 'Today',
-        'resolvedDate': 'Resolved Today, Just Now',
+        'resolvedDate': 'Resolved Today at $hourStr:$minStr',
         'resolvedBy': 'Resolved by Owner',
         'resolutionNote':
             'Issue inspected and fixed. Tenant notified on WhatsApp.',

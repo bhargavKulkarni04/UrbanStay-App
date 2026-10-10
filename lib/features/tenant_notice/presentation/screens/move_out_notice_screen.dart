@@ -42,20 +42,11 @@ class _MoveOutNoticeScreenState extends State<MoveOutNoticeScreen> {
   int _noticeDaysServed = 31;
   String _selectedReason = 'Job Relocation';
   final TextEditingController _otherReasonController = TextEditingController();
-  final TextEditingController _upiController = TextEditingController(text: 'rahul@okhdfcbank');
+  final TextEditingController _upiController = TextEditingController();
   final FocusNode _upiFocusNode = FocusNode();
 
   // Deductions in warm amber/yellow
-  final List<Map<String, dynamic>> _deductions = [
-    {
-      'title': 'Electricity Dues',
-      'amount': 180.0,
-    },
-    {
-      'title': 'Maintenance / Repair',
-      'amount': 350.0,
-    },
-  ];
+  final List<Map<String, dynamic>> _deductions = [];
 
   static const List<String> _reasons = [
     'Job Relocation',

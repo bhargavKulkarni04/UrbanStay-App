@@ -24,7 +24,11 @@ class OwnerExpensesScreen extends StatefulWidget {
 }
 
 class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
-  String _selectedMonth = 'August 2026';
+  String _selectedMonth = () {
+    final now = DateTime.now();
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return '${months[now.month - 1]} ${now.year}';
+  }();
   String _selectedCategoryFilter = 'all';
   final TextEditingController _searchController = TextEditingController();
 
@@ -617,10 +621,14 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
           // Cycle Selector Dropdown Pill
           InkWell(
             onTap: () {
+              final now = DateTime.now();
+              const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+              final cur = '${months[now.month - 1]} ${now.year}';
+              final prevMonth = now.month == 1 ? 12 : now.month - 1;
+              final prevYear = now.month == 1 ? now.year - 1 : now.year;
+              final prev = '${months[prevMonth - 1]} $prevYear';
               setState(() {
-                _selectedMonth = _selectedMonth == 'August 2026'
-                    ? 'July 2026'
-                    : 'August 2026';
+                _selectedMonth = _selectedMonth == cur ? prev : cur;
               });
               _showToast('Switched ledger cycle to $_selectedMonth');
             },

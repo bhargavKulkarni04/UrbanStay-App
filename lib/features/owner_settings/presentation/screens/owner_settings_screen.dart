@@ -757,7 +757,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '31 Beds Managed • Renews 24 Sep',
+                  '${OwnerAppState.instance.totalBeds} Beds Managed',
                   style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted, fontWeight: FontWeight.w500),
                 ),
               ],

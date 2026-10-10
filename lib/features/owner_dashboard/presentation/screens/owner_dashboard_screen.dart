@@ -76,31 +76,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 
-  // Team Management: Co-Owners & PG Managers State
-  final List<Map<String, dynamic>> _teamMembers = [
-    {
-      'id': 'tm_1',
-      'name': 'Arun Kumar',
-      'phone': '9845199201',
-      'role': 'co_owner',
-      'assignedPropertyIds': [
-        'prop_1',
-        'prop_2',
-        'prop_3'
-      ], // Co-Owners: Unlimited multi-building access
-      'status': 'Active',
-    },
-    {
-      'id': 'tm_2',
-      'name': 'Suresh Gowda',
-      'phone': '9880123456',
-      'role': 'manager',
-      'assignedPropertyIds': [
-        'prop_1'
-      ], // PG Managers: Max 3 per property, max 3 properties assigned
-      'status': 'Active',
-    },
-  ];
+  // Team Management: Co-Owners & PG Managers State (Populated dynamically)
+  final List<Map<String, dynamic>> _teamMembers = [];
 
   int _getManagerCountForProperty(String propId) {
     return _teamMembers.where((m) {
@@ -139,7 +116,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   bool _showAnnouncementModal = false;
 
   // Announcement Form Controllers
-  String _annTarget = 'All Residents (31)';
+  String _annTarget = 'All Residents';
   final _annTitleController = TextEditingController();
   final _annMsgController = TextEditingController();
 
@@ -180,8 +157,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               : '0% Full';
           loaded.add({
             'id': propId,
-            'name': p['property_name'] ?? p['brand_name'] ?? p['name'] ?? 'PG Property',
-            'ownerName': p['owner_legal_name'] ?? p['bank_holder_name'] ?? 'Owner',
+            'name': p['property_name'] ??
+                p['brand_name'] ??
+                p['name'] ??
+                'PG Property',
+            'ownerName':
+                p['owner_legal_name'] ?? p['bank_holder_name'] ?? 'Owner',
             'location':
                 '${p['area_locality'] ?? ''}, ${p['city'] ?? ''}'.trim(),
             'code': p['property_code'] ?? '',
@@ -286,12 +267,17 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       return;
     }
 
+    final now = DateTime.now();
+    final hourStr = now.hour.toString().padLeft(2, '0');
+    final minStr = now.minute.toString().padLeft(2, '0');
+    final formattedTime = 'Today at $hourStr:$minStr';
+
     setState(() {
       _announcements.insert(0, {
-        'id': 'ann_${DateTime.now().millisecondsSinceEpoch}',
+        'id': 'ann_${now.millisecondsSinceEpoch}',
         'title': title,
         'target': _annTarget,
-        'time': 'Just Now',
+        'time': formattedTime,
         'msg': msg,
         'status': 'Delivered',
       });
@@ -373,8 +359,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               OwnerSaaSBillingScreen(
                 propertyId: activeProp['id']?.toString(),
                 propertyName:
-                    (activeProp['name'] as String?) ?? 'Jai shree ram',
-                totalBeds: (activeProp['totalBeds'] as num?)?.toInt() ?? 12,
+                    (activeProp['name'] as String?) ?? 'My PG Building',
+                totalBeds: (activeProp['totalBeds'] as num?)?.toInt() ?? 0,
                 ownerName: _currentOwnerName,
                 onBack: () => setState(() {
                   _activeNavIndex = 0;
@@ -1253,9 +1239,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     String selectedRole = 'manager'; // 'manager', 'co_owner'
     // Default selected property IDs (initialized to active property)
     Set<String> selectedPropertyIds = {
-      _properties.isNotEmpty
-          ? (_properties[_activePropertyIndex]['id'] as String)
-          : 'prop_1'
+      if (_properties.isNotEmpty &&
+          _properties[_activePropertyIndex]['id'] != null)
+        _properties[_activePropertyIndex]['id'] as String
     };
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
@@ -1484,7 +1470,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     const SizedBox(height: 14),
 
                     // Mobile Number Field (Numbers only, 10 digits, clean title)
-                    Text('Mobile Number (WhatsApp Enabled)',
+                    Text('Mobile Number ',
                         style: GoogleFonts.outfit(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -3390,81 +3376,116 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
   /// Modal 1: Rent Collection & Defaulters
   Widget _buildRentModalSheet() {
+    final activeProp = _properties.isNotEmpty
+        ? _properties[_activePropertyIndex]
+        : (widget.initialProperty ?? const <String, dynamic>{});
+    final pendingCount = (activeProp['pendingCount'] as num?)?.toInt() ?? 0;
+
     return _buildModalWrapper(
       title: 'Rent Collection Hub',
       onClose: () => setState(() => _showRentModal = false),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('6 tenants have pending rent dues for this cycle.',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF4F6F9),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          if (pendingCount == 0) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Column(
                   children: [
-                    Text('₹51,500 Pending',
-                        style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink)),
-                    Text('6 Defaulters • 0% UPI Fee',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFFEF4444))),
+                    const Icon(Icons.check_circle_rounded,
+                        size: 40, color: AppColors.green),
+                    const SizedBox(height: 10),
+                    Text(
+                      'All Rent Settled! ✓',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.ink),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Zero pending dues for this cycle. 100% collected.',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12.5, color: AppColors.muted),
+                    ),
                   ],
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() => _showRentModal = false);
-                    _showToast(
-                        'WhatsApp Payment Links sent to 6 Overdue Residents');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFEF2F2),
-                    foregroundColor: const Color(0xFFEF4444),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(99)),
-                  ),
-                  child: Text('Send All',
-                      style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w700, fontSize: 11)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() => _showRentModal = false);
-                _showToast(
-                    'WhatsApp Payment Links sent to 6 Overdue Residents');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Send WhatsApp Payment Links',
-                  style: GoogleFonts.outfit(
-                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
-          ),
+          ] else ...[
+            Text(
+              '$pendingCount resident${pendingCount > 1 ? "s have" : " has"} pending rent dues for this cycle.',
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F6F9),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$pendingCount Pending',
+                          style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink)),
+                      Text('$pendingCount Defaulters • 0% UPI Fee',
+                          style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFFEF4444))),
+                    ],
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() => _showRentModal = false);
+                      _showToast(
+                          'WhatsApp Payment Links sent to $pendingCount Pending Residents');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFEF2F2),
+                      foregroundColor: const Color(0xFFEF4444),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(99)),
+                    ),
+                    child: Text('Send All',
+                        style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w700, fontSize: 11)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() => _showRentModal = false);
+                  _showToast(
+                      'WhatsApp Payment Links sent to $pendingCount Pending Residents');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text('Send WhatsApp Payment Links',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -3586,78 +3607,113 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
   /// Modal 4: Notice Periods
   Widget _buildNoticeModalSheet() {
+    final activeProp = _properties.isNotEmpty
+        ? _properties[_activePropertyIndex]
+        : (widget.initialProperty ?? const <String, dynamic>{});
+    final noticeCount = (activeProp['noticeBeds'] as num?)?.toInt() ?? 0;
+
     return _buildModalWrapper(
       title: 'Active Notice Periods',
       onClose: () => setState(() => _showNoticeModal = false),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-              '3 residents are vacating this month. Beds ready for advance booking.',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFF59E0B)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          if (noticeCount == 0) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Column(
                   children: [
-                    Text('Rahul Sharma (Room 102-C)',
-                        style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ink)),
-                    Text('Vacating on 25 May (7 days left)',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFFD97706))),
+                    const Icon(Icons.event_available_rounded,
+                        size: 40, color: AppColors.green),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No Residents on Notice',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.ink),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'All occupied beds are stable with zero upcoming move-outs. ✓',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                          fontSize: 12.5, color: AppColors.muted),
+                    ),
                   ],
                 ),
-                ElevatedButton(
-                  onPressed: () =>
-                      _showToast('WhatsApp Vacancy Flyer Generated'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFDE68A),
-                    foregroundColor: const Color(0xFF92400E),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(99)),
-                  ),
-                  child: Text('Share Flyer',
-                      style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w700, fontSize: 11)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() => _showNoticeModal = false);
-                _showToast('Vacancy flyer shared to WhatsApp');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Share Vacancy on WhatsApp',
-                  style: GoogleFonts.outfit(
-                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
-          ),
+          ] else ...[
+            Text(
+              '$noticeCount resident${noticeCount > 1 ? "s are" : " is"} vacating this month. Beds ready for advance booking.',
+              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFF59E0B)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$noticeCount Beds on Notice',
+                          style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink)),
+                      Text('Ready to advertise on WhatsApp',
+                          style: GoogleFonts.outfit(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFFD97706))),
+                    ],
+                  ),
+                  ElevatedButton(
+                    onPressed: () =>
+                        _showToast('WhatsApp Vacancy Flyer Generated'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFDE68A),
+                      foregroundColor: const Color(0xFF92400E),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(99)),
+                    ),
+                    child: Text('Share Flyer',
+                        style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w700, fontSize: 11)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() => _showNoticeModal = false);
+                  _showToast('Vacancy flyer shared to WhatsApp');
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text('Share Vacancy on WhatsApp',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -3671,48 +3727,50 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Track active repair tickets raised by residents.',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF4F6F9),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Room 201: Geyser Not Heating',
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: Column(
+                children: [
+                  const Icon(Icons.check_circle_outline_rounded,
+                      size: 40, color: AppColors.green),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No Open Complaints',
                     style: GoogleFonts.outfit(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink)),
-                const SizedBox(height: 2),
-                Text('Reported by Vikram A • 2 hours ago',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'All facilities are operational. No pending maintenance tickets. ✓',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
-                        fontSize: 11.5, color: AppColors.muted)),
-              ],
+                        fontSize: 12.5, color: AppColors.muted),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
               onPressed: () {
-                setState(() => _showComplaintsModal = false);
-                _showToast('Assigned to Electrician Ramesh');
+                setState(() {
+                  _showComplaintsModal = false;
+                  _activeSubScreen = 'complaints';
+                });
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
+                backgroundColor: AppColors.ink,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text('Assign to Plumber / Electrician',
+              child: Text('Open Complaints Desk',
                   style: GoogleFonts.outfit(
                       fontSize: 14, fontWeight: FontWeight.w700)),
             ),
@@ -3730,66 +3788,98 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Manage warden permissions and daily food mess headcount.',
-              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted)),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF4F6F9),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          if (_teamMembers.isEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Column(
                   children: [
-                    Text('Warden Suresh',
-                        style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.ink)),
-                    Text('Can check-in tenants • No Bank Access',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11, color: AppColors.muted)),
+                    const Icon(Icons.badge_outlined,
+                        size: 40, color: Color(0xFFD1D5DB)),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No Staff Assigned',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.ink),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add wardens, managers or cooks to manage on-ground operations.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                          fontSize: 12.5, color: AppColors.muted),
+                    ),
                   ],
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                      color: AppColors.greenLight,
-                      borderRadius: BorderRadius.circular(4)),
-                  child: Text('Active',
-                      style: GoogleFonts.outfit(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.greenDark)),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: () {
-                setState(() => _showStaffModal = false);
-                _showToast('Mess Headcount: 28 Veg / 7 Non-Veg');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.green,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
               ),
-              child: Text("View Today's Mess Headcount",
-                  style: GoogleFonts.outfit(
-                      fontSize: 14, fontWeight: FontWeight.w700)),
             ),
-          ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: () {
+                  setState(() => _showStaffModal = false);
+                  _showInviteManagerModal();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
+                child: Text('+ Invite Manager / Staff',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ] else ...[
+            ..._teamMembers.map((member) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F6F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(member['name']?.toString() ?? 'Staff',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink)),
+                        Text(
+                            member['role'] == 'manager'
+                                ? 'Property Manager'
+                                : 'Co-Owner',
+                            style: GoogleFonts.outfit(
+                                fontSize: 11, color: AppColors.muted)),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                          color: AppColors.greenLight,
+                          borderRadius: BorderRadius.circular(4)),
+                      child: Text('Active',
+                          style: GoogleFonts.outfit(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.greenDark)),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
         ],
       ),
     );
@@ -3826,11 +3916,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
             ),
             items: [
-              'All Residents (31)',
-              '1st Floor (8)',
-              '2nd Floor (8)',
-              '3rd Floor (8)',
-              'Ground Floor (7)'
+              'All Residents',
             ]
                 .map((t) => DropdownMenuItem(
                     value: t,

@@ -106,10 +106,13 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ACTIONS: APPROVE & REJECT WITH AUDIT HISTORY MIGRATION
   // ===========================================================================
   void _approvePayment(Map<String, dynamic> item) {
+    final now = DateTime.now();
+    final hourStr = now.hour.toString().padLeft(2, '0');
+    final minStr = now.minute.toString().padLeft(2, '0');
     setState(() {
       _pendingApprovals.removeWhere((p) => p['id'] == item['id']);
       _approvalHistory.insert(0, {
-        'id': 'hist_${DateTime.now().millisecondsSinceEpoch}',
+        'id': 'hist_${now.millisecondsSinceEpoch}',
         'name': item['name'],
         'initials': item['initials'],
         'room': item['room'],
@@ -117,10 +120,10 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
         'amount': item['amount'],
         'phone': item['phone'],
         'utr': item['utr'],
-        'settledTime': 'Just now',
+        'settledTime': 'Today at $hourStr:$minStr',
         'status': 'approved',
         'receiptNo':
-            'REC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+            'REC-${now.millisecondsSinceEpoch.toString().substring(7)}',
       });
     });
     _showToast(
@@ -348,10 +351,13 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   }
 
   void _rejectPayment(Map<String, dynamic> item) {
+    final now = DateTime.now();
+    final hourStr = now.hour.toString().padLeft(2, '0');
+    final minStr = now.minute.toString().padLeft(2, '0');
     setState(() {
       _pendingApprovals.removeWhere((p) => p['id'] == item['id']);
       _approvalHistory.insert(0, {
-        'id': 'hist_${DateTime.now().millisecondsSinceEpoch}',
+        'id': 'hist_${now.millisecondsSinceEpoch}',
         'name': item['name'],
         'initials': item['initials'],
         'room': item['room'],
@@ -359,7 +365,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
         'amount': item['amount'],
         'phone': item['phone'],
         'utr': item['utr'],
-        'settledTime': 'Just now',
+        'settledTime': 'Today at $hourStr:$minStr',
         'status': 'rejected',
         'rejectReason': 'Declined by owner',
       });

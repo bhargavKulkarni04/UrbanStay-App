@@ -24,21 +24,67 @@ class OwnerReportsScreen extends StatefulWidget {
 class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
   // Security Gatekeeper State
   bool _isUnlocked = false;
-  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  final List<TextEditingController> _otpControllers =
+      List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
   int _resendCountdown = 28;
 
   // Report Settings
-  String _selectedMonth = 'August 2026';
-  final List<String> _monthOptions = ['August 2026', 'July 2026', 'June 2026', 'FY 2026-27'];
+  late String _selectedMonth;
+  late final List<String> _monthOptions;
   bool _isAmountHidden = false;
 
-  // Dynamic Floor Data (Supports any number of floors added by owner)
-  final List<Map<String, dynamic>> _floorsData = [
-    {'floor': '1st Floor', 'beds': '10/10 Beds', 'pct': '100%', 'fraction': 1.0, 'color': AppColors.green},
-    {'floor': '2nd Floor', 'beds': '11/12 Beds', 'pct': '92%', 'fraction': 11 / 12, 'color': AppColors.green},
-    {'floor': '3rd Floor', 'beds': '10/13 Beds', 'pct': '77%', 'fraction': 10 / 13, 'color': AppColors.greenDark},
-  ];
+  // Dynamic Floor Data (Loaded from live property)
+  final List<Map<String, dynamic>> _floorsData = [];
+
+  void _loadFloorsData() {
+    final prop = OwnerAppState.instance.activeProperty;
+    if (prop != null && prop['floors'] is List) {
+      final List rawFloors = prop['floors'];
+      _floorsData.clear();
+      for (final f in rawFloors) {
+        final floorName = f['name'] ?? 'Floor';
+        final total = (f['totalBeds'] as num?)?.toInt() ?? 0;
+        final occ = (f['occupiedBeds'] as num?)?.toInt() ?? 0;
+        final pct = total > 0 ? ((occ / total) * 100).round() : 0;
+        final frac = total > 0 ? (occ / total).clamp(0.0, 1.0) : 0.0;
+        _floorsData.add({
+          'floor': floorName,
+          'beds': '$occ/$total Beds',
+          'pct': '$pct%',
+          'fraction': frac,
+          'color': frac >= 0.8 ? AppColors.green : AppColors.greenDark,
+        });
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    _monthOptions = List.generate(6, (i) {
+      final d = DateTime(now.year, now.month - i, 1);
+      return '${months[d.month - 1]} ${d.year}';
+    })
+      ..add('FY ${now.year}-${(now.year + 1).toString().substring(2)}');
+    _selectedMonth = _monthOptions.first;
+    _loadFloorsData();
+  }
 
   @override
   void dispose() {
@@ -57,7 +103,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         duration: const Duration(seconds: 2),
@@ -108,7 +155,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+                border: Border(
+                    bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
               ),
               child: Row(
                 children: [
@@ -129,7 +177,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
-                      child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+                      child: const Icon(Icons.arrow_back_rounded,
+                          size: 18, color: AppColors.ink),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -145,11 +194,11 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                 ],
               ),
             ),
-
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -160,15 +209,17 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                         decoration: BoxDecoration(
                           color: AppColors.greenLight,
                           shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.green.withValues(alpha: 0.25), width: 2),
+                          border: Border.all(
+                              color: AppColors.green.withValues(alpha: 0.25),
+                              width: 2),
                         ),
                         child: const Center(
-                          child: Icon(Icons.lock_outline_rounded, size: 34, color: AppColors.greenDark),
+                          child: Icon(Icons.lock_outline_rounded,
+                              size: 34, color: AppColors.greenDark),
                         ),
                       ),
                     ),
                     const SizedBox(height: 24),
-
                     Text(
                       'Enter Owner Verification Code',
                       textAlign: TextAlign.center,
@@ -183,11 +234,13 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                     Text(
                       'Sensitive monthly P&L, collections & tax audit reports are protected. A 6-digit OTP has been dispatched to your registered phone number:',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted, height: 1.4),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12.5, color: AppColors.muted, height: 1.4),
                     ),
                     const SizedBox(height: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       margin: const EdgeInsets.symmetric(horizontal: 40),
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -207,7 +260,6 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                       ),
                     ),
                     const SizedBox(height: 32),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: List.generate(6, (idx) {
@@ -225,7 +277,9 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                               fontWeight: FontWeight.w900,
                               color: AppColors.ink,
                             ),
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly
+                            ],
                             decoration: InputDecoration(
                               counterText: '',
                               filled: true,
@@ -233,11 +287,13 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                               contentPadding: EdgeInsets.zero,
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                                borderSide: const BorderSide(
+                                    color: Color(0xFFE5E7EB), width: 1.5),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(10),
-                                borderSide: const BorderSide(color: AppColors.ink, width: 2),
+                                borderSide: const BorderSide(
+                                    color: AppColors.ink, width: 2),
                               ),
                             ),
                             onChanged: (val) {
@@ -259,42 +315,50 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                       }),
                     ),
                     const SizedBox(height: 24),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           'Resend code in ${_resendCountdown}s',
-                          style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w500),
+                          style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: AppColors.muted,
+                              fontWeight: FontWeight.w500),
                         ),
                         InkWell(
-                          onTap: () => _showToast('New OTP dispatched via WhatsApp to +91 86188 •••• 22'),
+                          onTap: () => _showToast(
+                              'New OTP dispatched via WhatsApp to +91 86188 •••• 22'),
                           child: Text(
                             'Resend via WhatsApp',
-                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                            style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.greenDark),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 32),
-
                     ElevatedButton(
                       onPressed: _verifyOtp,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.green,
                         foregroundColor: Colors.white,
                         minimumSize: const Size.fromHeight(50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.check_circle_outline_rounded, size: 18, color: Colors.white),
+                          const Icon(Icons.check_circle_outline_rounded,
+                              size: 18, color: Colors.white),
                           const SizedBox(width: 8),
                           Text(
                             'Verify & Unlock Financial Reports',
-                            style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800),
+                            style: GoogleFonts.outfit(
+                                fontSize: 13.5, fontWeight: FontWeight.w800),
                           ),
                         ],
                       ),
@@ -357,7 +421,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -385,11 +450,11 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
-              child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+              child: const Icon(Icons.arrow_back_rounded,
+                  size: 18, color: AppColors.ink),
             ),
           ),
           const SizedBox(width: 14),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,7 +483,6 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               ],
             ),
           ),
-
           InkWell(
             onTap: () => setState(() => _isAmountHidden = !_isAmountHidden),
             borderRadius: BorderRadius.circular(10),
@@ -428,16 +492,21 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                 color: _isAmountHidden ? Colors.white : AppColors.greenLight,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: _isAmountHidden ? const Color(0xFFE5E7EB) : AppColors.green.withValues(alpha: 0.25),
+                  color: _isAmountHidden
+                      ? const Color(0xFFE5E7EB)
+                      : AppColors.green.withValues(alpha: 0.25),
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    _isAmountHidden ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                    _isAmountHidden
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
                     size: 15,
-                    color: _isAmountHidden ? AppColors.muted : AppColors.greenDark,
+                    color:
+                        _isAmountHidden ? AppColors.muted : AppColors.greenDark,
                   ),
                   const SizedBox(width: 5),
                   Text(
@@ -445,7 +514,9 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: _isAmountHidden ? AppColors.muted : AppColors.greenDark,
+                      color: _isAmountHidden
+                          ? AppColors.muted
+                          : AppColors.greenDark,
                     ),
                   ),
                 ],
@@ -480,20 +551,30 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.date_range_outlined, size: 17, color: AppColors.ink),
+              const Icon(Icons.date_range_outlined,
+                  size: 17, color: AppColors.ink),
               const SizedBox(width: 8),
               Text(
                 'Audit Period:',
-                style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted),
               ),
             ],
           ),
           DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: _selectedMonth,
+              value: _monthOptions.contains(_selectedMonth)
+                  ? _selectedMonth
+                  : _monthOptions.first,
               isDense: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.ink),
-              style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.ink),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 18, color: AppColors.ink),
+              style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink),
               onChanged: (val) {
                 if (val != null) setState(() => _selectedMonth = val);
               },
@@ -537,7 +618,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                   color: AppColors.ink,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.receipt_long_outlined, size: 18, color: Colors.white),
+                child: const Icon(Icons.receipt_long_outlined,
+                    size: 18, color: Colors.white),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -555,7 +637,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                     ),
                     Text(
                       '1-Tap instant exports for CA tax filing & police verification',
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11, color: AppColors.muted),
                     ),
                   ],
                 ),
@@ -563,49 +646,57 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
             ],
           ),
           const SizedBox(height: 12),
-
           ElevatedButton(
-            onPressed: () => _showToast('Generating 50ms Offline Master Audit PDF...'),
+            onPressed: () =>
+                _showToast('Generating 50ms Offline Master Audit PDF...'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.ink,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
               elevation: 0,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.download_rounded, size: 16, color: Colors.white),
+                const Icon(Icons.download_rounded,
+                    size: 16, color: Colors.white),
                 const SizedBox(width: 8),
                 Text(
                   'Download Financial PDF Statement',
-                  style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800),
+                  style: GoogleFonts.outfit(
+                      fontSize: 12.5, fontWeight: FontWeight.w800),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 8),
-
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => _showToast('Opening WhatsApp with CA / Accountant...'),
+                  onPressed: () =>
+                      _showToast('Opening WhatsApp with CA / Accountant...'),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFE5E7EB)),
                     foregroundColor: AppColors.ink,
                     minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.greenDark),
+                      const Icon(Icons.chat_bubble_outline_rounded,
+                          size: 14, color: AppColors.greenDark),
                       const SizedBox(width: 6),
                       Text(
                         'WhatsApp to CA',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink),
                       ),
                     ],
                   ),
@@ -614,21 +705,27 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () => _showToast('Exporting Police Station Dossier ZIP...'),
+                  onPressed: () =>
+                      _showToast('Exporting Police Station Dossier ZIP...'),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFE5E7EB)),
                     foregroundColor: AppColors.ink,
                     minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.local_police_outlined, size: 14, color: AppColors.ink),
+                      const Icon(Icons.local_police_outlined,
+                          size: 14, color: AppColors.ink),
                       const SizedBox(width: 6),
                       Text(
                         'Police Dossier',
-                        style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink),
                       ),
                     ],
                   ),
@@ -647,7 +744,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
   Widget _buildBedsAndVacancySection() {
     return _buildExecutiveCard(
       title: '1. Beds & Vacancy Analytics',
-      subtitle: 'Real-time occupancy yield, vacant beds & 30-day notice pipeline',
+      subtitle:
+          'Real-time occupancy yield, vacant beds & 30-day notice pipeline',
       icon: Icons.hotel_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -660,7 +758,7 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                   Expanded(
                     child: _buildLargeSquareMetricCard(
                       'Total Capacity',
-                      '35 Beds',
+                      '${OwnerAppState.instance.totalBeds} Beds',
                       '100% Scale',
                       Icons.domain_outlined,
                       AppColors.ink,
@@ -670,8 +768,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                   Expanded(
                     child: _buildLargeSquareMetricCard(
                       'Active Tenants',
-                      '31 Beds',
-                      '88.6% Occupied',
+                      '${OwnerAppState.instance.occupiedBeds} Beds',
+                      OwnerAppState.instance.occupancyPct,
                       Icons.how_to_reg_outlined,
                       AppColors.greenDark,
                       accentBorder: AppColors.green,
@@ -685,7 +783,7 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                   Expanded(
                     child: _buildLargeSquareMetricCard(
                       'Vacant Slots',
-                      '4 Beds',
+                      '${OwnerAppState.instance.vacantBeds} Beds',
                       'Available Now',
                       Icons.bed_outlined,
                       AppColors.ink,
@@ -695,7 +793,7 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                   Expanded(
                     child: _buildLargeSquareMetricCard(
                       'On Notice',
-                      '3 Beds',
+                      '${OwnerAppState.instance.noticeBeds} Beds',
                       '30-Day Vacancy Risk',
                       Icons.event_busy_outlined,
                       AppColors.ink,
@@ -718,28 +816,42 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE5E7EB)),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              child: Row(
-                children: _floorsData.map((fl) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: _buildThickVerticalFloorBar(
-                      fl['floor'],
-                      fl['beds'],
-                      fl['pct'],
-                      fl['fraction'],
-                      fl['color'],
+            child: _floorsData.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Text(
+                        'No floor statistics yet. Configure rooms to track occupancy.',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.muted,
+                        ),
+                      ),
                     ),
-                  );
-                }).toList(),
-              ),
-            ),
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: _floorsData.map((fl) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: _buildThickVerticalFloorBar(
+                            fl['floor'],
+                            fl['beds'],
+                            fl['pct'],
+                            fl['fraction'],
+                            fl['color'],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
           ),
           const SizedBox(height: 16),
 
-          // Sharing Type Breakdown Row
+          // Bed Breakdown Row (Dynamic from OwnerAppState)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
@@ -750,11 +862,20 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildSharingTypeInfo('Single Share', '5 Beds', '100% Full'),
+                _buildSharingTypeInfo(
+                    'Total Beds',
+                    '${OwnerAppState.instance.totalBeds} Beds',
+                    OwnerAppState.instance.occupancyPct),
                 Container(width: 1, height: 32, color: const Color(0xFFEEF0F2)),
-                _buildSharingTypeInfo('2-Sharing', '18 Beds', '89% Full'),
+                _buildSharingTypeInfo(
+                    'Occupied',
+                    '${OwnerAppState.instance.occupiedBeds} Beds',
+                    '${OwnerAppState.instance.occupiedBeds} Living'),
                 Container(width: 1, height: 32, color: const Color(0xFFEEF0F2)),
-                _buildSharingTypeInfo('3-Sharing', '12 Beds', '83% Full'),
+                _buildSharingTypeInfo(
+                    'Vacant',
+                    '${OwnerAppState.instance.vacantBeds} Beds',
+                    '${OwnerAppState.instance.vacantBeds} Available'),
               ],
             ),
           ),
@@ -769,7 +890,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
   Widget _buildAmountAndRentSection() {
     return _buildExecutiveCard(
       title: '2. Amount & Rent Collections',
-      subtitle: 'Gross potential, actual collections, pending dues & 0% UPI savings',
+      subtitle:
+          'Gross potential, actual collections, pending dues & 0% UPI savings',
       icon: Icons.account_balance_wallet_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -779,8 +901,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               Expanded(
                 child: _buildBigMetricCard(
                   'Total Collections',
-                  _formatAmount(263500),
-                  '25 Residents Settled',
+                  OwnerAppState.instance.monthlyCollectedFormatted,
+                  '${OwnerAppState.instance.paidBedsCount} Residents Settled',
                   AppColors.greenDark,
                   AppColors.greenLight,
                 ),
@@ -789,8 +911,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               Expanded(
                 child: _buildBigMetricCard(
                   'Pending Dues',
-                  _formatAmount(34000),
-                  '6 Dues to Collect',
+                  '${OwnerAppState.instance.pendingBedsCount} Pending',
+                  '${OwnerAppState.instance.pendingBedsCount} Dues to Collect',
                   const Color(0xFFDC2626),
                   const Color(0xFFFEF2F2),
                 ),
@@ -798,7 +920,6 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
             ],
           ),
           const SizedBox(height: 14),
-
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -815,7 +936,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                     color: AppColors.greenLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.savings_outlined, size: 18, color: AppColors.greenDark),
+                  child: const Icon(Icons.savings_outlined,
+                      size: 18, color: AppColors.greenDark),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -823,12 +945,16 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${_formatAmount(5270)} Gateway Fee Saved',
-                        style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                        '${_formatAmount(((int.tryParse(OwnerAppState.instance.monthlyCollectedFormatted.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0) * 0.02).round())} Gateway Fee Saved',
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.greenDark),
                       ),
                       Text(
                         '100% direct bank UPI settlement at 0% processing deduction',
-                        style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11, color: AppColors.muted),
                       ),
                     ],
                   ),
@@ -837,7 +963,6 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
             ),
           ),
           const SizedBox(height: 18),
-
           _buildSubHeader('6-Month Inflow Trend (Gross Collection)'),
           const SizedBox(height: 12),
           _buildTrendBarChart(),
@@ -868,7 +993,9 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '92.5% Approved Volume',
+                  OwnerAppState.instance.totalSubmittedPaymentsCount > 0
+                      ? '${((OwnerAppState.instance.approvedPaymentsCount / OwnerAppState.instance.totalSubmittedPaymentsCount) * 100).round()}% Approved Volume'
+                      : '100% Direct Bank Settlement',
                   style: GoogleFonts.outfit(
                     fontSize: 19,
                     fontWeight: FontWeight.w900,
@@ -878,23 +1005,41 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '25 of 27 Rent Submissions Verified & Settled in Bank',
-                  style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w500),
+                  '${OwnerAppState.instance.approvedPaymentsCount} of ${OwnerAppState.instance.totalSubmittedPaymentsCount} Rent Submissions Verified in Bank',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
           _buildSubHeader('Rent Verification Status Breakdown'),
           const SizedBox(height: 10),
-          _buildProgressBarRow('Verified & Settled in Bank', '${_formatAmount(263500)} (25 Paid • 92.5%)', 0.925, AppColors.green),
+          _buildProgressBarRow(
+            'Verified & Settled in Bank',
+            '${OwnerAppState.instance.monthlyCollectedFormatted} (${OwnerAppState.instance.approvedPaymentsCount} Settled)',
+            OwnerAppState.instance.totalSubmittedPaymentsCount > 0
+                ? (OwnerAppState.instance.approvedPaymentsCount /
+                    OwnerAppState.instance.totalSubmittedPaymentsCount)
+                : 1.0,
+            AppColors.green,
+          ),
           const SizedBox(height: 10),
-          _buildProgressBarRow('Pending Owner Review', '${_formatAmount(17000)} (2 Pending • 7.5%)', 0.075, AppColors.ink),
+          _buildProgressBarRow(
+            'Pending Owner Review',
+            '${OwnerAppState.instance.pendingApprovalsCount} Pending',
+            OwnerAppState.instance.totalSubmittedPaymentsCount > 0
+                ? (OwnerAppState.instance.pendingApprovalsCount /
+                    OwnerAppState.instance.totalSubmittedPaymentsCount)
+                : 0.0,
+            AppColors.ink,
+          ),
           const SizedBox(height: 10),
-          _buildProgressBarRow('Flagged / Invalid UTRs', '₹0 (0 Flagged • 0%)', 0.0, const Color(0xFF9CA3AF)),
+          _buildProgressBarRow('Flagged / Invalid UTRs', '₹0 (0 Flagged)', 0.0,
+              const Color(0xFF9CA3AF)),
           const SizedBox(height: 16),
-
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
@@ -907,17 +1052,24 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.shield_outlined, size: 16, color: AppColors.ink),
+                    const Icon(Icons.shield_outlined,
+                        size: 16, color: AppColors.ink),
                     const SizedBox(width: 8),
                     Text(
                       'Total Security Deposits Held:',
-                      style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted, fontWeight: FontWeight.w600),
+                      style: GoogleFonts.outfit(
+                          fontSize: 12.5,
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
                 Text(
-                  _formatAmount(465000),
-                  style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w900, color: AppColors.ink),
+                  _formatAmount(OwnerAppState.instance.occupiedBeds * 10000),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink),
                 ),
               ],
             ),
@@ -928,19 +1080,18 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
   }
 
   // ===========================================================================
-  // 4. SECTION 4: OPERATING EXPENSES (WITH 4-SEGMENT DONUT CHART)
+  // 4. SECTION 4: OPERATING EXPENSES (DYNAMIC FROM LIVE RECORDS)
   // ===========================================================================
   Widget _buildOperatingExpensesSection() {
-    final List<Map<String, dynamic>> expenses = [
-      {'name': 'BESCOM Electricity Bill', 'amount': 18400, 'share': 0.36, 'color': AppColors.ink},
-      {'name': 'Kitchen & Grocery Rations', 'amount': 22000, 'share': 0.44, 'color': AppColors.greenDark},
-      {'name': 'BWSSB Water & Tanker Supply', 'amount': 6800, 'share': 0.14, 'color': const Color(0xFF4B5563)},
-      {'name': 'Wi-Fi, Repairs & Maintenance', 'amount': 3200, 'share': 0.06, 'color': const Color(0xFF9CA3AF)},
-    ];
+    final rawExpenses =
+        (OwnerAppState.instance.activeProperty?['expenses'] as List?) ?? [];
+    final int totalExpense = rawExpenses.fold(
+        0, (sum, item) => sum + ((item['amount'] as num?)?.toInt() ?? 0));
 
     return _buildExecutiveCard(
       title: '4. Operating Expenses Audit',
-      subtitle: 'Itemized electricity, water tanker, grocery rations & repair costs',
+      subtitle:
+          'Itemized electricity, water tanker, grocery rations & repair costs',
       icon: Icons.receipt_long_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -957,58 +1108,66 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               children: [
                 Text(
                   'Total Monthly Operating Costs:',
-                  style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w600),
                 ),
                 Text(
-                  _formatAmount(50400),
-                  style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.w900, color: const Color(0xFFDC2626)),
+                  _formatAmount(totalExpense),
+                  style: GoogleFonts.outfit(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFFDC2626)),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
-          Row(
-            children: [
-              SizedBox(
-                width: 80,
-                height: 80,
-                child: CustomPaint(
-                  painter: _ExpenseDonutPainter(
-                    segments: [0.44, 0.36, 0.14, 0.06],
-                    colors: [AppColors.greenDark, AppColors.ink, const Color(0xFF4B5563), const Color(0xFF9CA3AF)],
-                  ),
-                ),
+          if (rawExpenses.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
-              const SizedBox(width: 14),
-
-              Expanded(
+              child: Center(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Icon(Icons.receipt_long_outlined,
+                        size: 28, color: AppColors.muted),
+                    const SizedBox(height: 6),
                     Text(
-                      'Kitchen Rations (44%) & BESCOM (36%)',
-                      style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+                      'No expenses recorded for this month',
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
-                    const SizedBox(height: 2),
                     Text(
-                      'Account for 80% of monthly building operating costs',
-                      style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
+                      'Track utility or grocery bills in Expenses tab',
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5, color: AppColors.muted),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          ...expenses.map((exp) {
-            final amtStr = '${_formatAmount(exp['amount'] as int)} (${((exp['share'] as double) * 100).toInt()}%)';
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildProgressBarRow(exp['name'], amtStr, exp['share'], exp['color']),
-            );
-          }),
+            )
+          else ...[
+            ...rawExpenses.map((exp) {
+              final int amt = (exp['amount'] as num?)?.toInt() ?? 0;
+              final double share =
+                  totalExpense > 0 ? (amt / totalExpense) : 0.0;
+              final amtStr =
+                  '${_formatAmount(amt)} (${(share * 100).toInt()}%)';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildProgressBarRow(
+                    exp['name'] ?? 'Expense', amtStr, share, AppColors.ink),
+              );
+            }),
+          ],
         ],
       ),
     );
@@ -1018,33 +1177,73 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
   // 5. SECTION 5: WORKERS & STAFF PAYROLL ANALYTICS
   // ===========================================================================
   Widget _buildWorkersAndPayrollSection() {
+    final staffCount = OwnerAppState.instance.activeStaffCount;
+
     return _buildExecutiveCard(
       title: '5. Staff & Worker Payroll Audit',
-      subtitle: 'Active building crew, monthly salaries & payout disbursement status',
+      subtitle:
+          'Active building crew, monthly salaries & payout disbursement status',
       icon: Icons.badge_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Expanded(child: _buildMetricTile('Team Size', '4 Staff', 'Active', AppColors.ink)),
+              Expanded(
+                  child: _buildMetricTile('Team Size', '$staffCount Staff',
+                      staffCount > 0 ? 'Active' : 'Empty', AppColors.ink)),
               const SizedBox(width: 8),
-              Expanded(child: _buildMetricTile('Total Payroll', _formatAmount(56000), 'Monthly', AppColors.ink)),
+              Expanded(
+                  child: _buildMetricTile(
+                      'Total Payroll',
+                      _formatAmount(staffCount * 14000),
+                      'Monthly',
+                      AppColors.ink)),
               const SizedBox(width: 8),
-              Expanded(child: _buildMetricTile('Disbursed', _formatAmount(28000), '2 Staff', AppColors.greenDark, bgColor: AppColors.greenLight)),
+              Expanded(
+                  child: _buildMetricTile('Disbursed', _formatAmount(0),
+                      '0 Staff', AppColors.greenDark,
+                      bgColor: AppColors.greenLight)),
               const SizedBox(width: 8),
-              Expanded(child: _buildMetricTile('Pending', _formatAmount(28000), '2 Staff', AppColors.ink)),
+              Expanded(
+                  child: _buildMetricTile(
+                      'Pending',
+                      _formatAmount(staffCount * 14000),
+                      '$staffCount Staff',
+                      AppColors.ink)),
             ],
           ),
           const SizedBox(height: 16),
-
-          _buildProgressBarRow('Ramesh Kumar (Warden)', '${_formatAmount(18000)} (Paid ✓)', 1.0, AppColors.green),
-          const SizedBox(height: 8),
-          _buildProgressBarRow('Manjunath (Cook)', '${_formatAmount(16000)} (Pending)', 0.5, AppColors.muted),
-          const SizedBox(height: 8),
-          _buildProgressBarRow('Lakshmi (Housekeeping)', '${_formatAmount(12000)} (Paid ✓)', 1.0, AppColors.green),
-          const SizedBox(height: 8),
-          _buildProgressBarRow('Somanna (Night Guard)', '${_formatAmount(10000)} (Pending)', 0.5, AppColors.muted),
+          if (staffCount == 0)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.badge_outlined,
+                        size: 28, color: AppColors.muted),
+                    const SizedBox(height: 6),
+                    Text(
+                      'No staff members assigned yet',
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
+                    ),
+                    Text(
+                      'Add wardens, cooks, or cleaners in Staff Directory',
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5, color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1104,7 +1303,10 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
                     ),
                     Text(
                       subtitle,
-                      style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          color: AppColors.muted,
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -1123,7 +1325,8 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
   Widget _buildSubHeader(String title) {
     return Text(
       title,
-      style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+      style: GoogleFonts.outfit(
+          fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
     );
   }
 
@@ -1140,7 +1343,9 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: accentBorder ?? const Color(0xFFE5E7EB), width: accentBorder != null ? 1.5 : 1.0),
+        border: Border.all(
+            color: accentBorder ?? const Color(0xFFE5E7EB),
+            width: accentBorder != null ? 1.5 : 1.0),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1151,19 +1356,27 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
               Icon(icon, size: 20, color: valColor),
               Text(
                 sub,
-                style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: valColor),
+                style: GoogleFonts.outfit(
+                    fontSize: 10, fontWeight: FontWeight.w700, color: valColor),
               ),
             ],
           ),
           const SizedBox(height: 12),
           Text(
             val,
-            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5, color: valColor),
+            style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+                color: valColor),
           ),
           const SizedBox(height: 2),
           Text(
             title,
-            style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted, fontWeight: FontWeight.w600),
+            style: GoogleFonts.outfit(
+                fontSize: 11.5,
+                color: AppColors.muted,
+                fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -1185,10 +1398,10 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
       children: [
         Text(
           pctStr,
-          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w900, color: barColor),
+          style: GoogleFonts.outfit(
+              fontSize: 13, fontWeight: FontWeight.w900, color: barColor),
         ),
         const SizedBox(height: 8),
-
         Container(
           width: 44,
           height: totalHeight,
@@ -1207,20 +1420,24 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
           ),
         ),
         const SizedBox(height: 8),
-
         Text(
           floorName,
-          style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.ink),
+          style: GoogleFonts.outfit(
+              fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.ink),
         ),
         Text(
           bedsCount,
-          style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted, fontWeight: FontWeight.w500),
+          style: GoogleFonts.outfit(
+              fontSize: 10.5,
+              color: AppColors.muted,
+              fontWeight: FontWeight.w500),
         ),
       ],
     );
   }
 
-  Widget _buildBigMetricCard(String title, String val, String sub, Color valColor, Color bgColor) {
+  Widget _buildBigMetricCard(
+      String title, String val, String sub, Color valColor, Color bgColor) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1231,17 +1448,31 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, fontWeight: FontWeight.w600)),
+          Text(title,
+              style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
-          Text(val, style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.4, color: valColor)),
+          Text(val,
+              style: GoogleFonts.outfit(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                  color: valColor)),
           const SizedBox(height: 3),
-          Text(sub, style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: valColor)),
+          Text(sub,
+              style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: valColor)),
         ],
       ),
     );
   }
 
-  Widget _buildMetricTile(String label, String val, String sub, Color textColor, {Color? bgColor}) {
+  Widget _buildMetricTile(String label, String val, String sub, Color textColor,
+      {Color? bgColor}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
@@ -1251,24 +1482,45 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
       ),
       child: Column(
         children: [
-          Text(val, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w900, color: textColor)),
+          Text(val,
+              style: GoogleFonts.outfit(
+                  fontSize: 16, fontWeight: FontWeight.w900, color: textColor)),
           const SizedBox(height: 3),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted, fontWeight: FontWeight.w600)),
-          Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.outfit(fontSize: 10, color: textColor, fontWeight: FontWeight.w700)),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                  fontSize: 10.5,
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w600)),
+          Text(sub,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.outfit(
+                  fontSize: 10, color: textColor, fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 
-  Widget _buildProgressBarRow(String label, String valueStr, double fraction, Color barColor) {
+  Widget _buildProgressBarRow(
+      String label, String valueStr, double fraction, Color barColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.ink)),
-            Text(valueStr, style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: barColor)),
+            Text(label,
+                style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink)),
+            Text(valueStr,
+                style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: barColor)),
           ],
         ),
         const SizedBox(height: 5),
@@ -1296,10 +1548,22 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
   Widget _buildSharingTypeInfo(String label, String beds, String yield) {
     return Column(
       children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500)),
+        Text(label,
+            style: GoogleFonts.outfit(
+                fontSize: 11,
+                color: AppColors.muted,
+                fontWeight: FontWeight.w500)),
         const SizedBox(height: 3),
-        Text(beds, style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink)),
-        Text(yield, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.greenDark)),
+        Text(beds,
+            style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: AppColors.ink)),
+        Text(yield,
+            style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.greenDark)),
       ],
     );
   }
