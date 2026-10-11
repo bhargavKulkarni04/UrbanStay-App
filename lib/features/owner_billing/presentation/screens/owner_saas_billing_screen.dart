@@ -63,7 +63,7 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
           if (mounted) {
             setState(() {
               if (widget.propertyName == null) {
-                _activePropertyName = prop['brand_name'] ?? prop['name'] ?? _activePropertyName;
+                _activePropertyName = prop['property_name'] ?? prop['brand_name'] ?? prop['name'] ?? _activePropertyName;
               }
               if (widget.totalBeds == null && beds > 0) {
                 _totalBeds = beds;

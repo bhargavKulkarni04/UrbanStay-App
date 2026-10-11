@@ -996,6 +996,8 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     final finalPropId = createdProp?['id']?.toString() ??
         'prop_${DateTime.now().millisecondsSinceEpoch}';
 
+    SupabaseService.instance.activePropertyId = finalPropId;
+
     final finalBeds = (createdProp?['total_beds'] as num?)?.toInt() ?? calcBeds;
 
     final newProp = <String, dynamic>{

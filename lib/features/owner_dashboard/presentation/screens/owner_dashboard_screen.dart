@@ -54,6 +54,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   int _activePropertyIndex = 0;
   final List<Map<String, dynamic>> _properties = [];
 
+  String? get _currentPropertyId {
+    if (_properties.isNotEmpty && _activePropertyIndex < _properties.length) {
+      return _properties[_activePropertyIndex]['id']?.toString();
+    }
+    return widget.initialProperty?['id']?.toString() ??
+        SupabaseService.instance.activePropertyId;
+  }
+
   String get _currentOwnerName {
     if (_properties.isNotEmpty && _activePropertyIndex < _properties.length) {
       final n = _properties[_activePropertyIndex]['ownerName'];
@@ -182,6 +190,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           _properties.clear();
           _properties.addAll(loaded);
           _activePropertyIndex = 0;
+          if (_properties.isNotEmpty) {
+            SupabaseService.instance.activePropertyId =
+                _properties[0]['id']?.toString();
+          }
         });
       } else if (mounted && widget.initialProperty != null) {
         setState(() {
@@ -189,6 +201,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             _properties.add(widget.initialProperty!);
           }
           _activePropertyIndex = 0;
+          SupabaseService.instance.activePropertyId =
+              widget.initialProperty!['id']?.toString();
         });
       }
     } catch (e) {
@@ -197,6 +211,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         setState(() {
           _properties.add(widget.initialProperty!);
           _activePropertyIndex = 0;
+          SupabaseService.instance.activePropertyId =
+              widget.initialProperty!['id']?.toString();
         });
       }
     }
@@ -301,57 +317,102 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           children: [
             if (_activeSubScreen == 'rent')
               OwnerRentCollectionScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                propertyId: _currentPropertyId,
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeNavIndex == 1 || _activeSubScreen == 'rooms')
               OwnerRoomsScreen(
-                onBack: () => setState(() {
-                  _activeNavIndex = 0;
-                  _activeSubScreen = 'dashboard';
-                }),
+                propertyId: _currentPropertyId,
+                onBack: () {
+                  setState(() {
+                    _activeNavIndex = 0;
+                    _activeSubScreen = 'dashboard';
+                  });
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeNavIndex == 2 || _activeSubScreen == 'approvals')
               OwnerApprovalsScreen(
-                onBack: () => setState(() {
-                  _activeNavIndex = 0;
-                  _activeSubScreen = 'dashboard';
-                }),
+                propertyId: _currentPropertyId,
+                onBack: () {
+                  setState(() {
+                    _activeNavIndex = 0;
+                    _activeSubScreen = 'dashboard';
+                  });
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'complaints')
               OwnerComplaintsScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                propertyId: _currentPropertyId,
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'expenses')
               OwnerExpensesScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                propertyId: _currentPropertyId,
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'staff')
               OwnerStaffScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                propertyId: _currentPropertyId,
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'settings')
               OwnerSettingsScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                propertyId: _currentPropertyId,
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'onboarding')
               OwnerOnboardingApprovalsScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'reports')
               OwnerReportsScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'day_collection')
               OwnerDayCollectionScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'food_menu')
               OwnerFoodMenuScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                propertyId: _currentPropertyId,
+                propertyName: (activeProp['name'] as String?) ?? 'My PG Building',
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'tenant_controls')
               OwnerTenantControlsScreen(
-                onBack: () => setState(() => _activeSubScreen = 'dashboard'),
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
               )
             else if (_activeSubScreen == 'notifications')
               _buildNotificationFullPage()
@@ -362,10 +423,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     (activeProp['name'] as String?) ?? 'My PG Building',
                 totalBeds: (activeProp['totalBeds'] as num?)?.toInt() ?? 0,
                 ownerName: _currentOwnerName,
-                onBack: () => setState(() {
-                  _activeNavIndex = 0;
-                  _activeSubScreen = 'dashboard';
-                }),
+                onBack: () {
+                  setState(() {
+                    _activeNavIndex = 0;
+                    _activeSubScreen = 'dashboard';
+                  });
+                  _loadPropertiesFromSupabase();
+                },
               )
             else
               Column(
@@ -1100,7 +1164,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: InkWell(
                     onTap: () {
-                      setState(() => _activePropertyIndex = idx);
+                      setState(() {
+                        _activePropertyIndex = idx;
+                        SupabaseService.instance.activePropertyId =
+                            prop['id']?.toString();
+                      });
                       Navigator.of(ctx).pop();
                       _showToast(
                           'Switched to ${prop['name']} (${prop['location']})');
@@ -1237,11 +1305,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   // ===========================================================================
   void _showInviteManagerModal() {
     String selectedRole = 'manager'; // 'manager', 'co_owner'
+    final currentPropId = (_properties.isNotEmpty &&
+            _properties[_activePropertyIndex]['id'] != null)
+        ? _properties[_activePropertyIndex]['id'] as String
+        : '';
+
     // Default selected property IDs (initialized to active property)
     Set<String> selectedPropertyIds = {
-      if (_properties.isNotEmpty &&
-          _properties[_activePropertyIndex]['id'] != null)
-        _properties[_activePropertyIndex]['id'] as String
+      if (currentPropId.isNotEmpty) currentPropId
     };
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
@@ -1254,6 +1325,29 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
+            // Load live team members from Supabase once on open
+            if (currentPropId.isNotEmpty && _teamMembers.isEmpty) {
+              SupabaseService.instance.getPropertyTeam(currentPropId).then((team) {
+                if (team.isNotEmpty && mounted) {
+                  final loaded = team.map((m) {
+                    final assigned = (m['assigned_property_ids'] as List?)?.cast<String>() ?? [currentPropId];
+                    return {
+                      'id': m['id'].toString(),
+                      'name': m['name'] ?? '',
+                      'phone': m['phone'] ?? '',
+                      'role': m['role'] ?? 'manager',
+                      'assignedPropertyIds': assigned,
+                      'status': m['status'] ?? 'Active',
+                    };
+                  }).toList();
+                  setModalState(() {
+                    _teamMembers.clear();
+                    _teamMembers.addAll(loaded);
+                  });
+                  setState(() {});
+                }
+              });
+            }
             return Container(
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -1391,6 +1485,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                               ),
                               InkWell(
                                 onTap: () {
+                                  final mId = member['id']?.toString() ?? '';
+                                  if (mId.isNotEmpty && !mId.startsWith('tm_')) {
+                                    SupabaseService.instance.removeTeamMember(mId);
+                                  }
                                   setModalState(() {
                                     _teamMembers.removeWhere(
                                         (m) => m['id'] == member['id']);
@@ -1806,6 +1904,43 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                               return;
                             }
                           }
+                        }
+
+                        // Save to Supabase property_team table immediately
+                        final primaryPropId = selectedPropertyIds.isNotEmpty
+                            ? selectedPropertyIds.first
+                            : (currentPropId.isNotEmpty
+                                ? currentPropId
+                                : (_properties.isNotEmpty
+                                    ? _properties.first['id'].toString()
+                                    : ''));
+                        if (primaryPropId.isNotEmpty) {
+                          SupabaseService.instance.inviteTeamMember(
+                            propertyId: primaryPropId,
+                            name: name,
+                            phone: phone,
+                            role: selectedRole,
+                          ).then((success) {
+                            if (success && mounted) {
+                              SupabaseService.instance.getPropertyTeam(primaryPropId).then((team) {
+                                if (team.isNotEmpty && mounted) {
+                                  final loaded = team.map((m) => {
+                                    'id': m['id'].toString(),
+                                    'name': m['name'] ?? '',
+                                    'phone': m['phone'] ?? '',
+                                    'role': m['role'] ?? 'manager',
+                                    'assignedPropertyIds': [primaryPropId],
+                                    'status': m['status'] ?? 'Active',
+                                  }).toList();
+                                  setModalState(() {
+                                    _teamMembers.clear();
+                                    _teamMembers.addAll(loaded);
+                                  });
+                                  setState(() {});
+                                }
+                              });
+                            }
+                          });
                         }
 
                         // Save functional state immediately

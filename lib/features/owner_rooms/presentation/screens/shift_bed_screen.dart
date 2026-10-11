@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Full-Page Screen for Shifting a Resident's Bed or Swapping Rooms with another Resident.
 class ShiftBedScreen extends StatefulWidget {
@@ -155,6 +156,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
     }
 
     final residentName = widget.resident['name'] ?? 'Resident';
+    final oldBedId = widget.resident['id']?.toString() ?? '';
+    String newBedId = '';
 
     // 1. Locate and vacate the current bed
     for (final r in widget.rooms) {
@@ -164,7 +167,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
           if (b['bed'] == widget.resident['bed'] && b['isOccupied'] == true) {
             b['isOccupied'] = false;
             b['title'] = 'Vacant ${b['bed']} — Available';
-            b['sub'] = '₹${widget.resident['rent'] ?? 8000}/mo • Ready for Walk-In';
+            final rentVal = widget.resident['rent'];
+            final hasRent = rentVal != null && rentVal.toString().isNotEmpty && rentVal.toString() != '0';
+            b['sub'] = hasRent ? '₹$rentVal/mo • Ready for Walk-In' : 'Ready for Walk-In';
             b['name'] = null;
             b['phone'] = '';
             b['work'] = '';
@@ -186,6 +191,7 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
         final beds = r['beds'] as List<dynamic>;
         for (final b in beds) {
           if (b['bed'] == _selectedEmptyBed) {
+            newBedId = b['id']?.toString() ?? '';
             b['isOccupied'] = true;
             b['name'] = widget.resident['name'];
             b['initials'] = widget.resident['initials'];
@@ -204,6 +210,22 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
         r['occupied'] = (r['occupied'] as int? ?? 0) + 1;
         break;
       }
+    }
+
+    // Persist bed shift to Supabase
+    if (oldBedId.isNotEmpty && newBedId.isNotEmpty) {
+      SupabaseService.instance.shiftResidentBed(
+        oldBedId: oldBedId,
+        newBedId: newBedId,
+        name: residentName,
+        phone: widget.resident['phone'] ?? '',
+        rent: double.tryParse(_newRentController.text.isNotEmpty
+            ? _newRentController.text
+            : (_selectedEmptyRent?.toString() ?? widget.resident['rent']?.toString() ?? '8500')),
+        deposit: double.tryParse(_newDepositController.text.isNotEmpty
+            ? _newDepositController.text
+            : (widget.resident['deposit']?.toString() ?? '15000')),
+      );
     }
 
     widget.onShiftSuccess();

@@ -11,8 +11,9 @@ import '../../../../core/services/supabase_service.dart';
 /// and live migration to Approval History tab upon approval.
 class OwnerApprovalsScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
 
-  const OwnerApprovalsScreen({super.key, this.onBack});
+  const OwnerApprovalsScreen({super.key, this.onBack, this.propertyId});
 
   @override
   State<OwnerApprovalsScreen> createState() => _OwnerApprovalsScreenState();
@@ -21,6 +22,7 @@ class OwnerApprovalsScreen extends StatefulWidget {
 class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   int _selectedTabIndex = 0; // 0: Pending Approvals, 1: Approval History
   String _selectedFloor = 'all'; // 'all', '1st', '2nd', '3rd', 'ground'
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -30,51 +32,90 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
 
   Future<void> _loadApprovalsFromSupabase() async {
     try {
-      final prop = await SupabaseService.instance.getOwnerProperty();
-      if (prop != null) {
-        final propId = prop['id'].toString();
-        final res = await SupabaseService.instance.client
-            .from('upi_payment_submissions')
-            .select('*, tenants(full_name, phone, room_number)')
-            .eq('property_id', propId)
-            .eq('status', 'PENDING_APPROVAL')
-            .order('created_at', ascending: false);
+      final targetPropId = widget.propertyId ??
+          SupabaseService.instance.activePropertyId;
+      String? propId = targetPropId;
+      if (propId == null || propId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        propId = prop?['id']?.toString();
+      }
+
+      if (propId != null && propId.isNotEmpty) {
+        List<dynamic> res = [];
+        try {
+          res = await SupabaseService.instance.client
+              .from('payment_approvals')
+              .select('*')
+              .eq('property_id', propId)
+              .order('created_at', ascending: false);
+        } catch (_) {
+          try {
+            res = await SupabaseService.instance.client
+                .from('rent_approvals')
+                .select('*')
+                .eq('property_id', propId)
+                .order('created_at', ascending: false);
+          } catch (e) {
+            debugPrint('Error fetching approvals table: $e');
+          }
+        }
 
         if (res.isNotEmpty && mounted) {
-          final List<Map<String, dynamic>> loaded = [];
+          final List<Map<String, dynamic>> loadedPending = [];
+          final List<Map<String, dynamic>> loadedHistory = [];
+
           for (final item in res) {
-            final tenant = item['tenants'] as Map<String, dynamic>?;
-            final name = tenant?['full_name'] ?? 'Resident';
+            final rawAmount = item['amount'] ?? 0;
+            final amount = rawAmount is num
+                ? rawAmount.toInt()
+                : (num.tryParse(rawAmount.toString())?.toInt() ?? 0);
+
+            final status = (item['status'] ?? 'pending').toString().toLowerCase();
+            final name = item['tenant_name'] ?? item['name'] ?? 'Resident';
             final initials = name
+                .toString()
                 .split(' ')
                 .map((p) => p.isNotEmpty ? p[0] : '')
                 .take(2)
                 .join('')
                 .toUpperCase();
-            loaded.add({
+
+            final mappedItem = {
               'id': item['id'].toString(),
               'name': name,
               'initials': initials.isNotEmpty ? initials : 'TN',
-              'room': tenant?['room_number'] ?? 'Room',
+              'room': item['room_number'] ?? 'Room',
               'floor': '1st',
-              'amount': (item['amount'] as num?)?.toInt() ?? 0,
-              'phone': tenant?['phone'] ?? '',
-              'utr': item['utr_number'] ?? '',
+              'amount': amount,
+              'phone': item['phone'] ?? item['tenant_phone'] ?? '',
+              'utr': item['utr_number'] ?? item['utr'] ?? '',
               'time': item['created_at'] != null
                   ? item['created_at'].toString().split('T').first
                   : 'Recent',
-              'app': 'Direct UPI Transfer',
-              'proofFile': item['screenshot_url'] ?? '',
-            });
+              'app': item['payment_app'] ?? 'Direct UPI Transfer',
+              'proofFile': item['proof_image_url'] ?? item['screenshot_url'] ?? '',
+              'status': status,
+            };
+
+            if (status == 'pending') {
+              loadedPending.add(mappedItem);
+            } else {
+              loadedHistory.add(mappedItem);
+            }
           }
+
           setState(() {
             _pendingApprovals.clear();
-            _pendingApprovals.addAll(loaded);
+            _pendingApprovals.addAll(loadedPending);
+            _approvalHistory.clear();
+            _approvalHistory.addAll(loadedHistory);
           });
         }
       }
     } catch (e) {
       debugPrint('Error loading UPI approvals from Supabase: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -105,7 +146,19 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ===========================================================================
   // ACTIONS: APPROVE & REJECT WITH AUDIT HISTORY MIGRATION
   // ===========================================================================
-  void _approvePayment(Map<String, dynamic> item) {
+  Future<void> _approvePayment(Map<String, dynamic> item) async {
+    final submissionId = item['id']?.toString() ?? '';
+    if (submissionId.isNotEmpty) {
+      final success = await SupabaseService.instance.updatePaymentApprovalStatus(
+        submissionId: submissionId,
+        status: 'APPROVED',
+      );
+      if (!success) {
+        _showToast('Failed to update status in database. Please check connection.');
+        return;
+      }
+    }
+
     final now = DateTime.now();
     final hourStr = now.hour.toString().padLeft(2, '0');
     final minStr = now.minute.toString().padLeft(2, '0');
@@ -207,9 +260,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: InkWell(
-                      onTap: () {
+                      onTap: () async {
                         Navigator.of(dialogCtx).pop();
-                        _approvePayment(item);
+                        await _approvePayment(item);
                       },
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
@@ -317,9 +370,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: InkWell(
-                      onTap: () {
+                      onTap: () async {
                         Navigator.of(dialogCtx).pop();
-                        _rejectPayment(item);
+                        await _rejectPayment(item);
                       },
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
@@ -350,7 +403,19 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
     );
   }
 
-  void _rejectPayment(Map<String, dynamic> item) {
+  Future<void> _rejectPayment(Map<String, dynamic> item) async {
+    final submissionId = item['id']?.toString() ?? '';
+    if (submissionId.isNotEmpty) {
+      final success = await SupabaseService.instance.updatePaymentApprovalStatus(
+        submissionId: submissionId,
+        status: 'REJECTED',
+      );
+      if (!success) {
+        _showToast('Failed to reject payment in database. Please check connection.');
+        return;
+      }
+    }
+
     final now = DateTime.now();
     final hourStr = now.hour.toString().padLeft(2, '0');
     final minStr = now.minute.toString().padLeft(2, '0');
@@ -553,6 +618,15 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.green),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(

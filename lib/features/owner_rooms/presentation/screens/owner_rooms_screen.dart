@@ -23,8 +23,9 @@ import 'shift_bed_screen.dart';
 /// - Floating Black Action Button (+) positioned above bottom navigation bar (`bottom: 84`).
 class OwnerRoomsScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
 
-  const OwnerRoomsScreen({super.key, this.onBack});
+  const OwnerRoomsScreen({super.key, this.onBack, this.propertyId});
 
   @override
   State<OwnerRoomsScreen> createState() => _OwnerRoomsScreenState();
@@ -56,6 +57,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   final TextEditingController _assignDepositController =
       TextEditingController();
 
+  // Loading State
+  bool _isLoading = true;
+
   // Native Device Contacts State
   List<Contact>? _deviceContacts;
   bool _isLoadingContacts = false;
@@ -69,24 +73,33 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
   Future<void> _loadRoomsFromSupabase() async {
     try {
-      final prop = await SupabaseService.instance.getOwnerProperty();
-      if (prop != null) {
-        final propId = prop['id'].toString();
+      final targetPropId = widget.propertyId ??
+          SupabaseService.instance.activePropertyId;
+      String? propId = targetPropId;
+      if (propId == null || propId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        propId = prop?['id']?.toString();
+      }
+
+      if (propId != null && propId.isNotEmpty) {
         final roomsWithBeds = await SupabaseService.instance.getRoomsWithBeds(propId);
-        if (roomsWithBeds.isNotEmpty && mounted) {
+        if (mounted) {
           final List<Map<String, dynamic>> loadedRooms = [];
           for (final r in roomsWithBeds) {
             final List bedsList = (r['beds'] as List?) ?? [];
             final int occupiedCount = bedsList.where((b) => b['is_occupied'] == true).length;
             final formattedBeds = bedsList.map((b) {
               final isOcc = b['is_occupied'] == true;
-              final String tenantName = isOcc ? (b['tenant_name'] ?? 'Resident') : '';
+              final rawName = b['tenant_name']?.toString().trim();
+              final String tenantName = (rawName != null && rawName.isNotEmpty)
+                  ? rawName
+                  : (isOcc ? 'Resident' : '');
               final String bedStatus = b['status'] ?? (isOcc ? 'Active' : 'Vacant');
 
               // Compute initials from actual tenant name (e.g. 'Rahul Sharma' → 'RS')
               String? initials;
               if (isOcc && tenantName.isNotEmpty) {
-                final parts = tenantName.trim().split(' ');
+                final parts = tenantName.trim().split(' ').where((p) => p.isNotEmpty).toList();
                 if (parts.length >= 2) {
                   initials = '${parts.first[0]}${parts.last[0]}'.toUpperCase();
                 } else {
@@ -108,35 +121,38 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 docsVerified = false;
               }
 
-              final bedLabel = b['bed_label'] ?? b['bed_code'] ?? 'Bed A';
+              final bedLabel = b['bed_number']?.toString() ?? b['bed_label']?.toString() ?? b['bed_code']?.toString() ?? 'Bed';
+              final actualBedRent = isOcc ? ((b['rent'] ?? r['rent_per_bed'] ?? 0) as num) : 0;
+              final actualBedDeposit = isOcc ? ((b['deposit'] ?? r['deposit_per_bed'] ?? 0) as num) : 0;
               return {
                 'id': b['id']?.toString() ?? '',
-                'isOccupied': isOcc,
+                'label': bedLabel,
                 'bed': bedLabel,
-                'name': isOcc ? tenantName : null,
+                'isOccupied': isOcc,
+                'name': isOcc ? tenantName : '',
                 'initials': initials ?? (isOcc ? 'RS' : ''),
                 'status': bedStatus,
                 'phone': b['tenant_phone'] ?? '',
                 'work': b['workplace'] ?? '',
-                'rent': (r['rent_per_bed'] ?? 8000).toString(),
-                'deposit': (r['deposit_per_bed'] ?? 15000).toString(),
+                'rent': actualBedRent > 0 ? actualBedRent.toString() : '0',
+                'deposit': actualBedDeposit > 0 ? actualBedDeposit.toString() : '0',
                 'docs': docsLabel,
                 'docsVerified': docsVerified,
                 'title': !isOcc ? 'Vacant $bedLabel — Available' : null,
-                'sub': !isOcc ? '₹${r['rent_per_bed'] ?? 8000}/mo • Ready for Walk-In' : null,
+                'sub': !isOcc ? 'Ready for Walk-In' : null,
               };
             }).toList();
 
-            loadedRooms.add({
-              'room': r['room_number'] ?? 'Room 101',
-              'floor': r['floor_label']?.toString().split(' ').first.toLowerCase() ?? '1st',
-              'floorLabel': r['floor_label'] ?? '1st Floor',
-              'type': r['sharing_type'] ?? '2-Sharing',
-              'occupied': occupiedCount,
-              'total': r['total_beds'] ?? 2,
-              'beds': formattedBeds,
-            });
-          }
+              loadedRooms.add({
+                'room': r['room_number']?.toString() ?? '',
+                'floor': r['floor_label']?.toString().split(' ').first.toLowerCase() ?? (r['floor_id'] != null ? 'floor_${r['floor_id']}' : ''),
+                'floorLabel': r['floor_label'] ?? (r['floor_id'] != null ? 'Floor ${r['floor_id']}' : ''),
+                'type': r['sharing_type'] ?? '${bedsList.length}-Sharing',
+                'occupied': occupiedCount,
+                'total': r['total_beds'] ?? bedsList.length,
+                'beds': formattedBeds,
+              });
+            }
 
           setState(() {
             _rooms.clear();
@@ -146,6 +162,10 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       }
     } catch (e) {
       debugPrint('Error loading rooms from Supabase: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -332,8 +352,38 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
               // Save Changes Primary Button (Iconic Green + White Text)
               ElevatedButton(
-                onPressed: () {
-                  Navigator.of(ctx).pop();
+                onPressed: () async {
+                  final newName = _nameController.text.trim();
+                  final newPhone = _phoneController.text.trim();
+                  final newRent = double.tryParse(_rentController.text.trim());
+                  final newDeposit =
+                      double.tryParse(_depositController.text.trim());
+                  final bedId = resident['id']?.toString() ?? '';
+
+                  if (bedId.isNotEmpty) {
+                    final success = await SupabaseService.instance.assignResidentToBed(
+                      bedId: bedId,
+                      name: newName,
+                      phone: newPhone,
+                      rent: newRent,
+                      deposit: newDeposit,
+                    );
+                    if (!success) {
+                      _showToast('Failed to save resident changes. Please try again.');
+                      return;
+                    }
+                  }
+
+                  setState(() {
+                    resident['name'] = newName;
+                    resident['phone'] = newPhone;
+                    resident['rent'] = _rentController.text.trim();
+                    resident['deposit'] = _depositController.text.trim();
+                  });
+
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                  }
                   _showToast('Resident Details Saved ✓');
                 },
                 style: ElevatedButton.styleFrom(
@@ -398,31 +448,76 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Call Parent / Guardian
-                    _buildActionSubButton(
-                      Icons.contact_phone_outlined,
-                      'Call Parent / Guardian',
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        _showToast(
-                            'Calling Guardian of ${resident['name']}: 9811223344');
-                      },
-                    ),
-                    const SizedBox(height: 10),
-
-                    // Give Move-Out Notice (30 Days)
+                    // Give Move-Out Notice (30 Days) with Confirmation Dialog
                     _buildActionSubButton(
                       Icons.event_note_outlined,
                       'Give Move-Out Notice (30 Days)',
                       onTap: () {
-                        Navigator.of(ctx).pop();
-                        _showToast(
-                            'Initiated 30-Day Move Out Notice for ${resident['name']} ✓');
+                        showDialog(
+                          context: context,
+                          builder: (dialogCtx) => AlertDialog(
+                            backgroundColor: Colors.white,
+                            surfaceTintColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
+                            title: Text(
+                              'Confirm Move-Out Notice',
+                              style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w800, fontSize: 17),
+                            ),
+                            content: Text(
+                              'Are you sure you want to start a 30-day move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName?',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 13, color: AppColors.muted),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(dialogCtx).pop(),
+                                child: Text('Cancel',
+                                    style: GoogleFonts.outfit(
+                                        color: AppColors.muted,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  Navigator.of(dialogCtx).pop();
+                                  final bedId = resident['id']?.toString();
+                                  if (bedId != null && bedId.isNotEmpty) {
+                                    try {
+                                      await SupabaseService.instance.client
+                                          .from('beds')
+                                          .update({'status': 'Notice'})
+                                          .eq('id', bedId);
+                                    } catch (e) {
+                                      debugPrint('Error setting notice status: $e');
+                                    }
+                                  }
+                                  setState(() {
+                                    resident['status'] = 'Notice';
+                                  });
+                                  Navigator.of(ctx).pop();
+                                  _showToast(
+                                      'Initiated 30-Day Move Out Notice for ${resident['name']} ✓');
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.green,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: Text('Yes, Give Notice',
+                                    style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.w800)),
+                              ),
+                            ],
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 10),
 
-                    // Delete / Evict Resident
+                    // Delete / Evict Resident with Confirmation Dialog
                     _buildActionSubButton(
                       Icons.delete_outline_rounded,
                       'Delete / Evict Resident',
@@ -430,9 +525,69 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       bgColor: const Color(0xFFFEF2F2),
                       borderColor: AppColors.danger.withValues(alpha: 0.2),
                       onTap: () {
-                        Navigator.of(ctx).pop();
-                        _showToast(
-                            '${resident['name']} evicted and record updated');
+                        showDialog(
+                          context: context,
+                          builder: (dialogCtx) => AlertDialog(
+                            backgroundColor: Colors.white,
+                            surfaceTintColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
+                            title: Text(
+                              'Confirm Eviction',
+                              style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 17,
+                                  color: AppColors.danger),
+                            ),
+                            content: Text(
+                              'Are you sure you want to evict ${resident['name'] ?? "Resident"} from Room $roomName? This will immediately vacate the bed.',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 13, color: AppColors.muted),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(dialogCtx).pop(),
+                                child: Text('Cancel',
+                                    style: GoogleFonts.outfit(
+                                        color: AppColors.muted,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  Navigator.of(dialogCtx).pop();
+                                  final bedId = resident['id']?.toString();
+                                  final oldName = resident['name'];
+                                  if (bedId != null && bedId.isNotEmpty) {
+                                    await SupabaseService.instance.vacateBed(bedId: bedId);
+                                  }
+                                  setState(() {
+                                    resident['isOccupied'] = false;
+                                    resident['status'] = 'Vacant';
+                                    resident['name'] = null;
+                                    resident['phone'] = null;
+                                    resident['rent'] = '0';
+                                    resident['deposit'] = '0';
+                                    resident['sub'] = 'Ready for Walk-In';
+                                  });
+                                  _loadRoomsFromSupabase();
+                                  Navigator.of(ctx).pop();
+                                  _showToast(
+                                      '${oldName ?? "Resident"} evicted and bed marked vacant');
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.danger,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: Text('Yes, Evict',
+                                    style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.w800)),
+                              ),
+                            ],
+                          ),
+                        );
                       },
                     ),
                     const SizedBox(height: 24),
@@ -644,14 +799,54 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
                   // Submit Button
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final item = _damageItemController.text.trim();
                       final amount = _damageAmountController.text.trim();
                       if (item.isEmpty || amount.isEmpty) {
                         _showToast('Please enter damage item and amount');
                         return;
                       }
-                      Navigator.of(ctx).pop();
+
+                      final bedId = resident['id']?.toString() ?? '';
+                      final dmgAmount = double.tryParse(amount) ?? 0.0;
+
+                      final propId = widget.propertyId ??
+                          SupabaseService.instance.activePropertyId;
+                      final propName =
+                          OwnerAppState.instance.activePropertyName;
+
+                      final success =
+                          await SupabaseService.instance.addDamageDeduction(
+                        propertyId: propId ?? '',
+                        propertyName: propName.isNotEmpty ? propName : 'My PG',
+                        bedId: bedId,
+                        tenantName: resident['name'] ?? 'Resident',
+                        roomNumber: roomName,
+                        itemDamaged: item,
+                        amount: dmgAmount,
+                        deductionMode: _damageDeductionMode,
+                        photoUrl: _damageAttachedPhoto,
+                      );
+
+                      if (!success) {
+                        _showToast('Failed to log damage deduction. Please check connection.');
+                        return;
+                      }
+
+                      if (_damageDeductionMode == 'deposit') {
+                        final currentDeposit = double.tryParse(
+                                resident['deposit']?.toString() ?? '0') ??
+                            0.0;
+                        final newDeposit = (currentDeposit - dmgAmount)
+                            .clamp(0.0, double.infinity);
+                        setState(() {
+                          resident['deposit'] = newDeposit.toInt().toString();
+                        });
+                      }
+
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       final modeText = _damageDeductionMode == 'dues'
                           ? "Added to Dues"
                           : "Deducted from Deposit";
@@ -1093,7 +1288,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
                   // Submit Button
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final name = _assignNameController.text.trim();
                       final phone = _assignPhoneController.text.trim();
                       final rent = _assignRentController.text.trim();
@@ -1123,13 +1318,45 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         return;
                       }
 
-                      // Successfully assign resident to bed
+                      // Successfully assign resident to bed permanently in Supabase
+                      String bedId = vacantBed['id']?.toString() ?? '';
+                      if (bedId.isEmpty) {
+                        for (var r in _rooms) {
+                          if (r['room'] == roomName) {
+                            final beds = r['beds'] as List;
+                            for (var b in beds) {
+                              if (b['bed'] == vacantBed['bed'] || b['label'] == vacantBed['bed']) {
+                                bedId = b['id']?.toString() ?? '';
+                                break;
+                              }
+                            }
+                          }
+                        }
+                      }
+
+                      if (bedId.isEmpty) {
+                        _showToast('Cannot identify bed record. Please pull to refresh.');
+                        return;
+                      }
+
+                      final success = await SupabaseService.instance.assignResidentToBed(
+                        bedId: bedId,
+                        name: name,
+                        phone: phone,
+                        rent: double.tryParse(rent),
+                        deposit: double.tryParse(deposit),
+                      );
+                      if (!success) {
+                        _showToast('Failed to save to database. Please check connection.');
+                        return;
+                      }
+
                       setState(() {
                         for (var r in _rooms) {
                           if (r['room'] == roomName) {
                             final beds = r['beds'] as List;
                             for (var b in beds) {
-                              if (b['bed'] == vacantBed['bed']) {
+                              if (b['bed'] == vacantBed['bed'] || b['label'] == vacantBed['bed']) {
                                 b['isOccupied'] = true;
                                 b['name'] = name;
                                 b['phone'] = phone;
@@ -1151,9 +1378,11 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         }
                       });
 
-                      Navigator.of(ctx).pop();
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast(
-                          '$name assigned to $roomName (${vacantBed['bed']}) ✓');
+                          '$name assigned to $roomName (${vacantBed['bed'] ?? vacantBed['label'] ?? ""}) ✓');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
@@ -1181,15 +1410,28 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.green),
+        ),
+      );
+    }
+
     // Filter rooms by floor, card selection filter, and search query
     final filteredRooms = _rooms.map((room) {
-      final beds = (room['beds'] as List<dynamic>).where((b) {
+      final rawBeds = room['beds'];
+      final List bedsList = (rawBeds is List) ? rawBeds : [];
+      final beds = bedsList.where((b) {
+        if (b is! Map) return false;
         if (_selectedFilter == 'tenants') {
           return b['isOccupied'] == true;
         } else if (_selectedFilter == 'vacant') {
           return b['isOccupied'] == false;
         } else if (_selectedFilter == 'notice') {
-          return b['isOccupied'] == true && b['status'] == 'Notice';
+          return b['isOccupied'] == true &&
+              (b['status']?.toString().toLowerCase() == 'notice');
         }
         return true;
       }).toList();
@@ -1199,19 +1441,23 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
         'beds': beds,
       };
     }).where((room) {
-      final beds = room['beds'] as List;
+      final beds = (room['beds'] is List) ? (room['beds'] as List) : [];
       if (beds.isEmpty) return false;
 
       // 1. Floor filter
-      if (_selectedFloor != 'all' && room['floor'] != _selectedFloor) {
-        return false;
+      if (_selectedFloor != 'all') {
+        final floorStr = (room['floor'] ?? '').toString().toLowerCase();
+        if (floorStr != _selectedFloor.toLowerCase()) {
+          return false;
+        }
       }
       // 2. Search filter
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
-        final roomMatch =
-            (room['room'] as String).toLowerCase().contains(query);
+        final roomNameStr = (room['room'] ?? '').toString().toLowerCase();
+        final roomMatch = roomNameStr.contains(query);
         final bedMatch = beds.any((b) {
+          if (b is! Map) return false;
           final name = (b['name'] ?? '').toString().toLowerCase();
           final work = (b['work'] ?? '').toString().toLowerCase();
           return name.contains(query) || work.contains(query);
@@ -1266,29 +1512,6 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   ),
                 ),
               ],
-            ),
-
-            // Floating Action Button (+) Positioned Gracefully Above Bottom Navigation Bar
-            Positioned(
-              right: 18,
-              bottom: 84, // Clear above the 68px bottom navbar
-              child: FloatingActionButton(
-                onPressed: () {
-                  _openAssignModal(
-                    {
-                      'bed': 'Any Vacant Bed',
-                      'rent': '8500',
-                      'deposit': '15000'
-                    },
-                    'Auto-Assign Room',
-                    '1st Floor',
-                  );
-                },
-                backgroundColor: AppColors.ink,
-                elevation: 6,
-                shape: const CircleBorder(),
-                child: const Icon(Icons.add, size: 26, color: Colors.white),
-              ),
             ),
           ],
         ),
@@ -1427,8 +1650,6 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       final beds = (r['beds'] as List?) ?? [];
       totalCapacity += (r['total'] as num?)?.toInt() ?? beds.length;
     }
-    if (totalCapacity == 0) totalCapacity = OwnerAppState.instance.totalBeds;
-
     final List<Map<String, String>> floors = [
       {'id': 'all', 'label': 'All Floors ($totalCapacity Beds)'},
     ];
@@ -1502,8 +1723,6 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       }
     }
 
-    if (totalCapacity == 0) totalCapacity = OwnerAppState.instance.totalBeds;
-    if (occupiedCount == 0) occupiedCount = OwnerAppState.instance.occupiedBeds;
     final vacantCount = (totalCapacity - occupiedCount).clamp(0, totalCapacity);
 
     return Row(
@@ -1721,10 +1940,13 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
           // Bed List in Room
           ...((room['beds'] as List).map((bed) {
-            if (bed['isOccupied'] == true && bed['name'] != null && bed['name'].toString().trim().isNotEmpty) {
+            final isOcc = bed['isOccupied'] == true ||
+                (bed['name'] != null && bed['name'].toString().trim().isNotEmpty);
+            if (isOcc) {
               return _buildTenantCard(bed, room['room']?.toString() ?? '');
             } else {
-              return _buildVacantBedCard(bed, room['room']?.toString() ?? '', room['floorLabel']?.toString() ?? '');
+              return _buildVacantBedCard(
+                  bed, room['room']?.toString() ?? '', room['floorLabel']?.toString() ?? '');
             }
           })),
         ],

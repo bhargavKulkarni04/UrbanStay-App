@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen 9: Maintenance & Complaints Ticketing Hub.
 /// Strict Design Standards:
@@ -15,8 +16,9 @@ import '../../../../core/state/owner_app_state.dart';
 /// - Zero Emojis (pure native vector icons & Outfit font).
 class OwnerComplaintsScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
 
-  const OwnerComplaintsScreen({super.key, this.onBack});
+  const OwnerComplaintsScreen({super.key, this.onBack, this.propertyId});
 
   @override
   State<OwnerComplaintsScreen> createState() => _OwnerComplaintsScreenState();
@@ -32,10 +34,84 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
 
   // Resolution History List (Populated live from Supabase / State)
   final List<Map<String, dynamic>> _historyTickets = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _loadComplaintsFromSupabase();
+  }
+
+  Future<void> _loadComplaintsFromSupabase() async {
+    setState(() => _isLoading = true);
+    try {
+      final targetPropId = widget.propertyId ??
+          SupabaseService.instance.activePropertyId;
+      String? propId = targetPropId;
+      if (propId == null || propId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        propId = prop?['id']?.toString();
+      }
+
+      if (propId != null && propId.isNotEmpty) {
+        final list = await SupabaseService.instance.getComplaints(propId);
+        if (mounted) {
+          final List<Map<String, dynamic>> loadedActive = [];
+          final List<Map<String, dynamic>> loadedHistory = [];
+
+          for (final c in list) {
+            final statusStr = (c['status'] ?? 'pending').toString().toLowerCase();
+            final isResolved = statusStr == 'resolved';
+            final item = {
+              'id': c['id']?.toString() ?? '',
+              'residentName': c['resident_name'] ?? c['tenant_name'] ?? 'Resident',
+              'initials': 'RS',
+              'phone': c['phone'] ?? c['tenant_phone'] ?? '',
+              'room': c['room_number'] != null
+                  ? 'Room ${c['room_number']}'
+                  : '',
+              'sharingType': c['sharing_type']?.toString() ?? '',
+              'bed': c['bed_number']?.toString() ?? '',
+              'floor':
+                  c['floor_id'] != null ? 'Floor ${c['floor_id']}' : '',
+              'category': c['category'] ?? 'General',
+              'categoryIcon': Icons.build_rounded,
+              'issue':
+                  c['issue'] ?? c['description'] ?? 'Maintenance Issue',
+              'reportedDate': c['created_at'] != null
+                  ? c['created_at'].toString().split('T').first
+                  : 'Recent',
+              'reportedTime': c['created_at'] != null
+                  ? c['created_at'].toString().split('T').first
+                  : 'Recent',
+              'resolvedDate': 'Resolved',
+              'resolvedBy': 'Resolved by Owner',
+              'resolutionNote': c['resolution_notes'] ?? 'Issue fixed.',
+              'status': isResolved ? 'resolved' : (statusStr == 'in_progress' ? 'in_progress' : 'pending'),
+            };
+
+            if (isResolved) {
+              loadedHistory.add(item);
+            } else {
+              loadedActive.add(item);
+            }
+          }
+
+          setState(() {
+            _activeTickets.clear();
+            _activeTickets.addAll(loadedActive);
+            _historyTickets.clear();
+            _historyTickets.addAll(loadedHistory);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading complaints: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -61,8 +137,21 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
     );
   }
 
-  // 1-Tap Mark In Progress (Simplified - no modal required)
-  void _markInProgress(Map<String, dynamic> ticket) {
+  // 1-Tap Mark In Progress (Async Supabase persistence)
+  Future<void> _markInProgress(Map<String, dynamic> ticket) async {
+    final complaintId = ticket['id']?.toString() ?? '';
+    if (complaintId.isNotEmpty) {
+      final success = await SupabaseService.instance.updateComplaintStatus(
+        complaintId: complaintId,
+        status: 'in_progress',
+        resolutionNotes: 'Acknowledged by Owner • Work in progress',
+      );
+      if (!success) {
+        _showToast('Failed to update ticket status. Check connection.');
+        return;
+      }
+    }
+
     setState(() {
       ticket['status'] = 'in_progress';
       ticket['progressNote'] = 'Acknowledged by Owner • Work in progress';
@@ -72,7 +161,18 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   }
 
   // 1-Tap Mark Resolved (Migrates from Active to History)
-  void _markResolved(Map<String, dynamic> ticket) {
+  Future<void> _markResolved(Map<String, dynamic> ticket) async {
+    final complaintId = ticket['id']?.toString() ?? '';
+    if (complaintId.isNotEmpty) {
+      final success =
+          await SupabaseService.instance.resolveComplaint(complaintId);
+      if (!success) {
+        _showToast(
+            'Failed to resolve complaint in database. Please check connection.');
+        return;
+      }
+    }
+
     final now = DateTime.now();
     final hourStr = now.hour.toString().padLeft(2, '0');
     final minStr = now.minute.toString().padLeft(2, '0');
@@ -186,6 +286,15 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.green),
+        ),
+      );
+    }
+
     final pendingCount =
         _activeTickets.where((t) => t['status'] == 'pending').length;
     final inProgressCount =
@@ -1034,7 +1143,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               if (isPending) ...[
                 Expanded(
                   child: InkWell(
-                    onTap: () => _markInProgress(ticket),
+                    onTap: () async => await _markInProgress(ticket),
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       height: 38,
@@ -1060,7 +1169,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               ],
               Expanded(
                 child: InkWell(
-                  onTap: () => _markResolved(ticket),
+                  onTap: () async => await _markResolved(ticket),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     height: 38,

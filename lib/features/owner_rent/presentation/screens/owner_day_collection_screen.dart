@@ -26,12 +26,8 @@ class OwnerDayCollectionScreen extends StatefulWidget {
 class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   String _activeTab = 'schedule'; // 'schedule' or 'history'
   int _selectedDay = 1;
-  String _selectedStaffActor = 'Ramesh Gowda (Manager)';
-  final List<String> _staffActors = [
-    'Ramesh Gowda (Manager)',
-    'Arun Kumar (Co-Owner)',
-    'Bhargav S Kulkarni (Owner)',
-  ];
+  String _selectedStaffActor = 'Owner';
+  final List<String> _staffActors = [];
 
   String _historyFilter = 'all'; // 'all', 'payments', 'rescheduled', 'rejected'
   String _selectedFloor =
@@ -48,9 +44,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           .replaceAll('Bed ', 'Room ');
       room = clean.isNotEmpty
           ? (clean.startsWith('Room') ? clean : 'Room $clean')
-          : 'Room 101';
+          : '';
     }
-    return '$floor • $sharing • $room';
+    final parts = [if (floor.isNotEmpty) floor, if (sharing.isNotEmpty) sharing, if (room.isNotEmpty) room];
+    return parts.join(' • ');
   }
 
   // Master Tenant List & Audit History
@@ -70,16 +67,35 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       final prop = await SupabaseService.instance.getOwnerProperty();
       if (prop != null) {
         final propId = prop['id'].toString();
+        final ownerName = (prop['owner_legal_name'] ?? prop['name'] ?? 'Owner').toString();
+        final staffList = await SupabaseService.instance.getStaff(propId);
+        final List<String> loadedStaff = ['$ownerName (Owner)'];
+        for (final s in staffList) {
+          final sName = s['name']?.toString() ?? '';
+          final sRole = s['role']?.toString() ?? 'Staff';
+          if (sName.isNotEmpty) {
+            loadedStaff.add('$sName ($sRole)');
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _staffActors.clear();
+            _staffActors.addAll(loadedStaff);
+            if (_staffActors.isNotEmpty && (_selectedStaffActor == 'Owner' || !_staffActors.contains(_selectedStaffActor))) {
+              _selectedStaffActor = _staffActors.first;
+            }
+          });
+        }
         final ledger = await SupabaseService.instance.getMonthlyRentLedger(propId);
         if (mounted && ledger.isNotEmpty) {
           final List<Map<String, dynamic>> loaded = [];
           for (final row in ledger) {
             final tenant = row['tenants'] as Map<String, dynamic>?;
-            final roomNum = tenant?['room_number'] ?? 'Room 101';
-            final floorName = roomNum.startsWith('G') ? 'Ground Floor' : '${roomNum[0]}st Floor';
+            final roomNum = tenant?['room_number']?.toString() ?? row['room_number']?.toString() ?? '';
+            final floorName = roomNum.startsWith('G') ? 'Ground Floor' : (roomNum.isNotEmpty ? '${roomNum[0]}st Floor' : '');
             final status = (row['status'] ?? 'PENDING').toString().toLowerCase();
             final isPaid = status == 'paid';
-            final tenantName = tenant?['full_name'] ?? 'Resident';
+            final tenantName = tenant?['full_name'] ?? tenant?['name'] ?? row['tenant_name'] ?? 'Resident';
             final nameParts = tenantName.trim().split(' ');
             final computedInitials = nameParts.length >= 2
                 ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
@@ -91,13 +107,13 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               'id': row['id'].toString(),
               'name': tenantName,
               'initials': computedInitials,
-              'bed': tenant?['bed_number'] ?? 'Bed A',
+              'bed': tenant?['bed_number'] ?? row['bed_number'] ?? '',
               'room': roomNum,
               'floor': floorName,
-              'sharing': tenant?['sharing_type'] ?? '2-Sharing',
+              'sharing': tenant?['sharing_type'] ?? row['sharing_type'] ?? '',
               'phone': tenant?['phone'] ?? '',
               'payDay': dueDay,
-              'amount': (row['amount'] as num?)?.toInt() ?? 8000,
+              'amount': (row['amount'] as num?)?.toInt() ?? 0,
               'status': isPaid ? 'paid' : 'overdue',
               'paidDate': row['paid_at'] != null ? row['paid_at'].toString().split('T').first : null,
               'dueLabel': isPaid ? 'Paid' : 'Rent Due',
@@ -110,6 +126,49 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             _tenants.clear();
             _tenants.addAll(loaded);
           });
+        } else if (mounted) {
+          final rooms = await SupabaseService.instance.getRoomsWithBeds(propId);
+          final List<Map<String, dynamic>> bedTenants = [];
+          for (final r in rooms) {
+            final beds = r['beds'] as List<dynamic>? ?? [];
+            final actualRoomNum = r['room_number']?.toString() ?? '';
+            final actualFloor = r['floor_name']?.toString() ?? (r['floor_id'] != null ? 'Floor ${r['floor_id']}' : '');
+            final roomRent = (r['rent_per_bed'] as num?)?.toInt() ?? 0;
+            for (final b in beds) {
+              if (b['is_occupied'] == true && b['tenant_name'] != null) {
+                final tName = b['tenant_name'].toString();
+                final nameParts = tName.trim().split(' ');
+                final computedInitials = nameParts.length >= 2
+                    ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
+                    : (tName.isNotEmpty ? tName[0].toUpperCase() : 'TN');
+                final actualBedRent = (b['rent'] as num?)?.toInt() ?? roomRent;
+                bedTenants.add({
+                  'id': b['id'].toString(),
+                  'name': tName,
+                  'initials': computedInitials,
+                  'bed': b['bed_number'] ?? '',
+                  'room': actualRoomNum.isNotEmpty ? 'Room $actualRoomNum' : '',
+                  'floor': actualFloor,
+                  'sharing': r['sharing_type']?.toString() ?? '${beds.length}-Sharing',
+                  'phone': b['tenant_phone'] ?? '',
+                  'payDay': 1,
+                  'amount': actualBedRent,
+                  'status': 'overdue',
+                  'paidDate': null,
+                  'dueLabel': 'Rent Due',
+                  'approvedBy': _selectedStaffActor,
+                  'requestedDate': null,
+                  'extensionDate': null,
+                });
+              }
+            }
+          }
+          if (bedTenants.isNotEmpty) {
+            setState(() {
+              _tenants.clear();
+              _tenants.addAll(bedTenants);
+            });
+          }
         }
       }
     } catch (e) {
@@ -249,28 +308,92 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           ),
           const SizedBox(width: 8),
 
-          // Active Staff Actor Pill
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.greenLight,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.badge_outlined,
-                    size: 12, color: AppColors.greenDark),
-                const SizedBox(width: 4),
-                Text(
-                  _selectedStaffActor.split(' ')[0], // First name
-                  style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.greenDark),
-                ),
-              ],
+          // Active Staff Actor Pill (Dynamic from DB)
+          InkWell(
+            onTap: _staffActors.length > 1
+                ? () {
+                    showModalBottomSheet(
+                      context: context,
+                      backgroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                      ),
+                      builder: (ctx) => SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Text(
+                                  'Select Active Operator / Staff',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                              ),
+                              const Divider(),
+                              ..._staffActors.map((actor) => ListTile(
+                                    title: Text(
+                                      actor,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 13.5,
+                                        fontWeight: _selectedStaffActor == actor
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: _selectedStaffActor == actor
+                                            ? AppColors.greenDark
+                                            : AppColors.ink,
+                                      ),
+                                    ),
+                                    trailing: _selectedStaffActor == actor
+                                        ? const Icon(Icons.check_circle_rounded,
+                                            color: AppColors.green, size: 20)
+                                        : null,
+                                    onTap: () {
+                                      setState(() => _selectedStaffActor = actor);
+                                      Navigator.pop(ctx);
+                                    },
+                                  )),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                : null,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.greenLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.badge_outlined,
+                      size: 12, color: AppColors.greenDark),
+                  const SizedBox(width: 4),
+                  Text(
+                    _selectedStaffActor.split(' ')[0], // First name
+                    style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.greenDark),
+                  ),
+                  if (_staffActors.length > 1) ...[
+                    const SizedBox(width: 2),
+                    const Icon(Icons.arrow_drop_down_rounded,
+                        size: 14, color: AppColors.greenDark),
+                  ],
+                ],
+              ),
             ),
           ),
         ],

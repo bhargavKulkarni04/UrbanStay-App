@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen 11: Staff Directory & Payroll Management.
 /// Strict Design System:
@@ -15,8 +16,9 @@ import '../../../../core/state/owner_app_state.dart';
 /// - Live instant Search and Role Filter Chips.
 class OwnerStaffScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
 
-  const OwnerStaffScreen({super.key, this.onBack});
+  const OwnerStaffScreen({super.key, this.onBack, this.propertyId});
 
   @override
   State<OwnerStaffScreen> createState() => _OwnerStaffScreenState();
@@ -37,6 +39,69 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
 
   // Master Staff Directory List (Populated live from Supabase / User Entry)
   final List<Map<String, dynamic>> _staffList = [];
+  bool _isLoading = false;
+  String? _propertyId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStaffFromSupabase();
+  }
+
+  Future<void> _loadStaffFromSupabase() async {
+    setState(() => _isLoading = true);
+    try {
+      final targetPropId = widget.propertyId ??
+          SupabaseService.instance.activePropertyId;
+      String? propId = targetPropId;
+      if (propId == null || propId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        propId = prop?['id']?.toString();
+      }
+
+      if (propId != null && propId.isNotEmpty) {
+        _propertyId = propId;
+        final list = await SupabaseService.instance.getStaff(_propertyId!);
+        if (mounted) {
+          final List<Map<String, dynamic>> loaded = [];
+          for (final s in list) {
+            final name = s['name'] ?? 'Staff Member';
+            final initials = name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').join('').toUpperCase();
+            final role = (s['role'] ?? 'warden').toString().toLowerCase();
+
+            // Safe parsing of monthly_salary which Postgres returns as numeric/String "22.00"
+            final rawSalary = s['monthly_salary'] ?? s['salary'];
+            final int salary = rawSalary is num
+                ? rawSalary.toInt()
+                : (num.tryParse(rawSalary?.toString() ?? '0')?.toInt() ?? 0);
+
+            final status = (s['salary_status'] ?? s['status'] ?? 'pending').toString().toLowerCase();
+
+            loaded.add({
+              'id': s['id'].toString(),
+              'name': name,
+              'initials': initials.length > 2 ? initials.substring(0, 2) : initials,
+              'role': role,
+              'workTitle': s['work_title'] ?? s['role'] ?? 'Staff',
+              'phone': s['phone'] ?? '',
+              'salary': salary,
+              'month': '${_currentMonthName()} Salary',
+              'status': status,
+              'joinedDate': s['joined_date'] ?? (s['created_at'] != null ? s['created_at'].toString().split('T').first : 'Active'),
+            });
+          }
+          setState(() {
+            _staffList.clear();
+            _staffList.addAll(loaded);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading staff from Supabase: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   String _currentMonthName() {
     const months = [
@@ -79,10 +144,40 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
       .where((s) => s['status'] == 'pending')
       .fold<int>(0, (sum, s) => sum + (s['salary'] as int));
 
-  void _approveSalary(Map<String, dynamic> staff) {
+  Future<void> _approveSalary(Map<String, dynamic> staff) async {
+    final staffId = staff['id']?.toString();
+    if (staffId != null && staffId.isNotEmpty) {
+      try {
+        await SupabaseService.instance.client
+            .from('property_team')
+            .update({'salary_status': 'paid'})
+            .eq('id', staffId);
+      } catch (_) {
+        try {
+          await SupabaseService.instance.client
+              .from('staff')
+              .update({'salary_status': 'paid'})
+              .eq('id', staffId);
+        } catch (e) {
+          debugPrint('Error updating staff salary status: $e');
+        }
+      }
+    }
+
+    if (_propertyId != null) {
+      final amount = (staff['salary'] as num?)?.toDouble() ?? 0.0;
+      await SupabaseService.instance.addExpense(
+        propertyId: _propertyId!,
+        category: 'Staff Salary',
+        amount: amount,
+        notes: 'Monthly Salary for ${staff['name']} (${staff['role']})',
+      );
+    }
+
     setState(() {
       staff['status'] = 'paid';
     });
+
     _showToast('₹${(staff['salary'] as int).toString()} Salary Approved for ${staff['name']} • Recorded in PG Expenses');
   }
 
@@ -163,9 +258,9 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: InkWell(
-                      onTap: () {
+                      onTap: () async {
                         Navigator.of(dialogCtx).pop();
-                        _approveSalary(staff);
+                        await _approveSalary(staff);
                       },
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
@@ -273,11 +368,31 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: InkWell(
-                      onTap: () {
-                        Navigator.of(dialogCtx).pop();
+                      onTap: () async {
+                        final staffId = staff['id']?.toString();
+                        if (staffId != null && staffId.isNotEmpty) {
+                          try {
+                            await SupabaseService.instance.client
+                                .from('property_team')
+                                .update({'salary_status': 'pending'})
+                                .eq('id', staffId);
+                          } catch (_) {
+                            try {
+                              await SupabaseService.instance.client
+                                  .from('staff')
+                                  .update({'salary_status': 'pending'})
+                                  .eq('id', staffId);
+                            } catch (e) {
+                              debugPrint('Error reverting salary status: $e');
+                            }
+                          }
+                        }
                         setState(() {
                           staff['status'] = 'pending';
                         });
+                        if (dialogCtx.mounted) {
+                          Navigator.of(dialogCtx).pop();
+                        }
                         _showToast('${staff['name']}\'s salary reverted to Pending');
                       },
                       borderRadius: BorderRadius.circular(12),
@@ -405,7 +520,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
 
                   // Submit Button
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final name = _nameController.text.trim();
                       final workTitle = _workTitleController.text.trim();
                       final salaryStr = _salaryController.text.trim();
@@ -423,7 +538,20 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
 
                       final initials = name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').join('').toUpperCase();
 
-                      Navigator.of(ctx).pop();
+                      if (_propertyId != null) {
+                        final success = await SupabaseService.instance.addStaff(
+                          propertyId: _propertyId!,
+                          name: name,
+                          role: workTitle.isNotEmpty ? workTitle : _selectedModalRole,
+                          phone: phone,
+                          salary: salary.toDouble(),
+                        );
+                        if (!success) {
+                          _showToast('Failed to add staff in database. Please check connection.');
+                          return;
+                        }
+                        await _loadStaffFromSupabase();
+                      }
                       setState(() {
                         _staffList.insert(0, {
                           'id': 'STF-${DateTime.now().millisecondsSinceEpoch % 1000}',
@@ -438,6 +566,9 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                           'joinedDate': 'Today',
                         });
                       });
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('$name added to Staff Directory ✓');
                     },
                     style: ElevatedButton.styleFrom(

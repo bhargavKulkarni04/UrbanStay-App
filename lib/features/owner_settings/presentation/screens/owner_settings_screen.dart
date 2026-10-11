@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/services/supabase_service.dart';
 import 'package:urbanstay/features/owner_setup/presentation/screens/owner_setup_screen.dart';
 
 /// Screen 12: Master Owner Settings & Configuration Hub.
@@ -19,8 +20,9 @@ import 'package:urbanstay/features/owner_setup/presentation/screens/owner_setup_
 class OwnerSettingsScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final String? initialView;
+  final String? propertyId;
 
-  const OwnerSettingsScreen({super.key, this.onBack, this.initialView});
+  const OwnerSettingsScreen({super.key, this.onBack, this.initialView, this.propertyId});
 
   @override
   State<OwnerSettingsScreen> createState() => _OwnerSettingsScreenState();
@@ -33,23 +35,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
 
   // ===========================================================================
-  // LIVE SETTINGS DATA STATE
+  // ===========================================================================
+  // LIVE SETTINGS DATA STATE (Populated dynamically from Supabase & OwnerAppState)
   // ===========================================================================
   // View 1: Property
-  String _propName = 'Greenview Luxury Coliving';
+  String _propName = '';
   String _propType = 'Standard PG';
-  String _propId = 'US-560034-A';
-  String _propAddress = 'Koramangala 5th Block, Bengaluru, 560034';
-  String _streetAddress = '#42, 7th Main, 4th Cross';
-  String _locality = 'Koramangala 5th Block';
-  String _landmark = 'Near Sony World Signal';
-  String _selectedState = 'Karnataka';
-  String _selectedCity = 'Bengaluru';
-  String _pincode = '560034';
-  String _propMapPin = 'maps.google.com/?q=12.9352,77.6245';
-  String _tenantPreference = 'Co-Living'; // 'Gents', 'Ladies', 'Co-Living'
-  String _curfewTime = '10:30 PM';
-  String _morningOpen = '6:00 AM';
+  String _propId = '';
+  String _propAddress = '';
+  String _streetAddress = '';
+  String _locality = '';
+  String _landmark = '';
+  String _selectedState = '';
+  String _selectedCity = '';
+  String _pincode = '';
+  String _propMapPin = '';
+  String _tenantPreference = ''; // 'Gents', 'Ladies', 'Co-Living'
+  String _curfewTime = '';
+  String _morningOpen = '';
 
   static const List<String> _propertyTypeOptions = [
     'Standard PG',
@@ -63,32 +66,32 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   ];
 
   // View 2: Management & Business
-  String _bizStatus = 'Verified Business';
-  String _bizEntityType = 'Sole Proprietorship';
-  String _bizLegalName = 'Greenview Hospitality Services';
-  String _bizGst = '29ABCDE1234F1Z5';
-  String _bizCin = 'BBMP-TR-2025-8819';
-  String _adminName = 'Bhargav Kulkarni';
-  String _adminEmail = 'bhargav@gmail.com';
-  String _adminPhone = '+91 86188 18322';
-  String _ownerGovtIdType = 'Aadhaar Card';
-  String _ownerGovtIdProofStatus = 'Verified (aadhaar_front_back.pdf)';
-  String _bizGstProofStatus = 'Uploaded (gst_reg_certificate.pdf)';
+  String _bizStatus = '';
+  String _bizEntityType = '';
+  String _bizLegalName = '';
+  String _bizGst = '';
+  String _bizCin = '';
+  String _adminName = '';
+  String _adminEmail = '';
+  String _adminPhone = '';
+  String _ownerGovtIdType = '';
+  String _ownerGovtIdProofStatus = '';
+  String _bizGstProofStatus = '';
 
   // View 3: Renting & Stay Rules
-  String _rentDueDay = '1st of Every Month';
-  String _gracePeriod = '3 Days';
-  String _dailyRate = '₹100 / day';
-  String _lockinPeriod = '3 Months';
-  String _noticePeriod = '30 Days';
-  String _agreementDur = '11 Months Standard';
+  String _rentDueDay = '';
+  String _gracePeriod = '';
+  String _dailyRate = '';
+  String _lockinPeriod = '';
+  String _noticePeriod = '';
+  String _agreementDur = '';
 
   // View 4: Banking Details
-  String _upiId = 'bhargav@hdfcbank';
-  String _bankName = 'HDFC Bank';
-  String _bankAccNum = '501002348921';
-  String _ifscCode = 'HDFC0001244';
-  String _beneficiaryName = 'Bhargav Kulkarni';
+  String _upiId = '';
+  String _bankName = '';
+  String _bankAccNum = '';
+  String _ifscCode = '';
+  String _beneficiaryName = '';
 
   // View 6: Security & Account
   String _appPasscode = '••••••••';
@@ -100,7 +103,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   bool _acceptPartialPayments = true;
   bool _autoSendWhatsappReceipts = true;
   bool _autoDuesReminders = true;
-  String _receiptTerms = 'This is an official acknowledgment of payment received for accommodation and hospitality services.\n\nIn case of payment reversal, chargeback, or dishonored instruments, this receipt stands immediately null and void.\n\nSecurity deposits and rent payments are strictly subject to the agreed notice period and premises rules.';
+  String _receiptTerms = '';
 
   // View 8: Tenant Onboarding & KYC Settings
   bool _autoWelcomeWhatsapp = true;
@@ -109,46 +112,58 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   bool _lockProfileAfterMovein = true;
   bool _mandatoryTenantKyc = true;
   bool _requireComplaintPhoto = true;
-  String _kycApplicableTo = 'All Residents';
-  String _authorizedSignatory = 'Bhargav S Kulkarni (Proprietor)';
-  String _stampBusinessName = 'Greenview Hospitality Services';
+  String _kycApplicableTo = '';
+  String _authorizedSignatory = '';
+  String _stampBusinessName = '';
   bool _foodMessRsvpEnabled = true;
 
   // View: Property Scale & Capacity Setup (C1–C4 Drilldown)
   String? _scaleSubSection; // null, 'c1', 'c2', 'c3', 'c4'
-  String _ownerFullName = 'Bhargav S Kulkarni';
-  String _ownerFatherName = 'Srinivas Kulkarni';
-  String _ownerWhatsapp = '+91 86188 18322';
-  String _ownerEmail = 'bhargav@gmail.com';
-  String _ownerAadhaar = '5678 9012 3456';
-  String _ownerAddress = 'Bengaluru, Karnataka';
+  String _ownerFullName = '';
+  String _ownerFatherName = '';
+  String _ownerWhatsapp = '';
+  String _ownerEmail = '';
+  String _ownerAadhaar = '';
+  String _ownerAddress = '';
 
-  String _scalePgName = 'Greenview Luxury Coliving';
-  String _scaleGenderCategory = 'Unisex / Coliving';
-  String _scaleOwnershipType = 'Self-Owned Independent Building';
-  String _scaleAreaLocality = 'Koramangala 5th Block';
-  String _scalePincode = '560034';
-  String _scaleLiftCount = '1 Passenger Lift';
-  String _scalePowerBackup = '25 kVA Diesel Generator';
+  String _scalePgName = '';
+  String _scaleGenderCategory = '';
+  String _scaleOwnershipType = '';
+  String _scaleAreaLocality = '';
+  String _scalePincode = '';
+  String _scaleLiftCount = '';
+  String _scalePowerBackup = '';
 
-  int _scaleFloorCount = 4;
-  int _scaleGroundRooms = 2;
-  int _scaleRoomsEachFloor = 4;
-  int _scaleTotalRooms = 14;
-  int _scaleTotalBeds = 35;
-  int _scale1SharingRooms = 2;
-  int _scale2SharingRooms = 8;
-  int _scale3SharingRooms = 4;
+  int _scaleFloorCount = 0;
+  int _scaleGroundRooms = 0;
+  int _scaleRoomsEachFloor = 0;
+  int _scaleTotalRooms = 0;
+  int _scaleTotalBeds = 0;
+  int _scale1SharingRooms = 0;
+  int _scale2SharingRooms = 0;
+  int _scale3SharingRooms = 0;
   int _scale4SharingRooms = 0;
 
-  int _scale1SharingRent = 14000;
-  int _scale1SharingDeposit = 25000;
-  int _scale2SharingRent = 8500;
-  int _scale2SharingDeposit = 15000;
-  int _scale3SharingRent = 7500;
-  int _scale3SharingDeposit = 12000;
-  int _scale4SharingRent = 6500;
-  int _scale4SharingDeposit = 10000;
+  int _scale1SharingRent = 0;
+  int _scale1SharingDeposit = 0;
+  int _scale2SharingRent = 0;
+  int _scale2SharingDeposit = 0;
+  int _scale3SharingRent = 0;
+  int _scale3SharingDeposit = 0;
+  int _scale4SharingRent = 0;
+  int _scale4SharingDeposit = 0;
+
+  bool _isLoading = true;
+
+  String get _adminInitials {
+    final name = _adminName.trim();
+    if (name.isEmpty) return 'PG';
+    final parts = name.split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+  }
 
   Map<String, List<String>> _liveStatesMap = {};
 
@@ -165,7 +180,142 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     if (OwnerAppState.instance.totalBeds > 0) {
       _scaleTotalBeds = OwnerAppState.instance.totalBeds;
     }
+    _loadPropertyFromSupabase();
     _fetchLiveGeoData();
+  }
+
+  Future<void> _loadPropertyFromSupabase() async {
+    try {
+      final targetPropId = widget.propertyId ??
+          SupabaseService.instance.activePropertyId;
+      final prop = await SupabaseService.instance
+          .getOwnerProperty(propertyId: targetPropId);
+      if (prop != null && mounted) {
+        final pId = prop['id']?.toString() ?? _propId;
+        final settings = await SupabaseService.instance.getPropertySettings(pId);
+        if (mounted) {
+          setState(() {
+            _propId = pId;
+            _propName = prop['property_name']?.toString() ?? prop['name']?.toString() ?? _propName;
+            _scalePgName = _propName;
+            _bizLegalName = '$_propName Hospitality Services';
+            _stampBusinessName = '$_propName Hospitality Services';
+
+            if (prop['property_structure'] != null) {
+              _propType = prop['property_structure'].toString();
+            }
+            if (prop['street_address'] != null) {
+              _streetAddress = prop['street_address'].toString();
+              _propAddress = _streetAddress;
+            }
+            if (prop['area_locality'] != null) {
+              _locality = prop['area_locality'].toString();
+              _scaleAreaLocality = _locality;
+            }
+            if (prop['landmark'] != null) {
+              _landmark = prop['landmark'].toString();
+            }
+            if (prop['city'] != null) {
+              _selectedCity = prop['city'].toString();
+            }
+            if (prop['state'] != null) {
+              _selectedState = prop['state'].toString();
+            }
+            if (prop['pincode'] != null) {
+              _pincode = prop['pincode'].toString();
+              _scalePincode = _pincode;
+            }
+            if (prop['maps_url'] != null) {
+              _propMapPin = prop['maps_url'].toString();
+            }
+            if (prop['gender_category'] != null) {
+              _tenantPreference = prop['gender_category'].toString();
+              _scaleGenderCategory = _tenantPreference;
+            }
+
+            // Rules & Renting
+            if (prop['rent_due_day'] != null) {
+              _rentDueDay = prop['rent_due_day'].toString();
+            }
+            if (prop['grace_period'] != null) {
+              _gracePeriod = prop['grace_period'].toString();
+            }
+            if (prop['notice_period'] != null) {
+              _noticePeriod = prop['notice_period'].toString();
+            }
+            if (prop['late_fee'] != null) {
+              _dailyRate = '₹${prop['late_fee']} / day';
+            }
+
+            // Banking & UPI
+            if (prop['upi_vpa'] != null || prop['upi_id'] != null) {
+              _upiId = (prop['upi_vpa'] ?? prop['upi_id']).toString();
+            }
+            if (prop['bank_name'] != null) {
+              _bankName = prop['bank_name'].toString();
+            }
+            if (prop['bank_holder_name'] != null) {
+              _beneficiaryName = prop['bank_holder_name'].toString();
+            }
+
+            // Owner Identity & KYC
+            if (prop['owner_legal_name'] != null) {
+              _adminName = prop['owner_legal_name'].toString();
+              _ownerFullName = _adminName;
+            }
+            if (prop['owner_email'] != null) {
+              _adminEmail = prop['owner_email'].toString();
+              _ownerEmail = _adminEmail;
+            }
+            if (prop['crediting_phone'] != null) {
+              _adminPhone = prop['crediting_phone'].toString();
+              _ownerWhatsapp = _adminPhone;
+            }
+            if (prop['owner_aadhaar_number'] != null) {
+              _ownerAadhaar = prop['owner_aadhaar_number'].toString();
+            }
+            if (prop['owner_permanent_address'] != null) {
+              _ownerAddress = prop['owner_permanent_address'].toString();
+            }
+
+            // Building Infrastructure & Capacity
+            if (prop['lift_count'] != null) {
+              _scaleLiftCount = prop['lift_count'].toString();
+            }
+            if (prop['power_backup'] != null) {
+              _scalePowerBackup = prop['power_backup'].toString();
+            }
+            if (prop['total_floors'] != null) {
+              _scaleFloorCount = (prop['total_floors'] as num).toInt();
+            }
+            if (prop['total_rooms'] != null) {
+              _scaleTotalRooms = (prop['total_rooms'] as num).toInt();
+            }
+            if (prop['total_beds'] != null) {
+              _scaleTotalBeds = (prop['total_beds'] as num).toInt();
+            }
+            if (prop['ground_floor_has_rooms'] != null) {
+              _scaleGroundRooms = (prop['ground_floor_has_rooms'] == true) ? 2 : 0;
+            }
+
+            // House Rules / Curfew
+            if (settings?['gate_closing_time'] != null) {
+              _curfewTime = settings!['gate_closing_time'].toString();
+            } else if (prop['gate_closing_time'] != null) {
+              _curfewTime = prop['gate_closing_time'].toString();
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading settings from Supabase: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _fetchLiveGeoData() async {
@@ -275,11 +425,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
             // 2. Body Views
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16.0, 14.0, 16.0, 40.0),
-                child: _buildCurrentView(),
-              ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: AppColors.green,
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16.0, 14.0, 16.0, 40.0),
+                      child: _buildCurrentView(),
+                    ),
             ),
           ],
         ),
@@ -584,7 +741,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               ),
               child: Center(
                 child: Text(
-                  'BK',
+                  _adminInitials,
                   style: GoogleFonts.outfit(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -1592,7 +1749,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 20),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final phone = phoneCtrl.text.trim();
                       if (phone.length != 10) {
                         _showToast('Please enter a valid 10-digit mobile number');
@@ -1606,14 +1763,31 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
                       setState(() {
                         _ownerFullName = nameCtrl.text.trim();
+                        _adminName = _ownerFullName;
                         _ownerFatherName = fatherCtrl.text.trim();
                         _ownerWhatsapp = '+91 $phone';
+                        _adminPhone = _ownerWhatsapp;
                         _ownerEmail = emailCtrl.text.trim();
+                        _adminEmail = _ownerEmail;
                         if (aadhaar.isNotEmpty) {
                           _ownerAadhaar = '${aadhaar.substring(0, 4)} •••• ${aadhaar.substring(8)}';
                         }
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          await SupabaseService.instance.client.from('properties').update({
+                            'owner_legal_name': _ownerFullName,
+                            'owner_email': _ownerEmail,
+                            'crediting_phone': _ownerWhatsapp,
+                            'owner_aadhaar_number': aadhaar.isNotEmpty ? aadhaar : _ownerAadhaar,
+                          }).eq('id', _propId);
+                        } catch (e) {
+                          debugPrint('Error updating owner identity in Supabase: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Owner Personal Identity updated ✓');
                     },
                     style: OutlinedButton.styleFrom(
@@ -1888,17 +2062,36 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 20),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() {
                         _scalePgName = nameCtrl.text.trim();
+                        _propName = _scalePgName;
                         _scaleAreaLocality = areaCtrl.text.trim();
+                        _locality = _scaleAreaLocality;
                         _scalePincode = pinCtrl.text.trim();
+                        _pincode = _scalePincode;
                         _scaleGenderCategory = tempGender;
                         _scaleLiftCount = tempLift;
                         _scalePowerBackup = tempGen;
                         _tenantPreference = tempGender.contains("Men's") ? 'Gents' : (tempGender.contains("Women's") ? 'Ladies' : 'Co-Living');
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          await SupabaseService.instance.client.from('properties').update({
+                            'property_name': _scalePgName,
+                            'area_locality': _scaleAreaLocality,
+                            'pincode': _scalePincode,
+                            'gender_category': _tenantPreference,
+                            'lift_count': _scaleLiftCount,
+                            'power_backup': _scalePowerBackup,
+                          }).eq('id', _propId);
+                        } catch (e) {
+                          debugPrint('Error updating infrastructure in Supabase: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Property Infrastructure updated ✓');
                     },
                     style: OutlinedButton.styleFrom(
@@ -2025,7 +2218,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 20),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final f = int.tryParse(floorCtrl.text) ?? _scaleFloorCount;
                       final u = int.tryParse(upperRoomsCtrl.text) ?? _scaleRoomsEachFloor;
                       final g = tempGroundHasRooms ? (int.tryParse(gfRoomsCtrl.text) ?? 2) : 0;
@@ -2034,13 +2227,27 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         return;
                       }
 
+                      final totalR = g + ((f > 1 ? f - 1 : 0) * u);
                       setState(() {
                         _scaleFloorCount = f;
                         _scaleRoomsEachFloor = u;
                         _scaleGroundRooms = g;
-                        _scaleTotalRooms = g + ((f > 1 ? f - 1 : 0) * u);
+                        _scaleTotalRooms = totalR;
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          await SupabaseService.instance.client.from('properties').update({
+                            'total_floors': f,
+                            'total_rooms': totalR,
+                            'ground_floor_has_rooms': tempGroundHasRooms,
+                          }).eq('id', _propId);
+                        } catch (e) {
+                          debugPrint('Error updating layout in Supabase: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Building Architecture updated to $_scaleTotalRooms Rooms ✓');
                     },
                     style: OutlinedButton.styleFrom(
@@ -3261,7 +3468,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 18),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() {
                         _propName = nameCtrl.text.trim();
                         _propType = tempType;
@@ -3279,7 +3486,26 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         if (_pincode.isNotEmpty) parts.add(_pincode);
                         _propAddress = parts.isNotEmpty ? parts.join(', ') : _propAddress;
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          await SupabaseService.instance.client.from('properties').update({
+                            'property_name': _propName,
+                            'property_structure': _propType,
+                            'area_locality': _locality,
+                            'landmark': _landmark,
+                            'city': _selectedCity,
+                            'state': _selectedState,
+                            'pincode': _pincode,
+                            'street_address': _propAddress,
+                            'maps_url': _propMapPin,
+                          }).eq('id', _propId);
+                        } catch (e) {
+                          debugPrint('Error updating property in Supabase: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Property Details & Address Updated ✓');
                     },
                     style: OutlinedButton.styleFrom(
@@ -3360,11 +3586,22 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 22),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() {
                         _tenantPreference = tempTenant;
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          await SupabaseService.instance.client.from('properties').update({
+                            'gender_category': _tenantPreference,
+                          }).eq('id', _propId);
+                        } catch (e) {
+                          debugPrint('Error updating gender preference in Supabase: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Tenant Preference Updated ✓');
                     },
                     style: OutlinedButton.styleFrom(
@@ -3572,12 +3809,20 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 20),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() {
                         _curfewTime = tempCurfew;
                         _morningOpen = tempMorning;
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        await SupabaseService.instance.updatePropertySettings(
+                          propertyId: _propId,
+                          gateClosingTime: tempCurfew,
+                        );
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Curfew & Timings Updated ✓');
                     },
                     style: OutlinedButton.styleFrom(
@@ -3775,12 +4020,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 22),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() {
                         _rentDueDay = tempDueDay;
                         _gracePeriod = tempGrace;
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          await SupabaseService.instance.client.from('properties').update({
+                            'rent_due_day': _rentDueDay,
+                            'grace_period': _gracePeriod,
+                          }).eq('id', _propId);
+                        } catch (e) {
+                          debugPrint('Error updating renting terms in Supabase: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Renting Terms Updated ✓');
                     },
                     style: OutlinedButton.styleFrom(
@@ -4125,14 +4382,30 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 22),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() {
                         _dailyRate = tempDailyRate;
                         _lockinPeriod = tempLockin;
                         _noticePeriod = tempNotice;
                         _agreementDur = tempAgreement;
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          final numLateFee = double.tryParse(
+                                _dailyRate.replaceAll(RegExp(r'[^0-9.]'), ''),
+                              ) ??
+                              100.0;
+                          await SupabaseService.instance.client.from('properties').update({
+                            'notice_period': _noticePeriod,
+                            'late_fee': numLateFee,
+                          }).eq('id', _propId);
+                        } catch (e) {
+                          debugPrint('Error updating stay terms in Supabase: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Stay & Policy Terms Updated ✓');
                     },
                     style: OutlinedButton.styleFrom(
@@ -4390,12 +4663,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               const SizedBox(height: 16),
 
               OutlinedButton(
-                onPressed: () {
+                onPressed: () async {
                   setState(() {
                     _adminPhone = phoneCtrl.text.trim();
                     _adminEmail = emailCtrl.text.trim();
                   });
-                  Navigator.of(ctx).pop();
+                  if (_propId.isNotEmpty) {
+                    try {
+                      await SupabaseService.instance.client.from('properties').update({
+                        'owner_email': _adminEmail,
+                        'crediting_phone': _adminPhone,
+                      }).eq('id', _propId);
+                    } catch (e) {
+                      debugPrint('Error updating account credentials in Supabase: $e');
+                    }
+                  }
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                  }
                   _showToast('Account Credentials Updated Successfully ✓');
                 },
                 style: OutlinedButton.styleFrom(
@@ -4851,18 +5136,22 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             const SizedBox(width: 12),
             Flexible(
               child: Text(
-                row.val,
+                row.val.trim().isNotEmpty ? row.val : 'Not Set',
                 textAlign: TextAlign.right,
                 style: row.isCode
                     ? GoogleFonts.firaCode(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: row.isGreen ? AppColors.greenDark : AppColors.ink,
+                        color: row.val.trim().isNotEmpty
+                            ? (row.isGreen ? AppColors.greenDark : AppColors.ink)
+                            : AppColors.muted,
                       )
                     : GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: row.isGreen ? AppColors.greenDark : AppColors.ink,
+                        color: row.val.trim().isNotEmpty
+                            ? (row.isGreen ? AppColors.greenDark : AppColors.ink)
+                            : AppColors.muted,
                       ),
               ),
             ),
@@ -5066,11 +5355,30 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               const SizedBox(height: 10),
 
               OutlinedButton(
-                onPressed: () {
+                onPressed: () async {
                   for (int i = 0; i < fields.length; i++) {
                     fields[i].onSave(controllers[i].text.trim());
                   }
-                  Navigator.of(ctx).pop();
+                  if (_propId.isNotEmpty) {
+                    try {
+                      await SupabaseService.instance.client.from('properties').update({
+                        'upi_vpa': _upiId,
+                        'bank_name': _bankName,
+                        'bank_holder_name': _beneficiaryName,
+                      }).eq('id', _propId);
+
+                      await SupabaseService.instance.updatePropertySettings(
+                        propertyId: _propId,
+                        upiId: _upiId,
+                        gateClosingTime: _curfewTime,
+                      );
+                    } catch (e) {
+                      debugPrint('Error updating settings in Supabase: $e');
+                    }
+                  }
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                  }
                   _showToast('$title Saved ✓');
                 },
                 style: OutlinedButton.styleFrom(

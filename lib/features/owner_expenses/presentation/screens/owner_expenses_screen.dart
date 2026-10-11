@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen 10: Operating Costs, Grocery Rations & Monthly Expense Ledger.
 /// Strict Design System:
@@ -16,8 +17,9 @@ import '../../../../core/state/owner_app_state.dart';
 /// - 100% Zero Overflow protection with Expanded & Flexible.
 class OwnerExpensesScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
 
-  const OwnerExpensesScreen({super.key, this.onBack});
+  const OwnerExpensesScreen({super.key, this.onBack, this.propertyId});
 
   @override
   State<OwnerExpensesScreen> createState() => _OwnerExpensesScreenState();
@@ -49,6 +51,48 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
 
   // Master Expenses Ledger (Populated live from Supabase / State)
   final List<Map<String, dynamic>> _expenses = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExpensesFromSupabase();
+  }
+
+  Future<void> _loadExpensesFromSupabase() async {
+    try {
+      final targetPropId = widget.propertyId ??
+          SupabaseService.instance.activePropertyId;
+      String? propId = targetPropId;
+      if (propId == null || propId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        propId = prop?['id']?.toString();
+      }
+
+      if (propId != null && propId.isNotEmpty) {
+        final list = await SupabaseService.instance.getExpenses(propId);
+        if (list.isNotEmpty && mounted) {
+          setState(() {
+            _expenses.clear();
+            for (final e in list) {
+              _expenses.add({
+                'id': e['id']?.toString() ?? '',
+                'title': e['title']?.toString() ?? e['notes']?.toString() ?? e['category']?.toString() ?? 'Expense',
+                'category': e['category']?.toString() ?? 'Other',
+                'vendor': e['vendor']?.toString() ?? 'Direct Expense',
+                'amount': (e['amount'] as num?)?.toInt() ?? 0,
+                'date': e['created_at'] != null ? e['created_at'].toString().split('T').first : 'Recent',
+                'ref': 'Saved to Ledger',
+                'receiptFile': 'invoice_receipt.pdf',
+                'hasReceipt': false,
+              });
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading expenses from Supabase: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -255,7 +299,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
 
                   // Submit Button - GREEN BACKGROUND WITH WHITE TEXT
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final title = _titleController.text.trim();
                       final amountStr = _amountController.text.trim();
                       final vendor = _vendorController.text.trim();
@@ -279,9 +323,8 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                           ? _customCatController.text.trim()
                           : _selectedModalCat.split(' / ')[0];
 
-                      Navigator.of(ctx).pop();
-                      setState(() {
-                        if (isEditing) {
+                      if (isEditing) {
+                        setState(() {
                           expenseToEdit['title'] = title;
                           expenseToEdit['category'] = finalCat;
                           expenseToEdit['vendor'] =
@@ -291,8 +334,27 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                               _attachedBillName ?? 'invoice_receipt.pdf';
                           expenseToEdit['hasReceipt'] =
                               _attachedBillName != null;
-                          _showToast('Updated $title ✓');
-                        } else {
+                        });
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
+                        }
+                        _showToast('Updated $title ✓');
+                      } else {
+                        final prop = await SupabaseService.instance.getOwnerProperty();
+                        if (prop != null) {
+                          final success = await SupabaseService.instance.addExpense(
+                            propertyId: prop['id'].toString(),
+                            category: finalCat,
+                            amount: amount.toDouble(),
+                            notes: '$title • ${vendor.isNotEmpty ? vendor : "Direct Expense"}',
+                          );
+                          if (!success) {
+                            _showToast('Failed to record expense. Please try again.');
+                            return;
+                          }
+                        }
+
+                        setState(() {
                           _expenses.insert(0, {
                             'id':
                                 'EXP-${DateTime.now().millisecondsSinceEpoch % 1000}',
@@ -307,10 +369,14 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                                 _attachedBillName ?? 'invoice_receipt.pdf',
                             'hasReceipt': _attachedBillName != null,
                           });
-                          _showToast(
-                              '₹${amount.toString()} logged under $finalCat ✓');
+                        });
+
+                        if (ctx.mounted) {
+                          Navigator.of(ctx).pop();
                         }
-                      });
+                        _showToast(
+                            '₹${amount.toString()} logged under $finalCat ✓');
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
@@ -537,7 +603,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                       _buildEmptyState(
                           'No expenses found matching your filter.')
                     else
-                      ...filtered.map((e) => _buildExpenseCard(e)).toList(),
+                      ...filtered.map((e) => _buildExpenseCard(e)),
                   ],
                 ),
               ),

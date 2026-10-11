@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
+import '../../../../core/state/owner_app_state.dart';
 
 /// 🍽️ Meal Item Data Model for each daily meal slot
 class MealSlot {
@@ -44,10 +46,14 @@ class DayMealPlan {
 /// Allows PG Owners to setup a 1, 2, 3, or 4-week repeating meal cycle.
 class OwnerFoodMenuScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
+  final String? propertyName;
 
   const OwnerFoodMenuScreen({
     super.key,
     this.onBack,
+    this.propertyId,
+    this.propertyName,
   });
 
   @override
@@ -55,8 +61,8 @@ class OwnerFoodMenuScreen extends StatefulWidget {
 }
 
 class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
-  // Selected repeating cycle length: 1, 2, 3, or 4 weeks
-  int _selectedCycleWeeks = 2;
+  // Selected repeating cycle length: 1, 2, 3, or 4 weeks (Controlled purely by Owner)
+  int _selectedCycleWeeks = 1;
 
   // Active selected week index: 0 = Week 1, 1 = Week 2, etc.
   int _activeWeekIndex = 0;
@@ -92,6 +98,7 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
   late TextEditingController _dinnerController;
 
   bool _isSaved = false;
+  String? _propertyId;
 
   @override
   void initState() {
@@ -102,6 +109,51 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
 
     _initializeMenuStore();
     _loadCurrentDayIntoControllers();
+    _loadMenuFromSupabase();
+  }
+
+  Future<void> _loadMenuFromSupabase() async {
+    try {
+      final targetPropId = widget.propertyId ??
+          SupabaseService.instance.activePropertyId;
+      String? propId = targetPropId;
+      if (propId == null || propId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        propId = prop?['id']?.toString();
+      }
+
+      if (propId != null && propId.isNotEmpty) {
+        _propertyId = propId;
+        final list = await SupabaseService.instance.getFoodMenu(_propertyId!);
+        if (mounted && list.isNotEmpty) {
+          int? savedCycle;
+          for (final item in list) {
+            final cycle = (item['cycle_weeks'] as num?)?.toInt();
+            if (cycle != null && cycle >= 1 && cycle <= 4) {
+              savedCycle = cycle;
+            }
+            final rawWeek = (item['week_number'] as num?)?.toInt() ?? 1;
+            final weekIdx = (rawWeek - 1).clamp(0, 3);
+            final day = item['day_of_week']?.toString().toUpperCase();
+            final dayIdx = _dayNames.indexOf(day ?? '');
+            if (dayIdx != -1) {
+              _menuStore[weekIdx]?[dayIdx] = DayMealPlan(
+                breakfast: MealSlot(dishes: item['breakfast'] ?? ''),
+                lunch: MealSlot(dishes: item['lunch'] ?? ''),
+                dinner: MealSlot(dishes: item['dinner'] ?? ''),
+              );
+            }
+          }
+          if (savedCycle != null) {
+            _selectedCycleWeeks = savedCycle;
+          }
+          _loadCurrentDayIntoControllers();
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading food menu from Supabase: $e');
+    }
   }
 
   @override
@@ -123,59 +175,11 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
   }
 
   DayMealPlan _defaultMealFor(int dayIndex) {
-    switch (dayIndex) {
-      case 0: // Mon
-        return DayMealPlan(
-          breakfast:
-              MealSlot(dishes: 'Masala Dosa, Coconut Chutney, Sambar, Tea'),
-          lunch: MealSlot(
-              notProvided: false, dishes: 'Rice, Sambar, Mix Veg Curry, Curd'),
-          dinner: MealSlot(dishes: 'Chapati, Dal Tadka, Jeera Rice, Curd'),
-        );
-      case 1: // Tue
-        return DayMealPlan(
-          breakfast:
-              MealSlot(dishes: 'Idli Vada, Chutney, Sambar, Filter Coffee'),
-          lunch: MealSlot(
-              notProvided: false, dishes: 'Rice, Rasam, Aloo Fry, Papad'),
-          dinner: MealSlot(dishes: 'Roti, Paneer Butter Masala, Rice, Salad'),
-        );
-      case 2: // Wed
-        return DayMealPlan(
-          breakfast: MealSlot(dishes: 'Poori Sagu, Chutney, Tea'),
-          lunch: MealSlot(notProvided: true, dishes: ''),
-          dinner: MealSlot(dishes: 'Egg Curry / Veg Kurma, Chapati, Ghee Rice'),
-        );
-      case 3: // Thu
-        return DayMealPlan(
-          breakfast: MealSlot(dishes: 'Poha, Sev, Sweet Kesari Bath, Tea'),
-          lunch: MealSlot(
-              notProvided: false, dishes: 'Rice, Palak Dal, Curd, Pickle'),
-          dinner: MealSlot(dishes: 'Chapati, Mix Veg Gravy, Curd Rice'),
-        );
-      case 4: // Fri
-        return DayMealPlan(
-          breakfast: MealSlot(dishes: 'Aloo Paratha, Curd, Green Chutney'),
-          lunch: MealSlot(
-              notProvided: false, dishes: 'Rice, Tomato Dal, Beans Poriyal'),
-          dinner: MealSlot(dishes: 'Veg Pulao, Raita, Gulab Jamun'),
-        );
-      case 5: // Sat
-        return DayMealPlan(
-          breakfast: MealSlot(dishes: 'Rava Upma, Coconut Chutney, Coffee'),
-          lunch: MealSlot(notProvided: false, dishes: 'Rice, Sambar, Curd'),
-          dinner: MealSlot(dishes: 'Roti, Chana Masala, Rice'),
-        );
-      case 6: // Sun
-        return DayMealPlan(
-          breakfast: MealSlot(dishes: 'Special Set Dosa, Vada, Tea'),
-          lunch:
-              MealSlot(dishes: 'Chicken Biryani / Veg Biryani, Raita, Sweet'),
-          dinner: MealSlot(notProvided: true, dishes: ''),
-        );
-      default:
-        return DayMealPlan();
-    }
+    return DayMealPlan(
+      breakfast: MealSlot(dishes: ''),
+      lunch: MealSlot(dishes: ''),
+      dinner: MealSlot(dishes: ''),
+    );
   }
 
   void _saveCurrentControllersToStore() {
@@ -282,6 +286,40 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
     _saveCurrentControllersToStore();
     HapticFeedback.heavyImpact();
     setState(() => _isSaved = true);
+
+    if (_propertyId != null) {
+      final propName = widget.propertyName ??
+          OwnerAppState.instance.activePropertyName;
+
+      // Clean up any extra weeks if owner reduced cycle (e.g. from 4 to 2)
+      if (_selectedCycleWeeks < 4) {
+        SupabaseService.instance.client
+            .from('food_menus')
+            .delete()
+            .eq('property_id', _propertyId!)
+            .gt('week_number', _selectedCycleWeeks)
+            .then((_) {})
+            .catchError((_) {});
+      }
+
+      for (int w = 0; w < _selectedCycleWeeks; w++) {
+        for (int d = 0; d < 7; d++) {
+          final plan = _menuStore[w]?[d];
+          if (plan != null) {
+            SupabaseService.instance.saveFoodMenu(
+              propertyId: _propertyId!,
+              propertyName: propName.isNotEmpty ? propName : 'My PG',
+              cycleWeeks: _selectedCycleWeeks,
+              weekNumber: w + 1,
+              dayOfWeek: _dayNames[d],
+              breakfast: plan.breakfast.dishes,
+              lunch: plan.lunch.dishes,
+              dinner: plan.dinner.dishes,
+            );
+          }
+        }
+      }
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// 🍽️ Tenant Food Menu View & Day Inspector Screen
 /// Clean, zero-bloat daily menu reader for residents.
@@ -18,8 +19,8 @@ class TenantFoodMenuScreen extends StatefulWidget {
 }
 
 class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
-  // Week cycle length configured by owner (e.g. 2, 3, or 4 weeks)
-  final int _cycleWeeks = 2;
+  // Week cycle length configured by owner (e.g. 1, 2, 3, or 4 weeks)
+  int _cycleWeeks = 2;
 
   // Active selected week (0 = Week 1, 1 = Week 2, etc.)
   int _activeWeekIndex = 0;
@@ -57,6 +58,56 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
     _activeDayIndex = (todayWeekday - 1).clamp(0, 6);
 
     _initializeMenuStore();
+    _loadMenuFromSupabase();
+  }
+
+  Future<void> _loadMenuFromSupabase() async {
+    try {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      final propId = prop?['id']?.toString() ??
+          SupabaseService.instance.activePropertyId;
+      if (propId != null && propId.isNotEmpty) {
+        final list = await SupabaseService.instance.getFoodMenu(propId);
+        if (mounted && list.isNotEmpty) {
+          int maxCycle = _cycleWeeks;
+          for (final item in list) {
+            final cycle = (item['cycle_weeks'] as num?)?.toInt();
+            if (cycle != null && cycle > 0 && cycle <= 4) {
+              maxCycle = cycle;
+            }
+            final rawWeek = (item['week_number'] as num?)?.toInt() ?? 1;
+            final weekIdx = (rawWeek - 1).clamp(0, 3);
+            final day = item['day_of_week']?.toString().toUpperCase();
+            final dayIdx = _dayNames.indexOf(day ?? '');
+            if (dayIdx != -1) {
+              _menuStore[weekIdx] ??= {};
+              _menuStore[weekIdx]![dayIdx] = {
+                'breakfast': {
+                  'notProvided':
+                      (item['breakfast'] ?? '').toString().trim().isEmpty,
+                  'dishes': item['breakfast'] ?? '',
+                },
+                'lunch': {
+                  'notProvided':
+                      (item['lunch'] ?? '').toString().trim().isEmpty,
+                  'dishes': item['lunch'] ?? '',
+                },
+                'dinner': {
+                  'notProvided':
+                      (item['dinner'] ?? '').toString().trim().isEmpty,
+                  'dishes': item['dinner'] ?? '',
+                },
+              };
+            }
+          }
+          setState(() {
+            _cycleWeeks = maxCycle;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading tenant menu: $e');
+    }
   }
 
   void _initializeMenuStore() {

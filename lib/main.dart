@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/app_colors.dart';
 import 'features/owner_setup/presentation/screens/owner_setup_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'core/widgets/urban_loading.dart';
 import 'core/config/supabase_config.dart';
 
 Future<void> main() async {
@@ -86,11 +87,12 @@ class UrbanStayApp extends StatelessWidget {
         final adjustedMediaQuery =
             mediaQuery.copyWith(textScaler: safeTextScaler);
 
+        Widget rootContent;
         // 100% natural fluid expansion on all real devices (>= 320px)
         // Auto-scale smoothly if dragged below 320px (e.g. 275px micro DevTools viewport)
         if (screenWidth < 320 && screenWidth > 0) {
           final double scale = screenWidth / 320;
-          return MediaQuery(
+          rootContent = MediaQuery(
             data: adjustedMediaQuery.copyWith(
               size: Size(320, mediaQuery.size.height / scale),
             ),
@@ -104,11 +106,34 @@ class UrbanStayApp extends StatelessWidget {
               ),
             ),
           );
+        } else {
+          rootContent = MediaQuery(
+            data: adjustedMediaQuery,
+            child: content,
+          );
         }
 
-        return MediaQuery(
-          data: adjustedMediaQuery,
-          child: content,
+        // Global app-wide centered loading overlay
+        return ValueListenableBuilder<bool>(
+          valueListenable: UrbanLoadingService.isLoading,
+          builder: (context, loading, _) {
+            return Stack(
+              children: [
+                rootContent,
+                if (loading)
+                  Positioned.fill(
+                    child: Material(
+                      color: Colors.black.withValues(alpha: 0.35),
+                      child: ValueListenableBuilder<String?>(
+                        valueListenable: UrbanLoadingService.message,
+                        builder: (context, msg, _) =>
+                            UrbanLoadingCard(message: msg),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         );
       },
       // 🚀 Directly open Owner Setup Screen

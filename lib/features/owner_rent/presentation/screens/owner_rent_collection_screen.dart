@@ -14,8 +14,9 @@ import '../../../../core/state/owner_app_state.dart';
 /// - Clean Warm Gold / Neutral Ink family styling for extensions (zero purple).
 class OwnerRentCollectionScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
 
-  const OwnerRentCollectionScreen({super.key, this.onBack});
+  const OwnerRentCollectionScreen({super.key, this.onBack, this.propertyId});
 
   @override
   State<OwnerRentCollectionScreen> createState() =>
@@ -44,14 +45,15 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   Map<String, dynamic> _activeExtensionTarget = {};
   Map<String, dynamic> _activeReceiptTarget = {};
 
+  bool _isLoading = true;
+  String _propName = '';
+  int _totalBedsCount = 0;
   String _activeViewMode =
       'calendar'; // 'calendar' (Day-Wise Salary Calendar) or 'floor' (By Floor & Rooms)
   int _selectedCalendarDay = 5; // Default 5th of month
-  String _selectedStaffActor = 'Ramesh Gowda (Manager)';
+  String _selectedStaffActor = 'PG Owner';
   final List<String> _staffActors = [
-    'Ramesh Gowda (Manager)',
-    'Arun Kumar (Co-Owner)',
-    'Bhargav S Kulkarni (Owner)',
+    'PG Owner',
   ];
 
   List<String> get _cycleList {
@@ -80,16 +82,45 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
 
   Future<void> _loadRentLedgerFromSupabase() async {
     try {
-      final prop = await SupabaseService.instance.getOwnerProperty();
-      if (prop != null) {
-        final propId = prop['id'].toString();
+      final targetPropId = widget.propertyId ??
+          SupabaseService.instance.activePropertyId;
+      String? propId = targetPropId;
+      if (propId == null || propId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        propId = prop?['id']?.toString();
+      }
+
+      if (propId != null && propId.isNotEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty(propertyId: propId);
+        if (prop != null) {
+          _propName = (prop['property_name'] ?? prop['name'] ?? 'My PG').toString();
+          _totalBedsCount = (prop['total_beds'] as num?)?.toInt() ?? 0;
+
+          final ownerName = (prop['owner_legal_name'] ?? 'Owner').toString();
+          final staffList = await SupabaseService.instance.getStaff(propId);
+          final List<String> loadedStaff = ["$ownerName (Owner)"];
+          for (final s in staffList) {
+            final name = s['name']?.toString() ?? 'Staff';
+            final role = (s['role'] ?? 'Staff').toString().toUpperCase();
+            loadedStaff.add("$name ($role)");
+          }
+          if (mounted) {
+            _staffActors.clear();
+            _staffActors.addAll(loadedStaff);
+            if (_staffActors.isNotEmpty) {
+              _selectedStaffActor = _staffActors.first;
+            }
+          }
+        }
+
         final ledger = await SupabaseService.instance.getMonthlyRentLedger(propId);
-        if (ledger.isNotEmpty && mounted) {
-          final Map<String, Map<String, List<Map<String, dynamic>>>> floorMap = {};
+        final Map<String, Map<String, List<Map<String, dynamic>>>> floorMap = {};
+
+        if (ledger.isNotEmpty) {
           for (final row in ledger) {
             final tenant = row['tenants'] as Map<String, dynamic>?;
-            final roomNum = tenant?['room_number'] ?? 'Room 101';
-            final floorName = roomNum.startsWith('G') ? 'Ground Floor' : '${roomNum[0]}st Floor';
+            final roomNum = tenant?['room_number']?.toString() ?? row['room_number']?.toString() ?? '';
+            final floorName = roomNum.startsWith('G') ? 'Ground Floor' : (roomNum.isNotEmpty ? '${roomNum[0]}st Floor' : '1st Floor');
             final floorId = floorName.split(' ').first.toLowerCase();
 
             floorMap.putIfAbsent(floorId, () => {});
@@ -97,23 +128,23 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
 
             final status = (row['status'] ?? 'PENDING').toString().toLowerCase();
             final isPaid = status == 'paid';
-              final tenantName = tenant?['full_name'] ?? 'Resident';
-              final nameParts = tenantName.trim().split(' ');
-              final computedInitials = nameParts.length >= 2
-                  ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
-                  : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : '?');
+            final tenantName = tenant?['full_name'] ?? tenant?['name'] ?? row['tenant_name'] ?? 'Resident';
+            final nameParts = tenantName.trim().split(' ');
+            final computedInitials = nameParts.length >= 2
+                ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
+                : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : '?');
 
             floorMap[floorId]![roomNum]!.add({
               'id': row['id'].toString(),
               'name': tenantName,
               'initials': computedInitials,
-              'bed': tenant?['bed_number'] ?? 'Bed A',
+              'bed': tenant?['bed_number'] ?? row['bed_number'] ?? '',
               'room': roomNum,
               'roomNum': roomNum,
               'floor': floorId,
               'work': 'Resident',
               'phone': tenant?['phone'] ?? '',
-              'amount': (row['amount'] as num?)?.toInt() ?? 8000,
+              'amount': (row['amount'] as num?)?.toInt() ?? 0,
               'status': isPaid ? 'paid' : 'overdue',
               'paidLabel': isPaid ? 'Paid (Direct UPI)' : null,
               'tag': isPaid ? 'Settled 0% Fee' : null,
@@ -123,7 +154,54 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               'dueLabel': !isPaid ? 'Due this month' : null,
             });
           }
+        } else {
+          // Auto-populate active occupied residents from beds table
+          final roomsWithBeds = await SupabaseService.instance.getRoomsWithBeds(propId);
+          for (final r in roomsWithBeds) {
+            final bedsList = (r['beds'] as List?) ?? [];
+            final occBeds = bedsList.where((b) => b['is_occupied'] == true).toList();
+            if (occBeds.isNotEmpty) {
+              final roomNum = r['room_number']?.toString() ?? '';
+              final floorName = r['floor_name']?.toString() ?? (r['floor_id'] != null ? 'Floor ${r['floor_id']}' : '1st Floor');
+              final floorId = floorName.split(' ').first.toLowerCase();
 
+              floorMap.putIfAbsent(floorId, () => {});
+              floorMap[floorId]!.putIfAbsent(roomNum, () => []);
+
+              final roomRent = (r['rent_per_bed'] as num?)?.toInt() ?? 0;
+              for (final b in occBeds) {
+                final tenantName = b['tenant_name']?.toString() ?? 'Resident';
+                final parts = tenantName.trim().split(' ');
+                final computedInitials = parts.length >= 2
+                    ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
+                    : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'RS');
+                final actualBedRent = (b['rent'] as num?)?.toInt() ?? roomRent;
+
+                floorMap[floorId]![roomNum]!.add({
+                  'id': b['id'].toString(),
+                  'name': tenantName,
+                  'initials': computedInitials,
+                  'bed': b['bed_number']?.toString() ?? b['bed_label']?.toString() ?? '',
+                  'room': roomNum,
+                  'roomNum': roomNum,
+                  'floor': floorId,
+                  'work': 'Resident',
+                  'phone': b['tenant_phone']?.toString() ?? '',
+                  'amount': actualBedRent,
+                  'status': 'overdue',
+                  'paidLabel': null,
+                  'tag': null,
+                  'ref': 'UPI-PENDING',
+                  'paidDate': null,
+                  'overdueDays': 'Payment Pending',
+                  'dueLabel': 'Due this month',
+                });
+              }
+            }
+          }
+        }
+
+        if (floorMap.isNotEmpty && mounted) {
           final List<Map<String, dynamic>> loadedFloors = [];
           floorMap.forEach((fId, roomsMap) {
             final List<Map<String, dynamic>> roomsList = [];
@@ -151,6 +229,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       }
     } catch (e) {
       debugPrint('Error loading rent ledger from Supabase: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -290,20 +370,39 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       final amountReceived =
                           int.tryParse(_cashAmountController.text.trim()) ?? 0;
                       if (amountReceived <= 0) {
                         _showToast('Please enter a valid amount');
                         return;
                       }
-                      Navigator.of(ctx).pop();
+
+                      final prop = await SupabaseService.instance.getOwnerProperty();
+                      if (prop != null) {
+                        final success = await SupabaseService.instance.recordCashCollection(
+                          propertyId: prop['id'].toString(),
+                          tenantName: tenant['name'] ?? 'Resident',
+                          amount: amountReceived.toDouble(),
+                          collectedBy: currentStaff,
+                          roomNumber: tenant['room']?.toString(),
+                        );
+                        if (!success) {
+                          _showToast('Failed to record cash in database. Please check connection.');
+                          return;
+                        }
+                      }
+
                       setState(() {
                         tenant['status'] = 'paid';
                         tenant['paidLabel'] = 'Paid in Cash';
-                        tenant['paidDate'] = '18 Aug 2026';
+                        tenant['paidDate'] = 'Today';
                         tenant['approvedBy'] = currentStaff;
                       });
+
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast(
                           '₹$amountReceived marked Paid for ${tenant['name']} (Verified by $currentStaff) ✓');
                     },
@@ -906,6 +1005,15 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.green),
+        ),
+      );
+    }
+
     final allOccupied = _getAllOccupiedTenants();
     final overdueCount =
         allOccupied.where((t) => t['status'] == 'overdue').length;
@@ -1082,7 +1190,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     ),
                   ),
                   Text(
-                    '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • ${OwnerAppState.instance.totalBeds} Beds',
+                    '${_propName.isNotEmpty ? _propName : (OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG")} • ${_totalBedsCount > 0 ? _totalBedsCount : OwnerAppState.instance.totalBeds} Beds',
                     style: GoogleFonts.outfit(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w500,

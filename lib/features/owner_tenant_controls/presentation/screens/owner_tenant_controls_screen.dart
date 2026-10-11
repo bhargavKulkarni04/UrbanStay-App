@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen: Tenant Feature Control (Resident App Controls)
 /// Clean, executive enterprise design:
@@ -20,6 +21,7 @@ class OwnerTenantControlsScreen extends StatefulWidget {
 
 class _OwnerTenantControlsScreenState extends State<OwnerTenantControlsScreen> {
   bool _isEditing = false;
+  String? _propertyId;
 
   // Master Feature Toggles (Initial State)
   bool _payViaUpi = true;
@@ -41,6 +43,30 @@ class _OwnerTenantControlsScreenState extends State<OwnerTenantControlsScreen> {
   void initState() {
     super.initState();
     _resetStaged();
+    _loadControlsFromSupabase();
+  }
+
+  Future<void> _loadControlsFromSupabase() async {
+    try {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      if (prop != null) {
+        _propertyId = prop['id'].toString();
+        if (prop['tenant_controls'] is Map && mounted) {
+          final tc = prop['tenant_controls'] as Map;
+          setState(() {
+            _payViaUpi = tc['pay_via_upi'] ?? _payViaUpi;
+            _paidViaCash = tc['paid_via_cash'] ?? _paidViaCash;
+            _raiseTicket = tc['raise_ticket'] ?? _raiseTicket;
+            _ticketStatus = tc['ticket_status'] ?? _ticketStatus;
+            _bedsheetChange = tc['bedsheet_change'] ?? _bedsheetChange;
+            _rentAgreement = tc['rent_agreement'] ?? _rentAgreement;
+            _resetStaged();
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading tenant controls from Supabase: $e');
+    }
   }
 
   void _resetStaged() {
@@ -62,6 +88,22 @@ class _OwnerTenantControlsScreenState extends State<OwnerTenantControlsScreen> {
       _rentAgreement = _stagedRentAgreement;
       _isEditing = false;
     });
+
+    if (_propertyId != null) {
+      SupabaseService.instance.updatePropertySettings(
+        propertyId: _propertyId!,
+        settings: {
+          'tenant_controls': {
+            'pay_via_upi': _payViaUpi,
+            'paid_via_cash': _paidViaCash,
+            'raise_ticket': _raiseTicket,
+            'ticket_status': _ticketStatus,
+            'bedsheet_change': _bedsheetChange,
+            'rent_agreement': _rentAgreement,
+          }
+        },
+      );
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

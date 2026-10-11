@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Screen: Tenant Move-In & Onboarding Approval Hub.
 /// Strict Design Rules:
@@ -31,6 +32,64 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
 
   // Master Onboarding History List
   final List<Map<String, dynamic>> _historyList = [];
+
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCheckins();
+  }
+
+  Future<void> _loadCheckins() async {
+    setState(() => _isLoading = true);
+    try {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      if (prop != null) {
+        final propId = prop['id'].toString();
+        final checkins = await SupabaseService.instance.getTenantCheckins(propId);
+        if (mounted && checkins.isNotEmpty) {
+          final pending = <Map<String, dynamic>>[];
+          final history = <Map<String, dynamic>>[];
+          for (final c in checkins) {
+            final name = c['full_name'] ?? c['name'] ?? 'Resident';
+            final nameParts = name.trim().split(' ');
+            final initials = nameParts.length >= 2
+                ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
+                : (name.isNotEmpty ? name[0].toUpperCase() : 'RV');
+            final item = {
+              'id': c['id'].toString(),
+              'name': name,
+              'initials': initials,
+              'phone': c['phone'] ?? '',
+              'roomNumber': c['room_number']?.toString() ?? '',
+              'sharingType': c['sharing_type']?.toString() ?? '',
+              'rent': (c['rent'] as num?)?.toInt() ?? 0,
+              'deposit': (c['deposit'] as num?)?.toInt() ?? 0,
+              'status': (c['status'] ?? 'pending').toString().toLowerCase(),
+              'processedDate': c['created_at'] != null ? c['created_at'].toString().split('T').first : 'Today',
+              'auditNote': c['notes'] ?? 'QR Standee Check-In',
+            };
+            if (item['status'] == 'pending') {
+              pending.add(item);
+            } else {
+              history.add(item);
+            }
+          }
+          setState(() {
+            _pendingList.clear();
+            _pendingList.addAll(pending);
+            _historyList.clear();
+            _historyList.addAll(history);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading checkins: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -297,6 +356,10 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                       final finalDeposit = int.tryParse(depositController.text.replaceAll(',', '').replaceAll('₹', '')) ?? req['deposit'];
 
                       Navigator.of(ctx).pop();
+                      SupabaseService.instance.updateCheckinStatus(
+                        checkinId: req['id'].toString(),
+                        status: 'APPROVED',
+                      );
                       setState(() {
                         _pendingList.removeWhere((item) => item['id'] == req['id']);
                         _historyList.insert(0, {
@@ -369,6 +432,10 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                   ElevatedButton(
                     onPressed: () {
                       Navigator.of(ctx).pop();
+                      SupabaseService.instance.updateCheckinStatus(
+                        checkinId: req['id'].toString(),
+                        status: 'REJECTED',
+                      );
                       setState(() {
                         _pendingList.removeWhere((item) => item['id'] == req['id']);
                         _historyList.insert(0, {
