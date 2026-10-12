@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen 10: Operating Costs, Grocery Rations & Monthly Expense Ledger.
 /// Strict Design System:
@@ -49,8 +50,8 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   }());
   String? _attachedBillName;
 
-  // Master Expenses Ledger (Populated live from Supabase / State)
-  final List<Map<String, dynamic>> _expenses = [];
+  // Master Expenses Ledger (Strongly-typed ExpenseModel list)
+  final List<ExpenseModel> _expenses = [];
 
   @override
   void initState() {
@@ -69,23 +70,11 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       }
 
       if (propId != null && propId.isNotEmpty) {
-        final list = await SupabaseService.instance.getExpenses(propId);
-        if (list.isNotEmpty && mounted) {
+        final list = await SupabaseService.instance.getExpenseModels(propId);
+        if (mounted) {
           setState(() {
             _expenses.clear();
-            for (final e in list) {
-              _expenses.add({
-                'id': e['id']?.toString() ?? '',
-                'title': e['title']?.toString() ?? e['notes']?.toString() ?? e['category']?.toString() ?? 'Expense',
-                'category': e['category']?.toString() ?? 'Other',
-                'vendor': e['vendor']?.toString() ?? 'Direct Expense',
-                'amount': (e['amount'] as num?)?.toInt() ?? 0,
-                'date': e['created_at'] != null ? e['created_at'].toString().split('T').first : 'Recent',
-                'ref': 'Saved to Ledger',
-                'receiptFile': 'invoice_receipt.pdf',
-                'hasReceipt': false,
-              });
-            }
+            _expenses.addAll(list);
           });
         }
       }
@@ -124,19 +113,15 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   }
 
   int get _totalSpent =>
-      _expenses.fold<int>(0, (sum, item) => sum + (item['amount'] as int));
+      _expenses.fold<int>(0, (sum, item) => sum + item.amount.toInt());
 
-
-  // ===========================================================================
-  // MODAL: LOG NEW PG EXPENSE (With "+ Other" custom category text input)
-  // ===========================================================================
   // ===========================================================================
   // MODAL: LOG / EDIT PG EXPENSE
   // ===========================================================================
-  void _openExpenseModal({Map<String, dynamic>? expenseToEdit}) {
+  void _openExpenseModal({ExpenseModel? expenseToEdit}) {
     final isEditing = expenseToEdit != null;
     if (isEditing) {
-      _selectedModalCat = expenseToEdit['category'] ?? 'Electricity';
+      _selectedModalCat = expenseToEdit.category;
       _isCustomCategory = ![
         'Electricity',
         'Kitchen / Ration',
@@ -155,12 +140,10 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
       } else {
         _customCatController.clear();
       }
-      _titleController.text = expenseToEdit['title'] ?? '';
-      _amountController.text = (expenseToEdit['amount'] ?? '').toString();
-      _vendorController.text = expenseToEdit['vendor'] ?? '';
-      _attachedBillName = expenseToEdit['hasReceipt'] == true
-          ? (expenseToEdit['receiptFile'] ?? 'bill_receipt.jpg')
-          : null;
+      _titleController.text = expenseToEdit.title;
+      _amountController.text = expenseToEdit.amount.toInt().toString();
+      _vendorController.text = expenseToEdit.vendor ?? '';
+      _attachedBillName = expenseToEdit.receiptUrl;
     } else {
       _selectedModalCat = 'Electricity';
       _isCustomCategory = false;
@@ -323,60 +306,44 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                           ? _customCatController.text.trim()
                           : _selectedModalCat.split(' / ')[0];
 
-                      if (isEditing) {
-                        setState(() {
-                          expenseToEdit['title'] = title;
-                          expenseToEdit['category'] = finalCat;
-                          expenseToEdit['vendor'] =
-                              vendor.isNotEmpty ? vendor : 'Direct Expense';
-                          expenseToEdit['amount'] = amount;
-                          expenseToEdit['receiptFile'] =
-                              _attachedBillName ?? 'invoice_receipt.pdf';
-                          expenseToEdit['hasReceipt'] =
-                              _attachedBillName != null;
-                        });
-                        if (ctx.mounted) {
-                          Navigator.of(ctx).pop();
-                        }
-                        _showToast('Updated $title ✓');
-                      } else {
-                        final prop = await SupabaseService.instance.getOwnerProperty();
-                        if (prop != null) {
-                          final success = await SupabaseService.instance.addExpense(
-                            propertyId: prop['id'].toString(),
-                            category: finalCat,
-                            amount: amount.toDouble(),
-                            notes: '$title • ${vendor.isNotEmpty ? vendor : "Direct Expense"}',
-                          );
-                          if (!success) {
-                            _showToast('Failed to record expense. Please try again.');
-                            return;
-                          }
-                        }
+                      final prop = await SupabaseService.instance.getOwnerProperty();
+                      final pId = widget.propertyId ?? prop?['id']?.toString() ?? SupabaseService.instance.activePropertyId ?? '';
+                      final pName = prop?['property_name']?.toString() ?? SupabaseService.instance.activePropertyName ?? '';
 
-                        setState(() {
-                          _expenses.insert(0, {
-                            'id':
-                                'EXP-${DateTime.now().millisecondsSinceEpoch % 1000}',
-                            'title': title,
-                            'category': finalCat,
-                            'vendor':
-                                vendor.isNotEmpty ? vendor : 'Direct Expense',
-                            'amount': amount,
-                            'date': 'Today',
-                            'ref': 'Saved to Ledger',
-                            'receiptFile':
-                                _attachedBillName ?? 'invoice_receipt.pdf',
-                            'hasReceipt': _attachedBillName != null,
-                          });
-                        });
+                      final expenseModel = ExpenseModel(
+                        id: (isEditing && expenseToEdit != null) ? expenseToEdit.id : '',
+                        propertyId: pId,
+                        propertyName: pName,
+                        title: title,
+                        category: finalCat,
+                        amount: amount.toDouble(),
+                        vendor: vendor.isNotEmpty ? vendor : 'Direct Expense',
+                        receiptUrl: _attachedBillName,
+                        expenseDate: DateTime.now(),
+                      );
 
-                        if (ctx.mounted) {
-                          Navigator.of(ctx).pop();
-                        }
-                        _showToast(
-                            '₹${amount.toString()} logged under $finalCat ✓');
+                      final success = await SupabaseService.instance.recordExpenseModel(expenseModel);
+                      if (!success) {
+                        _showToast('Failed to record expense. Please try again.');
+                        return;
                       }
+
+                      setState(() {
+                        if (isEditing && expenseToEdit != null) {
+                          final idx = _expenses.indexWhere((e) => e.id == expenseToEdit.id);
+                          if (idx != -1) {
+                            _expenses[idx] = expenseModel;
+                          }
+                        } else {
+                          _expenses.insert(0, expenseModel);
+                        }
+                      });
+
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
+                      _showToast(
+                          '₹${amount.toString()} logged under $finalCat ✓');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
@@ -446,7 +413,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   // ===========================================================================
   // MODAL: VIEW RECEIPT PHOTO PREVIEW
   // ===========================================================================
-  void _openReceiptModal(Map<String, dynamic> expense) {
+  void _openReceiptModal(ExpenseModel expense) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -472,7 +439,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                         size: 48, color: AppColors.muted),
                     const SizedBox(height: 10),
                     Text(
-                      expense['receiptFile'] ?? 'bill_receipt.pdf',
+                      expense.receiptUrl ?? 'bill_receipt.pdf',
                       style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -480,7 +447,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '₹${(expense['amount'] as int).toString()} • Verified in Expense Ledger',
+                      '₹${expense.amount.toInt().toString()} • Verified in Expense Ledger',
                       style: GoogleFonts.outfit(
                           fontSize: 11, color: AppColors.muted),
                     ),
@@ -497,7 +464,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                '${expense['title']} — ${expense['vendor']}',
+                '${expense.title} — ${expense.vendor ?? "Direct Expense"}',
                 style: GoogleFonts.outfit(
                     fontSize: 13, color: AppColors.ink, height: 1.4),
               ),
@@ -533,12 +500,12 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
     final query = _searchController.text.toLowerCase().trim();
     final filtered = _expenses.where((item) {
       if (_selectedCategoryFilter != 'all') {
-        final cat = (item['category'] as String).toLowerCase();
+        final cat = item.category.toLowerCase();
         if (!cat.contains(_selectedCategoryFilter)) return false;
       }
       if (query.isNotEmpty) {
-        final title = (item['title'] as String).toLowerCase();
-        final vendor = (item['vendor'] as String).toLowerCase();
+        final title = item.title.toLowerCase();
+        final vendor = (item.vendor ?? '').toLowerCase();
         if (!title.contains(query) && !vendor.contains(query)) return false;
       }
       return true;
@@ -962,7 +929,8 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
   // ===========================================================================
   // 6. EXPENSE CARD
   // ===========================================================================
-  Widget _buildExpenseCard(Map<String, dynamic> expense) {
+  Widget _buildExpenseCard(ExpenseModel expense) {
+    final hasReceipt = expense.receiptUrl != null && expense.receiptUrl!.isNotEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
@@ -991,7 +959,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      expense['title'],
+                      expense.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -1004,7 +972,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      expense['vendor'],
+                      expense.vendor ?? 'Direct Expense',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -1019,7 +987,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
 
               // Amount (Just green text, no green bg)
               Text(
-                '₹${(expense['amount'] as int).toString()}',
+                '₹${expense.amount.toInt().toString()}',
                 style: GoogleFonts.outfit(
                   fontSize: 16.5,
                   fontWeight: FontWeight.w900,
@@ -1034,7 +1002,7 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
           // Action Buttons: View Bill Slip + Edit
           Row(
             children: [
-              if (expense['hasReceipt'] == true) ...[
+              if (hasReceipt) ...[
                 Expanded(
                   child: InkWell(
                     onTap: () => _openReceiptModal(expense),

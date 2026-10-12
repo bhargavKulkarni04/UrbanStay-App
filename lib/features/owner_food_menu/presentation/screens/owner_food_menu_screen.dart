@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/models/models.dart';
 
 /// 🍽️ Meal Item Data Model for each daily meal slot
 class MealSlot {
@@ -124,23 +125,23 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
 
       if (propId != null && propId.isNotEmpty) {
         _propertyId = propId;
-        final list = await SupabaseService.instance.getFoodMenu(_propertyId!);
+        final list = await SupabaseService.instance.getFoodMenuModels(_propertyId!);
         if (mounted && list.isNotEmpty) {
           int? savedCycle;
           for (final item in list) {
-            final cycle = (item['cycle_weeks'] as num?)?.toInt();
-            if (cycle != null && cycle >= 1 && cycle <= 4) {
+            final cycle = item.cycleWeeks;
+            if (cycle >= 1 && cycle <= 4) {
               savedCycle = cycle;
             }
-            final rawWeek = (item['week_number'] as num?)?.toInt() ?? 1;
+            final rawWeek = item.weekNumber;
             final weekIdx = (rawWeek - 1).clamp(0, 3);
-            final day = item['day_of_week']?.toString().toUpperCase();
-            final dayIdx = _dayNames.indexOf(day ?? '');
+            final day = item.dayOfWeek.toUpperCase();
+            final dayIdx = _dayNames.indexOf(day);
             if (dayIdx != -1) {
               _menuStore[weekIdx]?[dayIdx] = DayMealPlan(
-                breakfast: MealSlot(dishes: item['breakfast'] ?? ''),
-                lunch: MealSlot(dishes: item['lunch'] ?? ''),
-                dinner: MealSlot(dishes: item['dinner'] ?? ''),
+                breakfast: MealSlot(dishes: item.breakfast),
+                lunch: MealSlot(dishes: item.lunch),
+                dinner: MealSlot(dishes: item.dinner),
               );
             }
           }
@@ -306,7 +307,8 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
         for (int d = 0; d < 7; d++) {
           final plan = _menuStore[w]?[d];
           if (plan != null) {
-            SupabaseService.instance.saveFoodMenu(
+            final menuModel = FoodMenuModel(
+              id: '',
               propertyId: _propertyId!,
               propertyName: propName.isNotEmpty ? propName : 'My PG',
               cycleWeeks: _selectedCycleWeeks,
@@ -315,7 +317,9 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
               breakfast: plan.breakfast.dishes,
               lunch: plan.lunch.dishes,
               dinner: plan.dinner.dishes,
+              updatedAt: DateTime.now(),
             );
+            SupabaseService.instance.upsertFoodMenuModel(menuModel);
           }
         }
       }

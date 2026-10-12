@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen 11: Staff Directory & Payroll Management.
 /// Strict Design System:
@@ -17,8 +18,10 @@ import '../../../../core/services/supabase_service.dart';
 class OwnerStaffScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final String? propertyId;
+  final String? propertyName;
 
-  const OwnerStaffScreen({super.key, this.onBack, this.propertyId});
+  const OwnerStaffScreen(
+      {super.key, this.onBack, this.propertyId, this.propertyName});
 
   @override
   State<OwnerStaffScreen> createState() => _OwnerStaffScreenState();
@@ -37,10 +40,11 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   final TextEditingController _salaryController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
-  // Master Staff Directory List (Populated live from Supabase / User Entry)
-  final List<Map<String, dynamic>> _staffList = [];
+  // Master Staff Directory List (Typed StaffModel from Supabase)
+  final List<StaffModel> _staffList = [];
   bool _isLoading = false;
   String? _propertyId;
+  String? _propertyName;
 
   @override
   void initState() {
@@ -51,48 +55,26 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   Future<void> _loadStaffFromSupabase() async {
     setState(() => _isLoading = true);
     try {
-      final targetPropId = widget.propertyId ??
-          SupabaseService.instance.activePropertyId;
+      final targetPropId =
+          widget.propertyId ?? SupabaseService.instance.activePropertyId;
       String? propId = targetPropId;
-      if (propId == null || propId.isEmpty) {
+      String? pName =
+          widget.propertyName ?? SupabaseService.instance.activePropertyName;
+      if (propId == null || propId.isEmpty || pName == null || pName.isEmpty) {
         final prop = await SupabaseService.instance.getOwnerProperty();
-        propId = prop?['id']?.toString();
+        propId ??= prop?['id']?.toString();
+        pName ??= prop?['name']?.toString();
       }
 
       if (propId != null && propId.isNotEmpty) {
         _propertyId = propId;
-        final list = await SupabaseService.instance.getStaff(_propertyId!);
+        _propertyName = pName;
+        final list =
+            await SupabaseService.instance.getStaffMembers(_propertyId!);
         if (mounted) {
-          final List<Map<String, dynamic>> loaded = [];
-          for (final s in list) {
-            final name = s['name'] ?? 'Staff Member';
-            final initials = name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').join('').toUpperCase();
-            final role = (s['role'] ?? 'warden').toString().toLowerCase();
-
-            // Safe parsing of monthly_salary which Postgres returns as numeric/String "22.00"
-            final rawSalary = s['monthly_salary'] ?? s['salary'];
-            final int salary = rawSalary is num
-                ? rawSalary.toInt()
-                : (num.tryParse(rawSalary?.toString() ?? '0')?.toInt() ?? 0);
-
-            final status = (s['salary_status'] ?? s['status'] ?? 'pending').toString().toLowerCase();
-
-            loaded.add({
-              'id': s['id'].toString(),
-              'name': name,
-              'initials': initials.length > 2 ? initials.substring(0, 2) : initials,
-              'role': role,
-              'workTitle': s['work_title'] ?? s['role'] ?? 'Staff',
-              'phone': s['phone'] ?? '',
-              'salary': salary,
-              'month': '${_currentMonthName()} Salary',
-              'status': status,
-              'joinedDate': s['joined_date'] ?? (s['created_at'] != null ? s['created_at'].toString().split('T').first : 'Active'),
-            });
-          }
           setState(() {
             _staffList.clear();
-            _staffList.addAll(loaded);
+            _staffList.addAll(list);
           });
         }
       }
@@ -105,8 +87,18 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
 
   String _currentMonthName() {
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return months[DateTime.now().month - 1];
   }
@@ -128,7 +120,8 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         duration: const Duration(seconds: 2),
@@ -139,49 +132,39 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     );
   }
 
-  int get _totalPayroll => _staffList.fold<int>(0, (sum, s) => sum + (s['salary'] as int));
+  int get _totalPayroll =>
+      _staffList.fold<int>(0, (sum, s) => sum + s.monthlySalary.toInt());
   int get _pendingPayroll => _staffList
-      .where((s) => s['status'] == 'pending')
-      .fold<int>(0, (sum, s) => sum + (s['salary'] as int));
+      .where((s) => !s.isPaid)
+      .fold<int>(0, (sum, s) => sum + s.monthlySalary.toInt());
 
-  Future<void> _approveSalary(Map<String, dynamic> staff) async {
-    final staffId = staff['id']?.toString();
-    if (staffId != null && staffId.isNotEmpty) {
+  Future<void> _approveSalary(StaffModel staff) async {
+    if (staff.id.isNotEmpty) {
       try {
         await SupabaseService.instance.client
-            .from('property_team')
-            .update({'salary_status': 'paid'})
-            .eq('id', staffId);
-      } catch (_) {
-        try {
-          await SupabaseService.instance.client
-              .from('staff')
-              .update({'salary_status': 'paid'})
-              .eq('id', staffId);
-        } catch (e) {
-          debugPrint('Error updating staff salary status: $e');
-        }
+            .from('staff')
+            .update({'salary_status': 'paid'}).eq('id', staff.id);
+      } catch (e) {
+        debugPrint('Error updating staff salary status: $e');
       }
     }
 
     if (_propertyId != null) {
-      final amount = (staff['salary'] as num?)?.toDouble() ?? 0.0;
       await SupabaseService.instance.addExpense(
         propertyId: _propertyId!,
+        propertyName: _propertyName,
         category: 'Staff Salary',
-        amount: amount,
-        notes: 'Monthly Salary for ${staff['name']} (${staff['role']})',
+        amount: staff.monthlySalary,
+        notes: 'Monthly Salary for ${staff.name} (${staff.displayWorkTitle})',
       );
     }
 
-    setState(() {
-      staff['status'] = 'paid';
-    });
-
-    _showToast('₹${(staff['salary'] as int).toString()} Salary Approved for ${staff['name']} • Recorded in PG Expenses');
+    await _loadStaffFromSupabase();
+    _showToast(
+        '₹${staff.monthlySalary.toInt()} Salary Approved for ${staff.name} • Recorded in PG Expenses');
   }
 
-  void _showSalaryApproveDialog(Map<String, dynamic> staff) {
+  void _showSalaryApproveDialog(StaffModel staff) {
     showDialog(
       context: context,
       builder: (dialogCtx) {
@@ -220,7 +203,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Approve ₹${staff['salary']} salary payout for ${staff['name']} (${staff['workTitle']})?',
+                'Approve ₹${staff.monthlySalary.toInt()} salary payout for ${staff.name} (${staff.displayWorkTitle})?',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 12.5,
@@ -291,7 +274,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     );
   }
 
-  void _revertToUnpaid(Map<String, dynamic> staff) {
+  void _revertToUnpaid(StaffModel staff) {
     showDialog(
       context: context,
       builder: (dialogCtx) {
@@ -330,7 +313,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Mark ₹${staff['salary']} salary for ${staff['name']} back to Unpaid (Pending)?',
+                'Mark ₹${staff.monthlySalary.toInt()} salary for ${staff.name} back to Unpaid (Pending)?',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 12.5,
@@ -369,31 +352,22 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                   Expanded(
                     child: InkWell(
                       onTap: () async {
-                        final staffId = staff['id']?.toString();
-                        if (staffId != null && staffId.isNotEmpty) {
+                        if (staff.id.isNotEmpty) {
                           try {
                             await SupabaseService.instance.client
-                                .from('property_team')
-                                .update({'salary_status': 'pending'})
-                                .eq('id', staffId);
-                          } catch (_) {
-                            try {
-                              await SupabaseService.instance.client
-                                  .from('staff')
-                                  .update({'salary_status': 'pending'})
-                                  .eq('id', staffId);
-                            } catch (e) {
-                              debugPrint('Error reverting salary status: $e');
-                            }
+                                .from('staff')
+                                .update({'salary_status': 'pending'}).eq(
+                                    'id', staff.id);
+                          } catch (e) {
+                            debugPrint('Error reverting salary status: $e');
                           }
                         }
-                        setState(() {
-                          staff['status'] = 'pending';
-                        });
+                        await _loadStaffFromSupabase();
                         if (dialogCtx.mounted) {
                           Navigator.of(dialogCtx).pop();
                         }
-                        _showToast('${staff['name']}\'s salary reverted to Pending');
+                        _showToast(
+                            '${staff.name}\'s salary reverted to Pending');
                       },
                       borderRadius: BorderRadius.circular(12),
                       child: Container(
@@ -455,11 +429,17 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      _buildModalRoleChip('Warden', Icons.badge_outlined, setModalState),
-                      _buildModalRoleChip('Cook', Icons.restaurant_rounded, setModalState),
-                      _buildModalRoleChip('Housekeeping', Icons.cleaning_services_outlined, setModalState),
-                      _buildModalRoleChip('Security', Icons.shield_outlined, setModalState),
-                      _buildModalRoleChip('+ Other (Custom)', Icons.add_circle_outline_rounded, setModalState, isCustom: true),
+                      _buildModalRoleChip(
+                          'Warden', Icons.badge_outlined, setModalState),
+                      _buildModalRoleChip(
+                          'Cook', Icons.restaurant_rounded, setModalState),
+                      _buildModalRoleChip('Housekeeping',
+                          Icons.cleaning_services_outlined, setModalState),
+                      _buildModalRoleChip(
+                          'Security', Icons.shield_outlined, setModalState),
+                      _buildModalRoleChip('+ Other (Custom)',
+                          Icons.add_circle_outline_rounded, setModalState,
+                          isCustom: true),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -481,7 +461,8 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
 
                   // Work Title
                   _buildFormLabel('Designation / Work Title'),
-                  _buildTextInput(_workTitleController, hint: 'e.g. Assistant Cook / Day Cleaner'),
+                  _buildTextInput(_workTitleController,
+                      hint: 'e.g. Assistant Cook / Day Cleaner'),
                   const SizedBox(height: 12),
 
                   // Monthly Salary & Phone Number Row
@@ -531,41 +512,49 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                         return;
                       }
 
-                      final salary = int.tryParse(salaryStr.replaceAll(',', '').replaceAll('₹', '')) ?? 0;
-                      final roleKey = _isCustomRole && _customRoleController.text.trim().isNotEmpty
+                      final salary = int.tryParse(salaryStr
+                              .replaceAll(',', '')
+                              .replaceAll('₹', '')) ??
+                          0;
+                      final roleKey = _isCustomRole &&
+                              _customRoleController.text.trim().isNotEmpty
                           ? _customRoleController.text.trim().toLowerCase()
                           : _selectedModalRole.toLowerCase();
 
-                      final initials = name.split(' ').map((n) => n.isNotEmpty ? n[0] : '').join('').toUpperCase();
+                      final initials = name
+                          .split(' ')
+                          .map((n) => n.isNotEmpty ? n[0] : '')
+                          .join('')
+                          .toUpperCase();
+
+                      final staffMember = StaffModel(
+                        id: '',
+                        propertyId: _propertyId ?? '',
+                        propertyName: _propertyName ?? '',
+                        name: name,
+                        role: roleKey,
+                        workTitle: workTitle.isNotEmpty
+                            ? workTitle
+                            : _selectedModalRole,
+                        phone: phone,
+                        monthlySalary: salary.toDouble(),
+                        salaryStatus: 'pending',
+                      );
 
                       if (_propertyId != null) {
-                        final success = await SupabaseService.instance.addStaff(
-                          propertyId: _propertyId!,
-                          name: name,
-                          role: workTitle.isNotEmpty ? workTitle : _selectedModalRole,
-                          phone: phone,
-                          salary: salary.toDouble(),
-                        );
+                        final success = await SupabaseService.instance
+                            .addStaffMember(staffMember);
                         if (!success) {
-                          _showToast('Failed to add staff in database. Please check connection.');
+                          _showToast(
+                              'Failed to add staff in database. Please check connection.');
                           return;
                         }
                         await _loadStaffFromSupabase();
-                      }
-                      setState(() {
-                        _staffList.insert(0, {
-                          'id': 'STF-${DateTime.now().millisecondsSinceEpoch % 1000}',
-                          'name': name,
-                          'initials': initials.length > 2 ? initials.substring(0, 2) : initials,
-                          'role': roleKey,
-                          'workTitle': workTitle.isNotEmpty ? workTitle : _selectedModalRole,
-                          'phone': phone,
-                          'salary': salary,
-                          'month': '${_currentMonthName()} Salary',
-                          'status': 'pending',
-                          'joinedDate': 'Today',
+                      } else {
+                        setState(() {
+                          _staffList.insert(0, staffMember);
                         });
-                      });
+                      }
                       if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                       }
@@ -575,12 +564,14 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                       backgroundColor: AppColors.ink,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save Staff Member',
-                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13.5, fontWeight: FontWeight.w700),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -593,8 +584,12 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     );
   }
 
-  Widget _buildModalRoleChip(String label, IconData icon, StateSetter setModalState, {bool isCustom = false}) {
-    final isSelected = isCustom ? _isCustomRole : (!_isCustomRole && _selectedModalRole == label);
+  Widget _buildModalRoleChip(
+      String label, IconData icon, StateSetter setModalState,
+      {bool isCustom = false}) {
+    final isSelected = isCustom
+        ? _isCustomRole
+        : (!_isCustomRole && _selectedModalRole == label);
 
     return InkWell(
       onTap: () {
@@ -620,7 +615,9 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: isSelected ? Colors.white : AppColors.inkSecondary),
+            Icon(icon,
+                size: 14,
+                color: isSelected ? Colors.white : AppColors.inkSecondary),
             const SizedBox(width: 5),
             Text(
               label,
@@ -641,12 +638,12 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     final query = _searchController.text.toLowerCase().trim();
     final filtered = _staffList.where((s) {
       if (_selectedRoleFilter != 'all') {
-        final role = (s['role'] as String).toLowerCase();
+        final role = s.role.toLowerCase();
         if (!role.contains(_selectedRoleFilter)) return false;
       }
       if (query.isNotEmpty) {
-        final name = (s['name'] as String).toLowerCase();
-        final title = (s['workTitle'] as String).toLowerCase();
+        final name = s.name.toLowerCase();
+        final title = s.displayWorkTitle.toLowerCase();
         if (!name.contains(query) && !title.contains(query)) return false;
       }
       return true;
@@ -689,8 +686,17 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     const SizedBox(height: 14),
 
                     // Staff Cards Stack
-                    if (filtered.isEmpty)
-                      _buildEmptyState('No staff members found matching your search.')
+                    if (_isLoading)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child:
+                              CircularProgressIndicator(color: AppColors.green),
+                        ),
+                      )
+                    else if (filtered.isEmpty)
+                      _buildEmptyState(
+                          'No staff members found matching your search.')
                     else
                       ...filtered.map((s) => _buildStaffCard(s)),
                   ],
@@ -711,7 +717,8 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -742,11 +749,11 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+                  child: const Icon(Icons.arrow_back_rounded,
+                      size: 18, color: AppColors.ink),
                 ),
               ),
               const SizedBox(width: 12),
-
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -788,7 +795,10 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                   const SizedBox(width: 4),
                   Text(
                     'Add Staff',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white),
                   ),
                 ],
               ),
@@ -806,15 +816,18 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     return Row(
       children: [
         Expanded(
-          child: _buildStatTile('${_staffList.length} Staff', 'Active Team', AppColors.greenDark),
+          child: _buildStatTile(
+              '${_staffList.length} Staff', 'Active Team', AppColors.greenDark),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildStatTile('₹${_totalPayroll.toString()}', 'Monthly Payroll', AppColors.greenDark),
+          child: _buildStatTile('₹${_totalPayroll.toString()}',
+              'Monthly Payroll', AppColors.greenDark),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildStatTile('₹${_pendingPayroll.toString()}', 'Pending Payout', AppColors.greenDark),
+          child: _buildStatTile('₹${_pendingPayroll.toString()}',
+              'Pending Payout', AppColors.greenDark),
         ),
       ],
     );
@@ -890,12 +903,14 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               },
               borderRadius: BorderRadius.circular(99),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6.5),
                 decoration: BoxDecoration(
                   color: isSelected ? AppColors.green : Colors.white,
                   borderRadius: BorderRadius.circular(99),
                   border: Border.all(
-                    color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                    color:
+                        isSelected ? AppColors.green : const Color(0xFFE5E7EB),
                   ),
                 ),
                 child: Text(
@@ -928,18 +943,21 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
       child: TextField(
         controller: _searchController,
         onChanged: (_) => setState(() {}),
-        style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.ink, fontWeight: FontWeight.w600),
+        style: GoogleFonts.outfit(
+            fontSize: 12.5, color: AppColors.ink, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           hintText: 'Search staff by name or role...',
           hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.muted),
+          prefixIcon: const Icon(Icons.search_rounded,
+              size: 18, color: AppColors.muted),
           suffixIcon: _searchController.text.isNotEmpty
               ? InkWell(
                   onTap: () {
                     _searchController.clear();
                     setState(() {});
                   },
-                  child: const Icon(Icons.clear_rounded, size: 16, color: AppColors.muted),
+                  child: const Icon(Icons.clear_rounded,
+                      size: 16, color: AppColors.muted),
                 )
               : null,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -952,8 +970,8 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   // ===========================================================================
   // 5. STAFF CARD (Clean Elevated White Card, Zero Overflow, Side-by-Side Call & WA)
   // ===========================================================================
-  Widget _buildStaffCard(Map<String, dynamic> staff) {
-    final isPaid = staff['status'] == 'paid';
+  Widget _buildStaffCard(StaffModel staff) {
+    final isPaid = staff.isPaid;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -984,11 +1002,12 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                 decoration: BoxDecoration(
                   color: const Color(0xFFF9FAFB),
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+                  border:
+                      Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
                 ),
                 child: Center(
                   child: Text(
-                    staff['initials'] ?? 'SK',
+                    staff.initials,
                     style: GoogleFonts.outfit(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w800,
@@ -1005,7 +1024,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      staff['name'],
+                      staff.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -1017,7 +1036,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      staff['workTitle'],
+                      staff.displayWorkTitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -1035,7 +1054,8 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               Row(
                 children: [
                   InkWell(
-                    onTap: () => _showToast('Calling ${staff['name']}: +91${staff['phone']}'),
+                    onTap: () =>
+                        _showToast('Calling ${staff.name}: +91${staff.phone}'),
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       width: 36,
@@ -1043,21 +1063,24 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.greenLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
+                        border: Border.all(
+                            color: AppColors.green.withValues(alpha: 0.25)),
                       ),
                       child: Center(
                         child: SvgPicture.asset(
                           'assets/images/phone.svg',
                           width: 15,
                           height: 15,
-                          colorFilter: const ColorFilter.mode(AppColors.greenDark, BlendMode.srcIn),
+                          colorFilter: const ColorFilter.mode(
+                              AppColors.greenDark, BlendMode.srcIn),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 6),
                   InkWell(
-                    onTap: () => _showToast('WhatsApp opened with ${staff['name']} (${staff['workTitle']})'),
+                    onTap: () => _showToast(
+                        'WhatsApp opened with ${staff.name} (${staff.displayWorkTitle})'),
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
                       width: 36,
@@ -1065,7 +1088,8 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                       decoration: BoxDecoration(
                         color: AppColors.greenLight,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.green.withValues(alpha: 0.25)),
+                        border: Border.all(
+                            color: AppColors.green.withValues(alpha: 0.25)),
                       ),
                       child: Center(
                         child: SvgPicture.asset(
@@ -1094,7 +1118,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '₹${(staff['salary'] as int).toString()}',
+                  '₹${staff.monthlySalary.toInt()}',
                   style: GoogleFonts.outfit(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
@@ -1105,12 +1129,16 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
 
                 // Status Badge Pill
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                   decoration: BoxDecoration(
-                    color: isPaid ? AppColors.greenLight : const Color(0xFFFFFBEB),
+                    color:
+                        isPaid ? AppColors.greenLight : const Color(0xFFFFFBEB),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: isPaid ? AppColors.green.withValues(alpha: 0.25) : const Color(0xFFFDE68A),
+                      color: isPaid
+                          ? AppColors.green.withValues(alpha: 0.25)
+                          : const Color(0xFFFDE68A),
                     ),
                   ),
                   child: Text(
@@ -1118,7 +1146,9 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w800,
-                      color: isPaid ? AppColors.greenDark : const Color(0xFF92400E),
+                      color: isPaid
+                          ? AppColors.greenDark
+                          : const Color(0xFF92400E),
                     ),
                   ),
                 ),
@@ -1142,11 +1172,15 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.greenDark),
+                      const Icon(Icons.check_circle_rounded,
+                          size: 14, color: AppColors.greenDark),
                       const SizedBox(width: 6),
                       Text(
                         'Paid',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                        style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.greenDark),
                       ),
                     ],
                   ),
@@ -1154,7 +1188,8 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                     onTap: () => _revertToUnpaid(staff),
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(6),
@@ -1163,11 +1198,15 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.edit_outlined, size: 12, color: AppColors.muted),
+                          const Icon(Icons.edit_outlined,
+                              size: 12, color: AppColors.muted),
                           const SizedBox(width: 4),
                           Text(
                             'Revert to Unpaid',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.muted),
                           ),
                         ],
                       ),
@@ -1189,7 +1228,10 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                 child: Center(
                   child: Text(
                     'Approve',
-                    style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white),
                   ),
                 ),
               ),
@@ -1210,7 +1252,10 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
           Text(
             msg,
             textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.muted),
+            style: GoogleFonts.outfit(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.muted),
           ),
         ],
       ),
@@ -1220,9 +1265,11 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   // ===========================================================================
   // REUSABLE NATIVE BOTTOM SHEET WRAPPER
   // ===========================================================================
-  Widget _buildNativeBottomSheetWrapper({required String title, required Widget child}) {
+  Widget _buildNativeBottomSheetWrapper(
+      {required String title, required Widget child}) {
     return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
+      constraints:
+          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.90),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1297,12 +1344,16 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
       padding: const EdgeInsets.only(bottom: 5),
       child: Text(
         label,
-        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+        style: GoogleFonts.outfit(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.muted),
       ),
     );
   }
 
-  Widget _buildTextInput(TextEditingController controller, {String? hint, TextInputType? keyboardType}) {
+  Widget _buildTextInput(TextEditingController controller,
+      {String? hint, TextInputType? keyboardType}) {
     return Container(
       height: 44,
       decoration: BoxDecoration(
@@ -1313,11 +1364,13 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
-        style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
+        style: GoogleFonts.outfit(
+            fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           border: InputBorder.none,
         ),
       ),

@@ -22,6 +22,7 @@ import '../../../owner_tenant_controls/presentation/screens/owner_tenant_control
 import '../../../owner_setup/presentation/screens/owner_setup_screen.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen 5: Owner Command Center Dashboard.
 /// 1-to-1 exact translation of `ProductionCode/owner_dashboard.html`.
@@ -60,6 +61,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     }
     return widget.initialProperty?['id']?.toString() ??
         SupabaseService.instance.activePropertyId;
+  }
+
+  String? get _currentPropertyName {
+    if (_properties.isNotEmpty && _activePropertyIndex < _properties.length) {
+      return _properties[_activePropertyIndex]['name']?.toString();
+    }
+    return widget.initialProperty?['name']?.toString() ??
+        SupabaseService.instance.activePropertyName;
   }
 
   String get _currentOwnerName {
@@ -143,37 +152,27 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
   Future<void> _loadPropertiesFromSupabase() async {
     try {
-      final uid = SupabaseService.instance.currentUserId;
-      var query =
-          SupabaseService.instance.client.from('properties').select('*');
-      if (uid != null) {
-        query = query.eq('owner_id', uid);
-      }
-      final List res =
-          await query.order('created_at', ascending: false).limit(10);
-      if (res.isNotEmpty && mounted) {
+      final propModels = await SupabaseService.instance.getPropertyModels();
+      if (propModels.isNotEmpty && mounted) {
         final List<Map<String, dynamic>> loaded = [];
-        for (final p in res) {
-          final propId = p['id'].toString();
+        for (final p in propModels) {
+          final propId = p.id;
           final metrics = await SupabaseService.instance.getBedMetrics(propId);
           final total = (metrics['total'] != null && metrics['total']! > 0)
               ? metrics['total']!
-              : ((p['total_beds'] as num?)?.toInt() ?? 0);
+              : p.totalBeds;
           final occupied = metrics['occupied'] ?? 0;
           final pct = total > 0
               ? '${((occupied / total) * 100).round()}% Full'
               : '0% Full';
           loaded.add({
             'id': propId,
-            'name': p['property_name'] ??
-                p['brand_name'] ??
-                p['name'] ??
-                'PG Property',
-            'ownerName':
-                p['owner_legal_name'] ?? p['bank_holder_name'] ?? 'Owner',
-            'location':
-                '${p['area_locality'] ?? ''}, ${p['city'] ?? ''}'.trim(),
-            'code': p['property_code'] ?? '',
+            'name': p.propertyName.isNotEmpty ? p.propertyName : 'PG Property',
+            'ownerName': (p.ownerLegalName != null && p.ownerLegalName!.isNotEmpty)
+                ? p.ownerLegalName!
+                : (p.bankHolderName ?? 'Owner'),
+            'location': '${p.areaLocality ?? ''}, ${p.city}'.trim(),
+            'code': p.propertyCode,
             'occupiedBeds': occupied,
             'totalBeds': total,
             'occupancyPct': pct,
@@ -326,6 +325,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             else if (_activeNavIndex == 1 || _activeSubScreen == 'rooms')
               OwnerRoomsScreen(
                 propertyId: _currentPropertyId,
+                propertyName: _currentPropertyName,
                 onBack: () {
                   setState(() {
                     _activeNavIndex = 0;
@@ -364,6 +364,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             else if (_activeSubScreen == 'staff')
               OwnerStaffScreen(
                 propertyId: _currentPropertyId,
+                propertyName: _currentPropertyName,
                 onBack: () {
                   setState(() => _activeSubScreen = 'dashboard');
                   _loadPropertiesFromSupabase();
@@ -1327,17 +1328,21 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           builder: (modalCtx, setModalState) {
             // Load live team members from Supabase once on open
             if (currentPropId.isNotEmpty && _teamMembers.isEmpty) {
-              SupabaseService.instance.getPropertyTeam(currentPropId).then((team) {
+              SupabaseService.instance
+                  .getPropertyTeamMembers(currentPropId)
+                  .then((team) {
                 if (team.isNotEmpty && mounted) {
                   final loaded = team.map((m) {
-                    final assigned = (m['assigned_property_ids'] as List?)?.cast<String>() ?? [currentPropId];
+                    final assigned = m.assignedPropertyIds.isNotEmpty
+                        ? m.assignedPropertyIds
+                        : [currentPropId];
                     return {
-                      'id': m['id'].toString(),
-                      'name': m['name'] ?? '',
-                      'phone': m['phone'] ?? '',
-                      'role': m['role'] ?? 'manager',
+                      'id': m.id,
+                      'name': m.name,
+                      'phone': m.phone,
+                      'role': m.role,
                       'assignedPropertyIds': assigned,
-                      'status': m['status'] ?? 'Active',
+                      'status': m.status,
                     };
                   }).toList();
                   setModalState(() {
@@ -1922,16 +1927,22 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             role: selectedRole,
                           ).then((success) {
                             if (success && mounted) {
-                              SupabaseService.instance.getPropertyTeam(primaryPropId).then((team) {
+                              SupabaseService.instance
+                                  .getPropertyTeamMembers(primaryPropId)
+                                  .then((team) {
                                 if (team.isNotEmpty && mounted) {
-                                  final loaded = team.map((m) => {
-                                    'id': m['id'].toString(),
-                                    'name': m['name'] ?? '',
-                                    'phone': m['phone'] ?? '',
-                                    'role': m['role'] ?? 'manager',
-                                    'assignedPropertyIds': [primaryPropId],
-                                    'status': m['status'] ?? 'Active',
-                                  }).toList();
+                                  final loaded = team
+                                      .map((m) => {
+                                            'id': m.id,
+                                            'name': m.name,
+                                            'phone': m.phone,
+                                            'role': m.role,
+                                            'assignedPropertyIds': [
+                                              primaryPropId
+                                            ],
+                                            'status': m.status,
+                                          })
+                                      .toList();
                                   setModalState(() {
                                     _teamMembers.clear();
                                     _teamMembers.addAll(loaded);

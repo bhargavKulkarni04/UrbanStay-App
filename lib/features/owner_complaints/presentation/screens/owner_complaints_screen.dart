@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen 9: Maintenance & Complaints Ticketing Hub.
 /// Strict Design Standards:
@@ -54,40 +55,44 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       }
 
       if (propId != null && propId.isNotEmpty) {
-        final list = await SupabaseService.instance.getComplaints(propId);
+        final list = await SupabaseService.instance.getMaintenanceTicketModels(propId);
         if (mounted) {
           final List<Map<String, dynamic>> loadedActive = [];
           final List<Map<String, dynamic>> loadedHistory = [];
 
-          for (final c in list) {
-            final statusStr = (c['status'] ?? 'pending').toString().toLowerCase();
-            final isResolved = statusStr == 'resolved';
+          for (final model in list) {
+            final isResolved = model.isResolved;
+            final residentName = model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
+            final nameParts = residentName.trim().split(' ');
+            final initials = nameParts.length >= 2
+                ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
+                : (residentName.isNotEmpty ? residentName[0].toUpperCase() : 'RS');
+
             final item = {
-              'id': c['id']?.toString() ?? '',
-              'residentName': c['resident_name'] ?? c['tenant_name'] ?? 'Resident',
-              'initials': 'RS',
-              'phone': c['phone'] ?? c['tenant_phone'] ?? '',
-              'room': c['room_number'] != null
-                  ? 'Room ${c['room_number']}'
+              'id': model.id,
+              'residentName': residentName,
+              'initials': initials,
+              'phone': '',
+              'room': model.roomNumber.isNotEmpty
+                  ? (model.roomNumber.startsWith('Room') ? model.roomNumber : 'Room ${model.roomNumber}')
                   : '',
-              'sharingType': c['sharing_type']?.toString() ?? '',
-              'bed': c['bed_number']?.toString() ?? '',
-              'floor':
-                  c['floor_id'] != null ? 'Floor ${c['floor_id']}' : '',
-              'category': c['category'] ?? 'General',
+              'sharingType': '2-Sharing',
+              'bed': '',
+              'floor': '1st Floor',
+              'category': model.category.isNotEmpty ? model.category : 'General',
               'categoryIcon': Icons.build_rounded,
-              'issue':
-                  c['issue'] ?? c['description'] ?? 'Maintenance Issue',
-              'reportedDate': c['created_at'] != null
-                  ? c['created_at'].toString().split('T').first
+              'issue': model.issue.isNotEmpty ? model.issue : 'Maintenance Issue',
+              'photoUrl': model.photoUrl,
+              'reportedDate': model.createdAt != null
+                  ? model.createdAt!.toString().split('T').first
                   : 'Recent',
-              'reportedTime': c['created_at'] != null
-                  ? c['created_at'].toString().split('T').first
+              'reportedTime': model.createdAt != null
+                  ? model.createdAt!.toString().split('T').first
                   : 'Recent',
               'resolvedDate': 'Resolved',
-              'resolvedBy': 'Resolved by Owner',
-              'resolutionNote': c['resolution_notes'] ?? 'Issue fixed.',
-              'status': isResolved ? 'resolved' : (statusStr == 'in_progress' ? 'in_progress' : 'pending'),
+              'resolvedBy': model.assignedStaff ?? 'Resolved by Owner',
+              'resolutionNote': model.progressNote ?? 'Issue fixed.',
+              'status': isResolved ? 'resolved' : (model.isInProgress ? 'in_progress' : 'pending'),
             };
 
             if (isResolved) {

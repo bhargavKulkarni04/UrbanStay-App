@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen: Tenant Feature Control (Resident App Controls)
 /// Clean, executive enterprise design:
@@ -48,11 +49,13 @@ class _OwnerTenantControlsScreenState extends State<OwnerTenantControlsScreen> {
 
   Future<void> _loadControlsFromSupabase() async {
     try {
-      final prop = await SupabaseService.instance.getOwnerProperty();
+      final prop = await SupabaseService.instance.getPropertyModel();
       if (prop != null) {
-        _propertyId = prop['id'].toString();
-        if (prop['tenant_controls'] is Map && mounted) {
-          final tc = prop['tenant_controls'] as Map;
+        _propertyId = prop.id;
+        final settings =
+            await SupabaseService.instance.getPropertySettingsModel(prop.id);
+        final tc = settings?.tenantControls;
+        if (tc != null && mounted) {
           setState(() {
             _payViaUpi = tc['pay_via_upi'] ?? _payViaUpi;
             _paidViaCash = tc['paid_via_cash'] ?? _paidViaCash;

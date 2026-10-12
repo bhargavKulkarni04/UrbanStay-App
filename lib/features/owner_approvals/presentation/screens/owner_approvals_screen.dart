@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen 7: 0% Direct UPI Payment Approvals & Verification Hub with Audit History.
 /// Design System: Pure enterprise UrbanStay aesthetic (Stripe/Linear precision),
@@ -41,39 +42,15 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       }
 
       if (propId != null && propId.isNotEmpty) {
-        List<dynamic> res = [];
-        try {
-          res = await SupabaseService.instance.client
-              .from('payment_approvals')
-              .select('*')
-              .eq('property_id', propId)
-              .order('created_at', ascending: false);
-        } catch (_) {
-          try {
-            res = await SupabaseService.instance.client
-                .from('rent_approvals')
-                .select('*')
-                .eq('property_id', propId)
-                .order('created_at', ascending: false);
-          } catch (e) {
-            debugPrint('Error fetching approvals table: $e');
-          }
-        }
+        final approvals = await SupabaseService.instance.getPaymentApprovalModels(propId);
 
-        if (res.isNotEmpty && mounted) {
+        if (approvals.isNotEmpty && mounted) {
           final List<Map<String, dynamic>> loadedPending = [];
           final List<Map<String, dynamic>> loadedHistory = [];
 
-          for (final item in res) {
-            final rawAmount = item['amount'] ?? 0;
-            final amount = rawAmount is num
-                ? rawAmount.toInt()
-                : (num.tryParse(rawAmount.toString())?.toInt() ?? 0);
-
-            final status = (item['status'] ?? 'pending').toString().toLowerCase();
-            final name = item['tenant_name'] ?? item['name'] ?? 'Resident';
+          for (final model in approvals) {
+            final name = model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
             final initials = name
-                .toString()
                 .split(' ')
                 .map((p) => p.isNotEmpty ? p[0] : '')
                 .take(2)
@@ -81,23 +58,23 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                 .toUpperCase();
 
             final mappedItem = {
-              'id': item['id'].toString(),
+              'id': model.id,
               'name': name,
               'initials': initials.isNotEmpty ? initials : 'TN',
-              'room': item['room_number'] ?? 'Room',
+              'room': model.roomNumber.isNotEmpty ? model.roomNumber : 'Room',
               'floor': '1st',
-              'amount': amount,
-              'phone': item['phone'] ?? item['tenant_phone'] ?? '',
-              'utr': item['utr_number'] ?? item['utr'] ?? '',
-              'time': item['created_at'] != null
-                  ? item['created_at'].toString().split('T').first
+              'amount': model.amount.toInt(),
+              'phone': model.phone ?? '',
+              'utr': model.utrNumber,
+              'time': model.createdAt != null
+                  ? model.createdAt!.toString().split('T').first
                   : 'Recent',
-              'app': item['payment_app'] ?? 'Direct UPI Transfer',
-              'proofFile': item['proof_image_url'] ?? item['screenshot_url'] ?? '',
-              'status': status,
+              'app': model.paymentApp.isNotEmpty ? model.paymentApp : 'Direct UPI Transfer',
+              'proofFile': model.proofImageUrl ?? '',
+              'status': model.status.toLowerCase(),
             };
 
-            if (status == 'pending') {
+            if (model.isPending) {
               loadedPending.add(mappedItem);
             } else {
               loadedHistory.add(mappedItem);

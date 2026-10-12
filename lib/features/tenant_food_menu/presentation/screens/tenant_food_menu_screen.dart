@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// 🍽️ Tenant Food Menu View & Day Inspector Screen
 /// Clean, zero-bloat daily menu reader for residents.
@@ -67,35 +68,32 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
       final propId = prop?['id']?.toString() ??
           SupabaseService.instance.activePropertyId;
       if (propId != null && propId.isNotEmpty) {
-        final list = await SupabaseService.instance.getFoodMenu(propId);
+        final list = await SupabaseService.instance.getFoodMenuModels(propId);
         if (mounted && list.isNotEmpty) {
           int maxCycle = _cycleWeeks;
           for (final item in list) {
-            final cycle = (item['cycle_weeks'] as num?)?.toInt();
-            if (cycle != null && cycle > 0 && cycle <= 4) {
+            final cycle = item.cycleWeeks;
+            if (cycle > 0 && cycle <= 4) {
               maxCycle = cycle;
             }
-            final rawWeek = (item['week_number'] as num?)?.toInt() ?? 1;
+            final rawWeek = item.weekNumber;
             final weekIdx = (rawWeek - 1).clamp(0, 3);
-            final day = item['day_of_week']?.toString().toUpperCase();
-            final dayIdx = _dayNames.indexOf(day ?? '');
+            final day = item.dayOfWeek.toUpperCase();
+            final dayIdx = _dayNames.indexOf(day);
             if (dayIdx != -1) {
               _menuStore[weekIdx] ??= {};
               _menuStore[weekIdx]![dayIdx] = {
                 'breakfast': {
-                  'notProvided':
-                      (item['breakfast'] ?? '').toString().trim().isEmpty,
-                  'dishes': item['breakfast'] ?? '',
+                  'notProvided': item.breakfast.trim().isEmpty,
+                  'dishes': item.breakfast,
                 },
                 'lunch': {
-                  'notProvided':
-                      (item['lunch'] ?? '').toString().trim().isEmpty,
-                  'dishes': item['lunch'] ?? '',
+                  'notProvided': item.lunch.trim().isEmpty,
+                  'dishes': item.lunch,
                 },
                 'dinner': {
-                  'notProvided':
-                      (item['dinner'] ?? '').toString().trim().isEmpty,
-                  'dishes': item['dinner'] ?? '',
+                  'notProvided': item.dinner.trim().isEmpty,
+                  'dishes': item.dinner,
                 },
               };
             }

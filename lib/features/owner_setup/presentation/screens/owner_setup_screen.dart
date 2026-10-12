@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 import '../../../owner_dashboard/presentation/screens/owner_dashboard_screen.dart';
 
 /// Screen 4: 4-Step PG Owner Onboarding & Property Setup Wizard.
@@ -993,16 +994,25 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     final createdProp = await _persistPropertyToSupabase(
         calcBeds: calcBeds, calcRooms: calcRooms);
 
-    final finalPropId = createdProp?['id']?.toString() ??
-        'prop_${DateTime.now().millisecondsSinceEpoch}';
+    final propModel =
+        createdProp != null ? PropertyModel.fromJson(createdProp) : null;
+
+    final finalPropId = (propModel != null && propModel.id.isNotEmpty)
+        ? propModel.id
+        : (createdProp?['id']?.toString() ??
+            'prop_${DateTime.now().millisecondsSinceEpoch}');
 
     SupabaseService.instance.activePropertyId = finalPropId;
 
-    final finalBeds = (createdProp?['total_beds'] as num?)?.toInt() ?? calcBeds;
+    final finalBeds = (propModel != null && propModel.totalBeds > 0)
+        ? propModel.totalBeds
+        : ((createdProp?['total_beds'] as num?)?.toInt() ?? calcBeds);
 
     final newProp = <String, dynamic>{
       'id': finalPropId,
-      'name': brand,
+      'name': propModel?.propertyName.isNotEmpty == true
+          ? propModel!.propertyName
+          : brand,
       'location': loc,
       'ownerName': ownerName,
       'occupiedBeds': 0,

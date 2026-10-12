@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/models/models.dart';
 import 'shift_bed_screen.dart';
 
 /// Screen 6: Tenants & Rooms Matrix.
@@ -24,8 +25,9 @@ import 'shift_bed_screen.dart';
 class OwnerRoomsScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final String? propertyId;
+  final String? propertyName;
 
-  const OwnerRoomsScreen({super.key, this.onBack, this.propertyId});
+  const OwnerRoomsScreen({super.key, this.onBack, this.propertyId, this.propertyName});
 
   @override
   State<OwnerRoomsScreen> createState() => _OwnerRoomsScreenState();
@@ -59,6 +61,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
   // Loading State
   bool _isLoading = true;
+  String? _propertyId;
+  String? _propertyName;
 
   // Native Device Contacts State
   List<Contact>? _deviceContacts;
@@ -73,16 +77,21 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
   Future<void> _loadRoomsFromSupabase() async {
     try {
-      final targetPropId = widget.propertyId ??
+      final targetPropId = _propertyId ?? widget.propertyId ??
           SupabaseService.instance.activePropertyId;
       String? propId = targetPropId;
-      if (propId == null || propId.isEmpty) {
+      String? pName = widget.propertyName ??
+          SupabaseService.instance.activePropertyName;
+      if (propId == null || propId.isEmpty || pName == null || pName.isEmpty) {
         final prop = await SupabaseService.instance.getOwnerProperty();
-        propId = prop?['id']?.toString();
+        propId ??= prop?['id']?.toString();
+        pName ??= prop?['name']?.toString();
       }
 
       if (propId != null && propId.isNotEmpty) {
-        final roomsWithBeds = await SupabaseService.instance.getRoomsWithBeds(propId);
+        _propertyId = propId;
+        _propertyName = pName;
+        final roomsWithBeds = await SupabaseService.instance.getRoomsWithBeds(_propertyId!);
         if (mounted) {
           final List<Map<String, dynamic>> loadedRooms = [];
           for (final r in roomsWithBeds) {
@@ -365,6 +374,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       bedId: bedId,
                       name: newName,
                       phone: newPhone,
+                      propertyName: _propertyName,
+                      roomNumber: resident['roomNumber'] ?? resident['room'],
                       rent: newRent,
                       deposit: newDeposit,
                     );
@@ -372,6 +383,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       _showToast('Failed to save resident changes. Please try again.');
                       return;
                     }
+                    await _loadRoomsFromSupabase();
                   }
 
                   setState(() {
@@ -1343,6 +1355,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         bedId: bedId,
                         name: name,
                         phone: phone,
+                        propertyName: _propertyName,
+                        roomNumber: roomName,
                         rent: double.tryParse(rent),
                         deposit: double.tryParse(deposit),
                       );
@@ -1350,6 +1364,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         _showToast('Failed to save to database. Please check connection.');
                         return;
                       }
+
+                      await _loadRoomsFromSupabase();
 
                       setState(() {
                         for (var r in _rooms) {

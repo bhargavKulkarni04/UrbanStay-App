@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 import 'package:urbanstay/features/owner_setup/presentation/screens/owner_setup_screen.dart';
 
 /// Screen 12: Master Owner Settings & Configuration Hub.
@@ -188,121 +189,110 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     try {
       final targetPropId = widget.propertyId ??
           SupabaseService.instance.activePropertyId;
-      final prop = await SupabaseService.instance
-          .getOwnerProperty(propertyId: targetPropId);
-      if (prop != null && mounted) {
-        final pId = prop['id']?.toString() ?? _propId;
-        final settings = await SupabaseService.instance.getPropertySettings(pId);
+      final propModel = await SupabaseService.instance
+          .getPropertyModel(propertyId: targetPropId);
+      if (propModel != null && mounted) {
+        final pId = propModel.id.isNotEmpty ? propModel.id : _propId;
+        final settingsModel = await SupabaseService.instance.getPropertySettingsModel(pId);
         if (mounted) {
           setState(() {
             _propId = pId;
-            _propName = prop['property_name']?.toString() ?? prop['name']?.toString() ?? _propName;
+            _propName = propModel.propertyName.isNotEmpty ? propModel.propertyName : _propName;
             _scalePgName = _propName;
             _bizLegalName = '$_propName Hospitality Services';
             _stampBusinessName = '$_propName Hospitality Services';
 
-            if (prop['property_structure'] != null) {
-              _propType = prop['property_structure'].toString();
+            if (propModel.propertyStructure.isNotEmpty) {
+              _propType = propModel.propertyStructure;
             }
-            if (prop['street_address'] != null) {
-              _streetAddress = prop['street_address'].toString();
+            if (propModel.streetAddress != null && propModel.streetAddress!.isNotEmpty) {
+              _streetAddress = propModel.streetAddress!;
               _propAddress = _streetAddress;
             }
-            if (prop['area_locality'] != null) {
-              _locality = prop['area_locality'].toString();
+            if (propModel.areaLocality != null && propModel.areaLocality!.isNotEmpty) {
+              _locality = propModel.areaLocality!;
               _scaleAreaLocality = _locality;
             }
-            if (prop['landmark'] != null) {
-              _landmark = prop['landmark'].toString();
+            if (propModel.landmark != null && propModel.landmark!.isNotEmpty) {
+              _landmark = propModel.landmark!;
             }
-            if (prop['city'] != null) {
-              _selectedCity = prop['city'].toString();
+            if (propModel.city.isNotEmpty) {
+              _selectedCity = propModel.city;
             }
-            if (prop['state'] != null) {
-              _selectedState = prop['state'].toString();
+            if (propModel.state.isNotEmpty) {
+              _selectedState = propModel.state;
             }
-            if (prop['pincode'] != null) {
-              _pincode = prop['pincode'].toString();
+            if (propModel.pincode != null && propModel.pincode!.isNotEmpty) {
+              _pincode = propModel.pincode!;
               _scalePincode = _pincode;
             }
-            if (prop['maps_url'] != null) {
-              _propMapPin = prop['maps_url'].toString();
+            if (propModel.mapsUrl != null && propModel.mapsUrl!.isNotEmpty) {
+              _propMapPin = propModel.mapsUrl!;
             }
-            if (prop['gender_category'] != null) {
-              _tenantPreference = prop['gender_category'].toString();
+            if (propModel.genderCategory.isNotEmpty) {
+              _tenantPreference = propModel.genderCategory;
               _scaleGenderCategory = _tenantPreference;
             }
 
             // Rules & Renting
-            if (prop['rent_due_day'] != null) {
-              _rentDueDay = prop['rent_due_day'].toString();
+            if (propModel.rentDueDay.isNotEmpty) {
+              _rentDueDay = propModel.rentDueDay;
             }
-            if (prop['grace_period'] != null) {
-              _gracePeriod = prop['grace_period'].toString();
+            if (propModel.gracePeriod.isNotEmpty) {
+              _gracePeriod = propModel.gracePeriod;
             }
-            if (prop['notice_period'] != null) {
-              _noticePeriod = prop['notice_period'].toString();
+            if (propModel.noticePeriod.isNotEmpty) {
+              _noticePeriod = propModel.noticePeriod;
             }
-            if (prop['late_fee'] != null) {
-              _dailyRate = '₹${prop['late_fee']} / day';
+            if (propModel.lateFee > 0) {
+              _dailyRate = '₹${propModel.lateFee.toInt()} / day';
             }
 
             // Banking & UPI
-            if (prop['upi_vpa'] != null || prop['upi_id'] != null) {
-              _upiId = (prop['upi_vpa'] ?? prop['upi_id']).toString();
+            if (propModel.upiVpa != null && propModel.upiVpa!.isNotEmpty) {
+              _upiId = propModel.upiVpa!;
             }
-            if (prop['bank_name'] != null) {
-              _bankName = prop['bank_name'].toString();
+            if (propModel.bankName != null && propModel.bankName!.isNotEmpty) {
+              _bankName = propModel.bankName!;
             }
-            if (prop['bank_holder_name'] != null) {
-              _beneficiaryName = prop['bank_holder_name'].toString();
+            if (propModel.bankHolderName != null && propModel.bankHolderName!.isNotEmpty) {
+              _beneficiaryName = propModel.bankHolderName!;
             }
 
             // Owner Identity & KYC
-            if (prop['owner_legal_name'] != null) {
-              _adminName = prop['owner_legal_name'].toString();
+            if (propModel.ownerLegalName != null && propModel.ownerLegalName!.isNotEmpty) {
+              _adminName = propModel.ownerLegalName!;
               _ownerFullName = _adminName;
             }
-            if (prop['owner_email'] != null) {
-              _adminEmail = prop['owner_email'].toString();
+            if (propModel.ownerEmail != null && propModel.ownerEmail!.isNotEmpty) {
+              _adminEmail = propModel.ownerEmail!;
               _ownerEmail = _adminEmail;
             }
-            if (prop['crediting_phone'] != null) {
-              _adminPhone = prop['crediting_phone'].toString();
+            if (propModel.creditingPhone != null && propModel.creditingPhone!.isNotEmpty) {
+              _adminPhone = propModel.creditingPhone!;
               _ownerWhatsapp = _adminPhone;
-            }
-            if (prop['owner_aadhaar_number'] != null) {
-              _ownerAadhaar = prop['owner_aadhaar_number'].toString();
-            }
-            if (prop['owner_permanent_address'] != null) {
-              _ownerAddress = prop['owner_permanent_address'].toString();
             }
 
             // Building Infrastructure & Capacity
-            if (prop['lift_count'] != null) {
-              _scaleLiftCount = prop['lift_count'].toString();
+            if (propModel.liftCount.isNotEmpty) {
+              _scaleLiftCount = propModel.liftCount;
             }
-            if (prop['power_backup'] != null) {
-              _scalePowerBackup = prop['power_backup'].toString();
+            if (propModel.powerBackup.isNotEmpty) {
+              _scalePowerBackup = propModel.powerBackup;
             }
-            if (prop['total_floors'] != null) {
-              _scaleFloorCount = (prop['total_floors'] as num).toInt();
+            if (propModel.totalFloors > 0) {
+              _scaleFloorCount = propModel.totalFloors;
             }
-            if (prop['total_rooms'] != null) {
-              _scaleTotalRooms = (prop['total_rooms'] as num).toInt();
+            if (propModel.totalRooms > 0) {
+              _scaleTotalRooms = propModel.totalRooms;
             }
-            if (prop['total_beds'] != null) {
-              _scaleTotalBeds = (prop['total_beds'] as num).toInt();
-            }
-            if (prop['ground_floor_has_rooms'] != null) {
-              _scaleGroundRooms = (prop['ground_floor_has_rooms'] == true) ? 2 : 0;
+            if (propModel.totalBeds > 0) {
+              _scaleTotalBeds = propModel.totalBeds;
             }
 
             // House Rules / Curfew
-            if (settings?['gate_closing_time'] != null) {
-              _curfewTime = settings!['gate_closing_time'].toString();
-            } else if (prop['gate_closing_time'] != null) {
-              _curfewTime = prop['gate_closing_time'].toString();
+            if (settingsModel != null && settingsModel.gateClosingTime.isNotEmpty) {
+              _curfewTime = settingsModel.gateClosingTime;
             }
           });
         }

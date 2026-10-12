@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// Full-Page Screen for Shifting a Resident's Bed or Swapping Rooms with another Resident.
 class ShiftBedScreen extends StatefulWidget {

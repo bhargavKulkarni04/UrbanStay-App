@@ -8,6 +8,7 @@
 
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/models.dart';
 import '../widgets/urban_loading.dart';
 
 class SupabaseService {
@@ -335,6 +336,34 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  /// Fetch strongly-typed RentLedgerModels
+  Future<List<RentLedgerModel>> getRentLedgerModels(String propertyId) async {
+    try {
+      final response = await client
+          .from('rent_ledgers')
+          .select('*, tenants(id, full_name, phone, room_number, bed_number)')
+          .eq('property_id', propertyId)
+          .order('due_date', ascending: true);
+      return (response as List)
+          .map((e) => RentLedgerModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (_) {
+      try {
+        final response = await client
+            .from('rent_ledgers')
+            .select('*')
+            .eq('property_id', propertyId)
+            .order('due_date', ascending: true);
+        return (response as List)
+            .map((e) => RentLedgerModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      } catch (e) {
+        debugPrint('Error fetching rent ledger models: $e');
+        return [];
+      }
+    }
+  }
+
   /// Fetch SaaS subscription billing invoices for the owner / property
   Future<List<Map<String, dynamic>>> getSaasInvoices(
       {String? propertyId, String? ownerId}) async {
@@ -349,6 +378,19 @@ class SupabaseService {
 
     final response = await query.order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Fetch strongly-typed SaasInvoiceModels
+  Future<List<SaasInvoiceModel>> getSaasInvoiceModels(
+      {String? propertyId, String? ownerId}) async {
+    try {
+      final response =
+          await getSaasInvoices(propertyId: propertyId, ownerId: ownerId);
+      return response.map((e) => SaasInvoiceModel.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('Error fetching SaaS invoice models: $e');
+      return [];
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -411,8 +453,10 @@ class SupabaseService {
       'tenant_id': tenantId,
       'property_id': propertyId,
       if (pName.isNotEmpty) 'property_name': pName,
-      if (tenantName != null && tenantName.isNotEmpty) 'tenant_name': tenantName,
-      if (roomNumber != null && roomNumber.isNotEmpty) 'room_number': roomNumber,
+      if (tenantName != null && tenantName.isNotEmpty)
+        'tenant_name': tenantName,
+      if (roomNumber != null && roomNumber.isNotEmpty)
+        'room_number': roomNumber,
       'amount': amount,
       'utr_number': utrNumber,
       'payment_app': paymentApp ?? 'Google Pay',
@@ -472,6 +516,35 @@ class SupabaseService {
           if (rent != null) 'rent': rent,
           if (deposit != null) 'deposit': deposit,
         }).eq('id', bedId);
+
+        // Also sync to tenants table
+        try {
+          final bedRes = await client
+              .from('beds')
+              .select('property_id, room_id, bed_label')
+              .eq('id', bedId)
+              .maybeSingle();
+          if (bedRes != null && bedRes['property_id'] != null) {
+            await client.from('tenants').insert({
+              'property_id': bedRes['property_id'],
+              if (pName.isNotEmpty) 'property_name': pName,
+              'room_id': bedRes['room_id'],
+              if (roomNumber != null && roomNumber.isNotEmpty)
+                'room_number': roomNumber,
+              'bed_id': bedId,
+              'bed_label': bedRes['bed_label'],
+              'name': name,
+              'tenant_name': name,
+              'phone': phone,
+              if (rent != null) 'monthly_rent': rent,
+              if (deposit != null) 'security_deposit': deposit,
+              'status': 'Active',
+            });
+          }
+        } catch (e) {
+          debugPrint('Notice: non-critical tenant table sync: $e');
+        }
+
         return true;
       } catch (e) {
         debugPrint('Error assigning resident to bed: $e');
@@ -544,7 +617,7 @@ class SupabaseService {
     });
   }
 
-  /// 3b. Add Damage Deduction (with 8-pillar loader)
+  /// 4. Add Damage Deduction (with 8-pillar loader)
   Future<bool> addDamageDeduction({
     required String propertyId,
     String? propertyName,
@@ -569,7 +642,8 @@ class SupabaseService {
           if (tenantId != null && tenantId.isNotEmpty) 'tenant_id': tenantId,
           'tenant_name': tenantName,
           if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
-          if (roomNumber != null && roomNumber.isNotEmpty) 'room_number': roomNumber,
+          if (roomNumber != null && roomNumber.isNotEmpty)
+            'room_number': roomNumber,
           'item_damaged': itemDamaged,
           'amount': amount,
           'deduction_mode': deductionMode,
@@ -612,22 +686,25 @@ class SupabaseService {
     });
   }
 
-  /// 4. Update UTR / UPI approval status
+  /// 5. Update UTR / UPI approval status
   Future<bool> updatePaymentApprovalStatus({
-    required String submissionId,
+    String? submissionId,
+    String? approvalId,
     required String status,
   }) async {
+    final targetId = submissionId ?? approvalId ?? '';
+    if (targetId.isEmpty) return false;
     return await _withLoading('Updating Approval...', () async {
       try {
         await client.from('payment_approvals').update({
           'status': status.toLowerCase(),
-        }).eq('id', submissionId);
+        }).eq('id', targetId);
         return true;
       } catch (_) {
         try {
           await client.from('rent_approvals').update({
             'status': status.toLowerCase(),
-          }).eq('id', submissionId);
+          }).eq('id', targetId);
           return true;
         } catch (e) {
           debugPrint('Error updating payment approval: $e');
@@ -637,15 +714,19 @@ class SupabaseService {
     });
   }
 
-  /// 5. Fetch live complaints / maintenance tickets
-  Future<List<Map<String, dynamic>>> getComplaints(String propertyId) async {
+  /// 6. Fetch strongly-typed MaintenanceTicketModels
+  Future<List<MaintenanceTicketModel>> getMaintenanceTicketModels(
+      String propertyId) async {
     try {
       final res = await client
           .from('maintenance_tickets')
           .select('*')
           .eq('property_id', propertyId)
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(res);
+      return (res as List)
+          .map((e) =>
+              MaintenanceTicketModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (_) {
       try {
         final res = await client
@@ -653,40 +734,18 @@ class SupabaseService {
             .select('*')
             .eq('property_id', propertyId)
             .order('created_at', ascending: false);
-        return List<Map<String, dynamic>>.from(res);
+        return (res as List)
+            .map((e) =>
+                MaintenanceTicketModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
       } catch (e) {
-        debugPrint('Error fetching maintenance tickets/complaints: $e');
+        debugPrint('Error fetching maintenance ticket models: $e');
         return [];
       }
     }
   }
 
-  /// 4b. Fetch payment approvals (0% Direct UPI)
-  Future<List<Map<String, dynamic>>> getPaymentApprovals(
-      String propertyId) async {
-    try {
-      final res = await client
-          .from('payment_approvals')
-          .select('*')
-          .eq('property_id', propertyId)
-          .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(res);
-    } catch (_) {
-      try {
-        final res = await client
-            .from('rent_approvals')
-            .select('*')
-            .eq('property_id', propertyId)
-            .order('created_at', ascending: false);
-        return List<Map<String, dynamic>>.from(res);
-      } catch (e) {
-        debugPrint('Error fetching payment approvals: $e');
-        return [];
-      }
-    }
-  }
-
-  /// 5B. Update maintenance ticket / complaint status (e.g. in_progress, resolved, open)
+  /// 7. Update maintenance ticket / complaint status (e.g. in_progress, resolved, open)
   Future<bool> updateComplaintStatus({
     required String complaintId,
     required String status,
@@ -726,7 +785,7 @@ class SupabaseService {
     });
   }
 
-  /// 5C. Resolve maintenance ticket / complaint
+  /// 8. Resolve maintenance ticket / complaint
   Future<bool> resolveComplaint(String complaintId) async {
     return await updateComplaintStatus(
       complaintId: complaintId,
@@ -734,7 +793,7 @@ class SupabaseService {
     );
   }
 
-  /// 5D. Create maintenance ticket / complaint (with property, tenant, room snapshots)
+  /// 9. Create maintenance ticket / complaint (with property, tenant, room snapshots)
   Future<bool> createMaintenanceTicket({
     required String propertyId,
     String? propertyName,
@@ -777,7 +836,7 @@ class SupabaseService {
     });
   }
 
-  /// 6. Add operating expense
+  /// 10. Add operating expense
   Future<bool> addExpense({
     required String propertyId,
     String? propertyName,
@@ -807,128 +866,145 @@ class SupabaseService {
     });
   }
 
-  /// 7. Fetch operating expenses
-  Future<List<Map<String, dynamic>>> getExpenses(String propertyId) async {
+  /// 11. Fetch strongly-typed ExpenseModels
+  Future<List<ExpenseModel>> getExpenseModels(String propertyId) async {
     try {
       final res = await client
           .from('expenses')
           .select('*')
           .eq('property_id', propertyId)
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(res);
+      return (res as List)
+          .map((e) => ExpenseModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e) {
-      debugPrint('Error fetching expenses: $e');
+      debugPrint('Error fetching expense models: $e');
       return [];
     }
   }
 
-  /// 8. Fetch staff members
-  Future<List<Map<String, dynamic>>> getStaff(String propertyId) async {
-    try {
-      final res = await client
-          .from('property_team')
-          .select('*')
-          .eq('property_id', propertyId);
-      return List<Map<String, dynamic>>.from(res);
-    } catch (_) {
+  /// 12. Record operating expense using typed ExpenseModel
+  Future<bool> recordExpenseModel(ExpenseModel expense) async {
+    return await _withLoading('Recording Operating Expense...', () async {
       try {
-        final res = await client
-            .from('staff')
-            .select('*')
-            .eq('property_id', propertyId);
-        return List<Map<String, dynamic>>.from(res);
-      } catch (e) {
-        debugPrint('Error fetching staff/team: $e');
-        return [];
-      }
-    }
-  }
-
-  /// 9. Add or update staff member
-  Future<bool> addStaff({
-    required String propertyId,
-    String? propertyName,
-    required String name,
-    required String role,
-    required String phone,
-    double? salary,
-  }) async {
-    return await _withLoading('Adding Staff Member...', () async {
-      final pName = (propertyName != null && propertyName.isNotEmpty)
-          ? propertyName
-          : (activePropertyName ?? '');
-      final payload = {
-        'property_id': propertyId,
-        if (pName.isNotEmpty) 'property_name': pName,
-        'name': name,
-        'role': role.toLowerCase(),
-        'phone': phone,
-        if (salary != null) 'monthly_salary': salary,
-      };
-      try {
-        await client.from('property_team').insert(payload);
-        return true;
-      } catch (_) {
-        try {
-          await client.from('staff').insert(payload);
-          return true;
-        } catch (e) {
-          debugPrint('Error adding staff: $e');
-          return false;
+        final payload = expense.toJson();
+        if ((payload['property_name'] == null ||
+                payload['property_name'].toString().isEmpty) &&
+            activePropertyName != null) {
+          payload['property_name'] = activePropertyName!;
         }
-      }
-    });
-  }
-
-  /// 10. Fetch food menu
-  Future<List<Map<String, dynamic>>> getFoodMenu(String propertyId) async {
-    try {
-      final res = await client
-          .from('food_menus')
-          .select('*')
-          .eq('property_id', propertyId);
-      return List<Map<String, dynamic>>.from(res);
-    } catch (e) {
-      debugPrint('Error fetching food menu: $e');
-      return [];
-    }
-  }
-
-  /// 11. Save/Update food menu for a day in a specific week cycle
-  Future<bool> saveFoodMenu({
-    required String propertyId,
-    required String dayOfWeek,
-    required String breakfast,
-    required String lunch,
-    required String dinner,
-    int weekNumber = 1,
-    int cycleWeeks = 2,
-    String? propertyName,
-  }) async {
-    return await _withLoading('Saving Meal Menu...', () async {
-      try {
-        await client.from('food_menus').upsert({
-          'property_id': propertyId,
-          if (propertyName != null && propertyName.isNotEmpty)
-            'property_name': propertyName,
-          'cycle_weeks': cycleWeeks,
-          'week_number': weekNumber,
-          'day_of_week': dayOfWeek,
-          'breakfast': breakfast,
-          'lunch': lunch,
-          'dinner': dinner,
-          'updated_at': DateTime.now().toIso8601String(),
-        });
+        await client.from('expenses').insert(payload);
         return true;
       } catch (e) {
-        debugPrint('Error saving food menu: $e');
+        debugPrint('Error recording expense model: $e');
         return false;
       }
     });
   }
 
-  /// 12. Fetch check-in requests from QR standee
-  Future<List<Map<String, dynamic>>> getTenantCheckins(
+  /// 13. Fetch strongly-typed staff members (StaffModel: Cooks, Wardens, Maids, Security payroll)
+  Future<List<StaffModel>> getStaffMembers(String propertyId) async {
+    try {
+      final res = await client
+          .from('staff')
+          .select('*')
+          .eq('property_id', propertyId)
+          .order('created_at', ascending: false);
+      return (res as List)
+          .map((e) => StaffModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching staff members: $e');
+      return [];
+    }
+  }
+
+  /// 14. Add staff member using typed StaffModel
+  Future<bool> addStaffMember(StaffModel staff) async {
+    return await _withLoading('Adding Staff Member...', () async {
+      try {
+        await client.from('staff').insert(staff.toJson());
+        return true;
+      } catch (e) {
+        debugPrint('Error adding staff member: $e');
+        return false;
+      }
+    });
+  }
+
+  /// 15. Fetch strongly-typed FoodMenuModels
+  Future<List<FoodMenuModel>> getFoodMenuModels(String propertyId) async {
+    try {
+      final res = await client
+          .from('food_menus')
+          .select('*')
+          .eq('property_id', propertyId)
+          .order('week_number', ascending: true);
+      return (res as List)
+          .map((e) => FoodMenuModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching food menu models: $e');
+      return [];
+    }
+  }
+
+  /// 16. Upsert FoodMenuModel
+  Future<bool> upsertFoodMenuModel(FoodMenuModel menu) async {
+    try {
+      final payload = menu.toJson();
+      if ((payload['property_name'] == null ||
+              payload['property_name'].toString().isEmpty) &&
+          activePropertyName != null) {
+        payload['property_name'] = activePropertyName!;
+      }
+      payload['updated_at'] = DateTime.now().toIso8601String();
+      await client.from('food_menus').upsert(payload);
+      return true;
+    } catch (e) {
+      debugPrint('Error upserting food menu model: $e');
+      return false;
+    }
+  }
+
+  /// 17. Fetch strongly-typed RoomModels
+  Future<List<RoomModel>> getRoomModels(String propertyId) async {
+    try {
+      final res = await client
+          .from('rooms')
+          .select('*')
+          .eq('property_id', propertyId)
+          .order('floor_number', ascending: true)
+          .order('room_number', ascending: true);
+      return (res as List)
+          .map((e) => RoomModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching room models: $e');
+      return [];
+    }
+  }
+
+  /// 18. Fetch strongly-typed BedModels for a property
+  Future<List<BedModel>> getBedModels(String propertyId) async {
+    try {
+      final res = await client
+          .from('beds')
+          .select('*')
+          .eq('property_id', propertyId)
+          .order('room_number', ascending: true)
+          .order('bed_label', ascending: true);
+      return (res as List)
+          .map((e) => BedModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching bed models: $e');
+      return [];
+    }
+  }
+
+  /// 19. Fetch strongly-typed OnboardingRequestModels
+  Future<List<OnboardingRequestModel>> getOnboardingRequestModels(
       String propertyId) async {
     try {
       final res = await client
@@ -936,14 +1012,17 @@ class SupabaseService {
           .select('*')
           .eq('property_id', propertyId)
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(res);
+      return (res as List)
+          .map((e) =>
+              OnboardingRequestModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e) {
-      debugPrint('Error fetching tenant checkins: $e');
+      debugPrint('Error fetching onboarding request models: $e');
       return [];
     }
   }
 
-  /// 13. Update onboarding / check-in request status
+  /// 20. Update onboarding / check-in request status
   Future<bool> updateCheckinStatus({
     required String checkinId,
     required String status,
@@ -961,7 +1040,38 @@ class SupabaseService {
     });
   }
 
-  /// 14. Record warden cash collection
+  /// 21. Fetch strongly-typed PaymentApprovalModels
+  Future<List<PaymentApprovalModel>> getPaymentApprovalModels(
+      String propertyId) async {
+    try {
+      final res = await client
+          .from('payment_approvals')
+          .select('*')
+          .eq('property_id', propertyId)
+          .order('created_at', ascending: false);
+      return (res as List)
+          .map((e) =>
+              PaymentApprovalModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (_) {
+      try {
+        final res = await client
+            .from('rent_approvals')
+            .select('*')
+            .eq('property_id', propertyId)
+            .order('created_at', ascending: false);
+        return (res as List)
+            .map((e) =>
+                PaymentApprovalModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      } catch (e) {
+        debugPrint('Error fetching payment approval models: $e');
+        return [];
+      }
+    }
+  }
+
+  /// 22. Record warden cash collection
   Future<bool> recordCashCollection({
     required String propertyId,
     String? propertyName,
@@ -994,23 +1104,24 @@ class SupabaseService {
     });
   }
 
-  /// 15. Fetch day collections
-  Future<List<Map<String, dynamic>>> getDayCollections(
-      String propertyId) async {
+  /// 23. Fetch strongly-typed WardenCashModels
+  Future<List<WardenCashModel>> getWardenCashModels(String propertyId) async {
     try {
       final res = await client
           .from('warden_cash_collections')
           .select('*')
           .eq('property_id', propertyId)
           .order('created_at', ascending: false);
-      return List<Map<String, dynamic>>.from(res);
+      return (res as List)
+          .map((e) => WardenCashModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e) {
-      debugPrint('Error fetching day collections: $e');
+      debugPrint('Error fetching warden cash models: $e');
       return [];
     }
   }
 
-  /// 16. Update property settings (UPI VPA, Rules, Gate timings)
+  /// 24. Update property settings (UPI VPA, Rules, Gate timings)
   Future<bool> updatePropertySettings({
     required String propertyId,
     Map<String, dynamic>? settings,
@@ -1056,37 +1167,68 @@ class SupabaseService {
     });
   }
 
-  /// 16B. Fetch property settings & house rules
-  Future<Map<String, dynamic>?> getPropertySettings(String propertyId) async {
+  /// 25. Fetch strongly-typed PropertySettingsModel
+  Future<PropertySettingsModel?> getPropertySettingsModel(
+      String propertyId) async {
     try {
       final res = await client
           .from('property_settings')
           .select('*')
           .eq('property_id', propertyId)
           .maybeSingle();
-      return res;
+      if (res == null) return null;
+      return PropertySettingsModel.fromJson(Map<String, dynamic>.from(res));
     } catch (e) {
-      debugPrint('Error fetching property settings: $e');
+      debugPrint('Error fetching property settings model: $e');
       return null;
     }
   }
 
-  /// 17. Fetch active team members (Co-Owners & PG Managers)
-  Future<List<Map<String, dynamic>>> getPropertyTeam(String propertyId) async {
+  /// 26. Fetch strongly-typed PropertyModel
+  Future<PropertyModel?> getPropertyModel(
+      {String? propertyId, String? ownerId}) async {
+    final raw =
+        await getOwnerProperty(propertyId: propertyId, ownerId: ownerId);
+    if (raw == null) return null;
+    return PropertyModel.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  /// 27. Fetch list of strongly-typed PropertyModels for owner
+  Future<List<PropertyModel>> getPropertyModels({String? ownerId}) async {
+    try {
+      final uid = ownerId ?? currentUserId;
+      var query = client.from('properties').select('*');
+      if (uid != null) {
+        query = query.eq('owner_id', uid);
+      }
+      final res = await query.order('created_at', ascending: false).limit(10);
+      return (res as List)
+          .map((e) => PropertyModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching property models: $e');
+      return [];
+    }
+  }
+
+  /// 28. Fetch active team members (PropertyTeamModel: Co-Owners & PG Managers)
+  Future<List<PropertyTeamModel>> getPropertyTeamMembers(String propertyId) async {
     try {
       final res = await client
           .from('property_team')
           .select('*')
           .eq('property_id', propertyId)
           .eq('status', 'Active');
-      return List<Map<String, dynamic>>.from(res);
+      return (res as List)
+          .map((e) => PropertyTeamModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e) {
       debugPrint('Error fetching property team: $e');
       return [];
     }
   }
 
-  /// 18. Store invited team member (Co-Owner or PG Manager)
+  /// 29. Store invited team member (PropertyTeamModel: Co-Owner or PG Manager)
   Future<bool> inviteTeamMember({
     required String propertyId,
     String? propertyName,
@@ -1118,7 +1260,7 @@ class SupabaseService {
     });
   }
 
-  /// 19. Remove/Revoke team member access
+  /// 30. Remove/Revoke team member access
   Future<bool> removeTeamMember(String memberId) async {
     return await _withLoading('Updating Access...', () async {
       try {

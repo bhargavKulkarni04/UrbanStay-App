@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen 8: Rent Collection Hub & WhatsApp Dues Chaser.
 /// 3-Tier Hierarchy: Floor -> Room (Sharing Type & Rent Total) -> Beds & Resident Cards.
@@ -97,11 +98,12 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           _totalBedsCount = (prop['total_beds'] as num?)?.toInt() ?? 0;
 
           final ownerName = (prop['owner_legal_name'] ?? 'Owner').toString();
-          final staffList = await SupabaseService.instance.getStaff(propId);
+          final staffList =
+              await SupabaseService.instance.getStaffMembers(propId);
           final List<String> loadedStaff = ["$ownerName (Owner)"];
           for (final s in staffList) {
-            final name = s['name']?.toString() ?? 'Staff';
-            final role = (s['role'] ?? 'Staff').toString().toUpperCase();
+            final name = s.name.isNotEmpty ? s.name : 'Staff';
+            final role = s.role.toUpperCase();
             loadedStaff.add("$name ($role)");
           }
           if (mounted) {
@@ -113,43 +115,43 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           }
         }
 
-        final ledger = await SupabaseService.instance.getMonthlyRentLedger(propId);
+        final ledgerModels = await SupabaseService.instance.getRentLedgerModels(propId);
         final Map<String, Map<String, List<Map<String, dynamic>>>> floorMap = {};
 
-        if (ledger.isNotEmpty) {
-          for (final row in ledger) {
-            final tenant = row['tenants'] as Map<String, dynamic>?;
-            final roomNum = tenant?['room_number']?.toString() ?? row['room_number']?.toString() ?? '';
-            final floorName = roomNum.startsWith('G') ? 'Ground Floor' : (roomNum.isNotEmpty ? '${roomNum[0]}st Floor' : '1st Floor');
+        if (ledgerModels.isNotEmpty) {
+          for (final model in ledgerModels) {
+            final roomNum = model.roomNumber;
+            final floorName = roomNum.startsWith('G')
+                ? 'Ground Floor'
+                : (roomNum.isNotEmpty ? '${roomNum[0]}st Floor' : '1st Floor');
             final floorId = floorName.split(' ').first.toLowerCase();
 
             floorMap.putIfAbsent(floorId, () => {});
             floorMap[floorId]!.putIfAbsent(roomNum, () => []);
 
-            final status = (row['status'] ?? 'PENDING').toString().toLowerCase();
-            final isPaid = status == 'paid';
-            final tenantName = tenant?['full_name'] ?? tenant?['name'] ?? row['tenant_name'] ?? 'Resident';
+            final isPaid = model.isPaid;
+            final tenantName = model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
             final nameParts = tenantName.trim().split(' ');
             final computedInitials = nameParts.length >= 2
                 ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
                 : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : '?');
 
             floorMap[floorId]![roomNum]!.add({
-              'id': row['id'].toString(),
+              'id': model.id,
               'name': tenantName,
               'initials': computedInitials,
-              'bed': tenant?['bed_number'] ?? row['bed_number'] ?? '',
+              'bed': model.bedNumber ?? '',
               'room': roomNum,
               'roomNum': roomNum,
               'floor': floorId,
               'work': 'Resident',
-              'phone': tenant?['phone'] ?? '',
-              'amount': (row['amount'] as num?)?.toInt() ?? 0,
+              'phone': model.phone ?? '',
+              'amount': model.rentAmount.toInt(),
               'status': isPaid ? 'paid' : 'overdue',
               'paidLabel': isPaid ? 'Paid (Direct UPI)' : null,
               'tag': isPaid ? 'Settled 0% Fee' : null,
-              'ref': row['transaction_ref'] ?? 'UPI-REF',
-              'paidDate': row['paid_at'] != null ? row['paid_at'].toString().split('T').first : null,
+              'ref': 'UPI-REF',
+              'paidDate': model.paidDate != null ? model.paidDate.toString().split('T').first : null,
               'overdueDays': !isPaid ? 'Payment Pending' : null,
               'dueLabel': !isPaid ? 'Due this month' : null,
             });

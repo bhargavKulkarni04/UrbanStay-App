@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen 9th Quick Action: Dedicated Day-Wise Rent Collection & Salary Cycle Hub.
 /// Features:
@@ -68,11 +69,12 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       if (prop != null) {
         final propId = prop['id'].toString();
         final ownerName = (prop['owner_legal_name'] ?? prop['name'] ?? 'Owner').toString();
-        final staffList = await SupabaseService.instance.getStaff(propId);
+        final staffList =
+            await SupabaseService.instance.getStaffMembers(propId);
         final List<String> loadedStaff = ['$ownerName (Owner)'];
         for (final s in staffList) {
-          final sName = s['name']?.toString() ?? '';
-          final sRole = s['role']?.toString() ?? 'Staff';
+          final sName = s.name;
+          final sRole = s.role.isNotEmpty ? s.role : 'Staff';
           if (sName.isNotEmpty) {
             loadedStaff.add('$sName ($sRole)');
           }
@@ -86,36 +88,55 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             }
           });
         }
-        final ledger = await SupabaseService.instance.getMonthlyRentLedger(propId);
-        if (mounted && ledger.isNotEmpty) {
+
+        // Load Warden Cash Collections Audit History
+        final cashModels = await SupabaseService.instance.getWardenCashModels(propId);
+        if (mounted && cashModels.isNotEmpty) {
+          final List<Map<String, dynamic>> loadedHistory = [];
+          for (final c in cashModels) {
+            loadedHistory.add({
+              'id': c.id,
+              'type': 'payment_verified',
+              'title': '₹${c.amount.toInt()} Cash Collection Recorded',
+              'tenant': '${c.tenantName} (${c.roomNumber})',
+              'actor': c.collectedBy,
+              'time': c.createdAt != null ? c.createdAt.toString().split('T').first : 'Recent',
+              'ref': c.isDeposited ? 'Deposited to Owner' : 'With Warden',
+              'badge': c.isDeposited ? 'Cash Settled' : 'Audit Pending',
+            });
+          }
+          setState(() {
+            _historyLogs.clear();
+            _historyLogs.addAll(loadedHistory);
+          });
+        }
+
+        final ledgerModels = await SupabaseService.instance.getRentLedgerModels(propId);
+        if (mounted && ledgerModels.isNotEmpty) {
           final List<Map<String, dynamic>> loaded = [];
-          for (final row in ledger) {
-            final tenant = row['tenants'] as Map<String, dynamic>?;
-            final roomNum = tenant?['room_number']?.toString() ?? row['room_number']?.toString() ?? '';
+          for (final model in ledgerModels) {
+            final roomNum = model.roomNumber;
             final floorName = roomNum.startsWith('G') ? 'Ground Floor' : (roomNum.isNotEmpty ? '${roomNum[0]}st Floor' : '');
-            final status = (row['status'] ?? 'PENDING').toString().toLowerCase();
-            final isPaid = status == 'paid';
-            final tenantName = tenant?['full_name'] ?? tenant?['name'] ?? row['tenant_name'] ?? 'Resident';
+            final isPaid = model.isPaid;
+            final tenantName = model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
             final nameParts = tenantName.trim().split(' ');
             final computedInitials = nameParts.length >= 2
                 ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
                 : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'TN');
 
-            final dueDay = ((tenant?['rent_cycle_date'] ?? tenant?['pay_day'] ?? row['rent_due_day'] ?? row['due_date'] ?? row['due_day']) as num?)?.toInt() ?? 1;
-
             loaded.add({
-              'id': row['id'].toString(),
+              'id': model.id,
               'name': tenantName,
               'initials': computedInitials,
-              'bed': tenant?['bed_number'] ?? row['bed_number'] ?? '',
+              'bed': model.bedNumber ?? '',
               'room': roomNum,
               'floor': floorName,
-              'sharing': tenant?['sharing_type'] ?? row['sharing_type'] ?? '',
-              'phone': tenant?['phone'] ?? '',
-              'payDay': dueDay,
-              'amount': (row['amount'] as num?)?.toInt() ?? 0,
+              'sharing': '2-Sharing',
+              'phone': model.phone ?? '',
+              'payDay': model.dueDate.day,
+              'amount': model.rentAmount.toInt(),
               'status': isPaid ? 'paid' : 'overdue',
-              'paidDate': row['paid_at'] != null ? row['paid_at'].toString().split('T').first : null,
+              'paidDate': model.paidDate != null ? model.paidDate.toString().split('T').first : null,
               'dueLabel': isPaid ? 'Paid' : 'Rent Due',
               'approvedBy': _selectedStaffActor,
               'requestedDate': null,
@@ -2269,10 +2290,22 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   final amt = int.tryParse(amountCtrl.text.trim()) ??
                       (tenant['amount'] as int);
                   Navigator.of(ctx).pop();
+
+                  final prop = await SupabaseService.instance.getOwnerProperty();
+                  if (prop != null) {
+                    await SupabaseService.instance.recordCashCollection(
+                      propertyId: prop['id'].toString(),
+                      tenantName: tenant['name'] ?? 'Resident',
+                      amount: amt.toDouble(),
+                      collectedBy: _selectedStaffActor,
+                      roomNumber: tenant['room']?.toString(),
+                    );
+                  }
+
                   setState(() {
                     tenant['status'] = 'paid';
                     tenant['paidLabel'] =

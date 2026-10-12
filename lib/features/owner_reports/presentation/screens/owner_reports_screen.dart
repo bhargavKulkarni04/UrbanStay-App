@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 
 /// Screen: Owner Business Intelligence & Master Reports Hub.
 /// Specific Updates:
@@ -131,14 +132,12 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
   Future<void> _loadAllReportData() async {
     setState(() => _isLoading = true);
     try {
-      final prop = await SupabaseService.instance.getOwnerProperty();
+      final prop = await SupabaseService.instance.getPropertyModel();
       if (prop != null) {
-        final propId = prop['id'].toString();
-        _propName =
-            (prop['property_name'] ?? prop['name'] ?? 'My PG').toString();
-        _propCode = (prop['property_code'] ?? prop['code'] ?? '').toString();
-        _ownerPhone =
-            (prop['crediting_phone'] ?? prop['phone'] ?? '').toString();
+        final propId = prop.id;
+        _propName = prop.propertyName.isNotEmpty ? prop.propertyName : 'My PG';
+        _propCode = prop.propertyCode;
+        _ownerPhone = prop.creditingPhone ?? '';
         _formattedOwnerPhone = _maskPhoneNumber(_ownerPhone);
 
         // 1. Rooms & Beds Real Audit
@@ -194,9 +193,7 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
 
         _floorsData.clear();
         _floorsData.addAll(loadedFloors);
-        _totalBeds = totalB > 0
-            ? totalB
-            : ((prop['total_beds'] as num?)?.toInt() ?? 0);
+        _totalBeds = totalB > 0 ? totalB : prop.totalBeds;
         _occupiedBeds = occB;
         _vacantBeds = (_totalBeds - occB).clamp(0, _totalBeds);
         _noticeBeds = noticeB;
@@ -205,24 +202,20 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
 
         // 2. 0% Direct UPI Payment Approvals
         final approvals =
-            await SupabaseService.instance.getPaymentApprovals(propId);
+            await SupabaseService.instance.getPaymentApprovalModels(propId);
         int approvedC = 0;
         int pendingC = 0;
         int flaggedC = 0;
         int collectedAmt = 0;
 
         for (final a in approvals) {
-          final st = (a['status'] ?? '').toString().toLowerCase();
-          final rawAmt = a['amount'];
-          final amt = rawAmt is num
-              ? rawAmt.toInt()
-              : (num.tryParse(rawAmt.toString())?.toInt() ?? 0);
-          if (st == 'approved') {
+          final amt = a.amount.toInt();
+          if (a.isApproved) {
             approvedC++;
             collectedAmt += amt;
-          } else if (st == 'pending') {
+          } else if (a.isPending) {
             pendingC++;
-          } else if (st == 'rejected' || st == 'flagged') {
+          } else if (a.isRejected) {
             flaggedC++;
           }
         }
@@ -237,17 +230,14 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
         _directUpiSavings = (_totalCollectedAmount * 0.02).round();
 
         // 3. Operating Expenses (OpEx)
-        final expenses = await SupabaseService.instance.getExpenses(propId);
+        final expenses = await SupabaseService.instance.getExpenseModels(propId);
         int sumExpenses = 0;
         final List<Map<String, dynamic>> mappedExp = [];
         for (final exp in expenses) {
-          final rawAmt = exp['amount'];
-          final amt = rawAmt is num
-              ? rawAmt.toInt()
-              : (num.tryParse(rawAmt.toString())?.toInt() ?? 0);
+          final amt = exp.amount.toInt();
           sumExpenses += amt;
           mappedExp.add({
-            'name': exp['title'] ?? exp['category'] ?? 'Operating Expense',
+            'name': exp.title.isNotEmpty ? exp.title : exp.category,
             'amount': amt,
           });
         }
@@ -255,17 +245,13 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
         _totalExpenseAmount = sumExpenses;
 
         // 4. Staff & Payroll
-        final staffList = await SupabaseService.instance.getStaff(propId);
+        final staffList = await SupabaseService.instance.getStaffMembers(propId);
         int totalSal = 0;
         int disbursedSal = 0;
         for (final s in staffList) {
-          final rawSal = s['monthly_salary'] ?? s['salary'];
-          final sal = rawSal is num
-              ? rawSal.toInt()
-              : (num.tryParse(rawSal.toString())?.toInt() ?? 0);
+          final sal = s.monthlySalary.toInt();
           totalSal += sal;
-          final st = (s['salary_status'] ?? '').toString().toLowerCase();
-          if (st == 'paid' || st == 'disbursed') {
+          if (s.isPaid) {
             disbursedSal += sal;
           }
         }

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/cashfree_launcher.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/models/models.dart';
 import 'package:urbanstay/features/owner_settings/presentation/screens/owner_settings_screen.dart';
 
 class OwnerSaaSBillingScreen extends StatefulWidget {
@@ -32,7 +33,7 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
   final int _pricePerBed = 15;
   final int _platformFee = 79;
   late String _activePropertyName;
-  List<Map<String, dynamic>> _invoices = [];
+  List<SaasInvoiceModel> _invoices = [];
   bool _isMandateActive = false;
   bool _isLoading = false;
 
@@ -55,15 +56,15 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
           });
         }
       } else {
-        final prop = await SupabaseService.instance.getOwnerProperty();
+        final prop = await SupabaseService.instance.getPropertyModel();
         if (prop != null) {
-          final propId = prop['id'].toString();
+          final propId = prop.id;
           final metrics = await SupabaseService.instance.getBedMetrics(propId);
           final int beds = metrics['total'] ?? 0;
           if (mounted) {
             setState(() {
               if (widget.propertyName == null) {
-                _activePropertyName = prop['property_name'] ?? prop['brand_name'] ?? prop['name'] ?? _activePropertyName;
+                _activePropertyName = prop.propertyName.isNotEmpty ? prop.propertyName : _activePropertyName;
               }
               if (widget.totalBeds == null && beds > 0) {
                 _totalBeds = beds;
@@ -73,7 +74,7 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
         }
       }
 
-      final invoicesList = await SupabaseService.instance.getSaasInvoices();
+      final invoicesList = await SupabaseService.instance.getSaasInvoiceModels();
       if (mounted) {
         setState(() {
           _invoices = invoicesList;
@@ -542,12 +543,12 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
               )
             else
               ..._invoices.map((inv) {
-                final invNum = inv['invoice_number']?.toString() ?? 'US-INV-001';
-                final dateStr = inv['created_at'] != null
-                    ? inv['created_at'].toString().split('T').first
+                final invNum = inv.invoiceNumber.isNotEmpty ? inv.invoiceNumber : 'US-INV-001';
+                final dateStr = inv.createdAt != null
+                    ? inv.createdAt!.toString().split('T').first
                     : 'Recent';
-                final amount = '₹${inv['total_amount'] ?? '11.00'}';
-                final status = inv['status']?.toString() ?? 'Paid';
+                final amount = '₹${inv.amount.toStringAsFixed(2)}';
+                final status = inv.isPaid ? 'Paid' : 'Pending';
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Material(
