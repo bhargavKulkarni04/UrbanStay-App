@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 import 'package:urbanstay/features/owner_setup/presentation/screens/owner_setup_screen.dart';
 
 /// Screen 12: Master Owner Settings & Configuration Hub.
@@ -417,10 +418,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             Expanded(
               child: _isLoading
                   ? const Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: AppColors.green,
-                      ),
+                      child: UrbanSpinner(size: 38),
                     )
                   : SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
@@ -1656,6 +1654,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     final emailCtrl = TextEditingController(text: _ownerEmail);
     final aadhaarCtrl = TextEditingController(text: _ownerAadhaar.replaceAll(RegExp(r'\D'), ''));
     String docAttachedStatus = 'Aadhaar Card Front & Back Attached ';
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
@@ -1739,47 +1738,50 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 20),
 
                   OutlinedButton(
-                    onPressed: () async {
-                      final phone = phoneCtrl.text.trim();
-                      if (phone.length != 10) {
-                        _showToast('Please enter a valid 10-digit mobile number');
-                        return;
-                      }
-                      final aadhaar = aadhaarCtrl.text.trim();
-                      if (aadhaar.isNotEmpty && aadhaar.length != 12) {
-                        _showToast('Aadhaar number must be exactly 12 digits');
-                        return;
-                      }
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            final phone = phoneCtrl.text.trim();
+                            if (phone.length != 10) {
+                              _showToast('Please enter a valid 10-digit mobile number');
+                              return;
+                            }
+                            final aadhaar = aadhaarCtrl.text.trim();
+                            if (aadhaar.isNotEmpty && aadhaar.length != 12) {
+                              _showToast('Aadhaar number must be exactly 12 digits');
+                              return;
+                            }
 
-                      setState(() {
-                        _ownerFullName = nameCtrl.text.trim();
-                        _adminName = _ownerFullName;
-                        _ownerFatherName = fatherCtrl.text.trim();
-                        _ownerWhatsapp = '+91 $phone';
-                        _adminPhone = _ownerWhatsapp;
-                        _ownerEmail = emailCtrl.text.trim();
-                        _adminEmail = _ownerEmail;
-                        if (aadhaar.isNotEmpty) {
-                          _ownerAadhaar = '${aadhaar.substring(0, 4)} •••• ${aadhaar.substring(8)}';
-                        }
-                      });
-                      if (_propId.isNotEmpty) {
-                        try {
-                          await SupabaseService.instance.client.from('properties').update({
-                            'owner_legal_name': _ownerFullName,
-                            'owner_email': _ownerEmail,
-                            'crediting_phone': _ownerWhatsapp,
-                            'owner_aadhaar_number': aadhaar.isNotEmpty ? aadhaar : _ownerAadhaar,
-                          }).eq('id', _propId);
-                        } catch (e) {
-                          debugPrint('Error updating owner identity in Supabase: $e');
-                        }
-                      }
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
-                      }
-                      _showToast('Owner Personal Identity updated ✓');
-                    },
+                            setModalState(() => isSaving = true);
+                            setState(() {
+                              _ownerFullName = nameCtrl.text.trim();
+                              _adminName = _ownerFullName;
+                              _ownerFatherName = fatherCtrl.text.trim();
+                              _ownerWhatsapp = '+91 $phone';
+                              _adminPhone = _ownerWhatsapp;
+                              _ownerEmail = emailCtrl.text.trim();
+                              _adminEmail = _ownerEmail;
+                              if (aadhaar.isNotEmpty) {
+                                _ownerAadhaar = '${aadhaar.substring(0, 4)} •••• ${aadhaar.substring(8)}';
+                              }
+                            });
+                            if (_propId.isNotEmpty) {
+                              try {
+                                await SupabaseService.instance.client.from('properties').update({
+                                  'owner_legal_name': _ownerFullName,
+                                  'owner_email': _ownerEmail,
+                                  'crediting_phone': _ownerWhatsapp,
+                                  'owner_aadhaar_number': aadhaar.isNotEmpty ? aadhaar : _ownerAadhaar,
+                                }).eq('id', _propId);
+                              } catch (e) {
+                                debugPrint('Error updating owner identity in Supabase: $e');
+                              }
+                            }
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('Owner Personal Identity updated ✓');
+                          },
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
@@ -1788,7 +1790,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
-                    child: Text('Save Identity Changes', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.green)),
+                    child: isSaving
+                        ? const Center(
+                            child: UrbanSpinner(
+                              size: 20,
+                              color: AppColors.green,
+                            ),
+                          )
+                        : Text('Save Identity Changes', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.green)),
                   ),
                 ],
               ),
@@ -1940,6 +1949,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     final nameCtrl = TextEditingController(text: _scalePgName);
     final areaCtrl = TextEditingController(text: _scaleAreaLocality);
     final pinCtrl = TextEditingController(text: _scalePincode);
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
@@ -2052,38 +2062,41 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 20),
 
                   OutlinedButton(
-                    onPressed: () async {
-                      setState(() {
-                        _scalePgName = nameCtrl.text.trim();
-                        _propName = _scalePgName;
-                        _scaleAreaLocality = areaCtrl.text.trim();
-                        _locality = _scaleAreaLocality;
-                        _scalePincode = pinCtrl.text.trim();
-                        _pincode = _scalePincode;
-                        _scaleGenderCategory = tempGender;
-                        _scaleLiftCount = tempLift;
-                        _scalePowerBackup = tempGen;
-                        _tenantPreference = tempGender.contains("Men's") ? 'Gents' : (tempGender.contains("Women's") ? 'Ladies' : 'Co-Living');
-                      });
-                      if (_propId.isNotEmpty) {
-                        try {
-                          await SupabaseService.instance.client.from('properties').update({
-                            'property_name': _scalePgName,
-                            'area_locality': _scaleAreaLocality,
-                            'pincode': _scalePincode,
-                            'gender_category': _tenantPreference,
-                            'lift_count': _scaleLiftCount,
-                            'power_backup': _scalePowerBackup,
-                          }).eq('id', _propId);
-                        } catch (e) {
-                          debugPrint('Error updating infrastructure in Supabase: $e');
-                        }
-                      }
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
-                      }
-                      _showToast('Property Infrastructure updated ✓');
-                    },
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            setModalState(() => isSaving = true);
+                            setState(() {
+                              _scalePgName = nameCtrl.text.trim();
+                              _propName = _scalePgName;
+                              _scaleAreaLocality = areaCtrl.text.trim();
+                              _locality = _scaleAreaLocality;
+                              _scalePincode = pinCtrl.text.trim();
+                              _pincode = _scalePincode;
+                              _scaleGenderCategory = tempGender;
+                              _scaleLiftCount = tempLift;
+                              _scalePowerBackup = tempGen;
+                              _tenantPreference = tempGender.contains("Men's") ? 'Gents' : (tempGender.contains("Women's") ? 'Ladies' : 'Co-Living');
+                            });
+                            if (_propId.isNotEmpty) {
+                              try {
+                                await SupabaseService.instance.client.from('properties').update({
+                                  'property_name': _scalePgName,
+                                  'area_locality': _scaleAreaLocality,
+                                  'pincode': _scalePincode,
+                                  'gender_category': _tenantPreference,
+                                  'lift_count': _scaleLiftCount,
+                                  'power_backup': _scalePowerBackup,
+                                }).eq('id', _propId);
+                              } catch (e) {
+                                debugPrint('Error updating infrastructure in Supabase: $e');
+                              }
+                            }
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('Property Infrastructure updated ✓');
+                          },
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
@@ -2092,7 +2105,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
-                    child: Text('Save Infrastructure Changes', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green)),
+                    child: isSaving
+                        ? const Center(
+                            child: UrbanSpinner(
+                              size: 20,
+                              color: AppColors.green,
+                            ),
+                          )
+                        : Text('Save Infrastructure Changes', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green)),
                   ),
                 ],
               ),
@@ -3620,6 +3640,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   void _openEditCurfewTimingsModal() {
     String tempCurfew = _curfewTime;
     String tempMorning = _morningOpen;
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
@@ -3799,22 +3820,25 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 20),
 
                   OutlinedButton(
-                    onPressed: () async {
-                      setState(() {
-                        _curfewTime = tempCurfew;
-                        _morningOpen = tempMorning;
-                      });
-                      if (_propId.isNotEmpty) {
-                        await SupabaseService.instance.updatePropertySettings(
-                          propertyId: _propId,
-                          gateClosingTime: tempCurfew,
-                        );
-                      }
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
-                      }
-                      _showToast('Curfew & Timings Updated ✓');
-                    },
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            setModalState(() => isSaving = true);
+                            setState(() {
+                              _curfewTime = tempCurfew;
+                              _morningOpen = tempMorning;
+                            });
+                            if (_propId.isNotEmpty) {
+                              await SupabaseService.instance.updatePropertySettings(
+                                propertyId: _propId,
+                                gateClosingTime: tempCurfew,
+                              );
+                            }
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('Curfew & Timings Updated ✓');
+                          },
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
@@ -3823,10 +3847,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
-                    child: Text(
-                      'Save Changes',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
-                    ),
+                    child: isSaving
+                        ? const Center(
+                            child: UrbanSpinner(
+                              size: 20,
+                              color: AppColors.green,
+                            ),
+                          )
+                        : Text(
+                            'Save Changes',
+                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
+                          ),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -5288,6 +5319,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   // ===========================================================================
   void _openEditModal({required String title, required List<_ModalField> fields}) {
     final controllers = fields.map((f) => TextEditingController(text: f.initialVal)).toList();
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
@@ -5295,98 +5327,112 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return _buildNativeBottomSheetWrapper(
-          title: title,
-          modalContext: ctx,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ...List.generate(fields.length, (i) {
-                final labelLower = fields[i].label.toLowerCase();
-                final isPhone = labelLower.contains('phone') || labelLower.contains('mobile');
-                final isEmail = labelLower.contains('email');
-                final isNumber = labelLower.contains('pin') || labelLower.contains('passcode');
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        fields[i].label,
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
-                      ),
-                      const SizedBox(height: 5),
-                      Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
-                        ),
-                        child: TextField(
-                          controller: controllers[i],
-                          keyboardType: isPhone
-                              ? TextInputType.phone
-                              : (isEmail
-                                  ? TextInputType.emailAddress
-                                  : (isNumber ? TextInputType.number : TextInputType.text)),
-                          scrollPadding: const EdgeInsets.only(bottom: 160),
-                          style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
-                          decoration: const InputDecoration(
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                            border: InputBorder.none,
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return _buildNativeBottomSheetWrapper(
+              title: title,
+              modalContext: ctx,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ...List.generate(fields.length, (i) {
+                    final labelLower = fields[i].label.toLowerCase();
+                    final isPhone = labelLower.contains('phone') || labelLower.contains('mobile');
+                    final isEmail = labelLower.contains('email');
+                    final isNumber = labelLower.contains('pin') || labelLower.contains('passcode');
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fields[i].label,
+                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
                           ),
-                        ),
+                          const SizedBox(height: 5),
+                          Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                            ),
+                            child: TextField(
+                              controller: controllers[i],
+                              keyboardType: isPhone
+                                  ? TextInputType.phone
+                                  : (isEmail
+                                      ? TextInputType.emailAddress
+                                      : (isNumber ? TextInputType.number : TextInputType.text)),
+                              scrollPadding: const EdgeInsets.only(bottom: 160),
+                              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
+                              decoration: const InputDecoration(
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                                border: InputBorder.none,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    );
+                  }),
+                  const SizedBox(height: 10),
+
+                  OutlinedButton(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            setModalState(() => isSaving = true);
+                            for (int i = 0; i < fields.length; i++) {
+                              fields[i].onSave(controllers[i].text.trim());
+                            }
+                            if (_propId.isNotEmpty) {
+                              try {
+                                await SupabaseService.instance.client.from('properties').update({
+                                  'upi_vpa': _upiId,
+                                  'bank_name': _bankName,
+                                  'bank_holder_name': _beneficiaryName,
+                                }).eq('id', _propId);
+
+                                await SupabaseService.instance.updatePropertySettings(
+                                  propertyId: _propId,
+                                  upiId: _upiId,
+                                  gateClosingTime: _curfewTime,
+                                );
+                              } catch (e) {
+                                debugPrint('Error updating settings in Supabase: $e');
+                              }
+                            }
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('$title Saved ✓');
+                          },
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.green,
+                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: isSaving
+                        ? const Center(
+                            child: UrbanSpinner(
+                              size: 20,
+                              color: AppColors.green,
+                            ),
+                          )
+                        : Text(
+                            'Save Changes',
+                            style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.green),
+                          ),
                   ),
-                );
-              }),
-              const SizedBox(height: 10),
-
-              OutlinedButton(
-                onPressed: () async {
-                  for (int i = 0; i < fields.length; i++) {
-                    fields[i].onSave(controllers[i].text.trim());
-                  }
-                  if (_propId.isNotEmpty) {
-                    try {
-                      await SupabaseService.instance.client.from('properties').update({
-                        'upi_vpa': _upiId,
-                        'bank_name': _bankName,
-                        'bank_holder_name': _beneficiaryName,
-                      }).eq('id', _propId);
-
-                      await SupabaseService.instance.updatePropertySettings(
-                        propertyId: _propId,
-                        upiId: _upiId,
-                        gateClosingTime: _curfewTime,
-                      );
-                    } catch (e) {
-                      debugPrint('Error updating settings in Supabase: $e');
-                    }
-                  }
-                  if (ctx.mounted) {
-                    Navigator.of(ctx).pop();
-                  }
-                  _showToast('$title Saved ✓');
-                },
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.green,
-                  side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: Text(
-                  'Save Changes',
-                  style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.green),
-                ),
+                  const SizedBox(height: 16),
+                ],
               ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            );
+          },
         );
       },
     );

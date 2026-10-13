@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/cashfree_launcher.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 import 'package:urbanstay/features/owner_settings/presentation/screens/owner_settings_screen.dart';
 
 class OwnerSaaSBillingScreen extends StatefulWidget {
@@ -403,12 +404,10 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
                   ),
                 ),
                 child: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ? const Center(
+                        child: UrbanSpinner(
+                          size: 20,
+                          color: Colors.white,
                         ),
                       )
                     : Text(

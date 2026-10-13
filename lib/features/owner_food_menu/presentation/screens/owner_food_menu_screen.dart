@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// 🍽️ Meal Item Data Model for each daily meal slot
 class MealSlot {
@@ -115,8 +116,8 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
 
   Future<void> _loadMenuFromSupabase() async {
     try {
-      final targetPropId = widget.propertyId ??
-          SupabaseService.instance.activePropertyId;
+      final targetPropId =
+          widget.propertyId ?? SupabaseService.instance.activePropertyId;
       String? propId = targetPropId;
       if (propId == null || propId.isEmpty) {
         final prop = await SupabaseService.instance.getOwnerProperty();
@@ -125,7 +126,8 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
 
       if (propId != null && propId.isNotEmpty) {
         _propertyId = propId;
-        final list = await SupabaseService.instance.getFoodMenuModels(_propertyId!);
+        final list =
+            await SupabaseService.instance.getFoodMenuModels(_propertyId!);
         if (mounted && list.isNotEmpty) {
           int? savedCycle;
           for (final item in list) {
@@ -283,67 +285,97 @@ class _OwnerFoodMenuScreenState extends State<OwnerFoodMenuScreen> {
     });
   }
 
-  void _handleSaveMenu() {
+  Future<void> _handleSaveMenu() async {
     _saveCurrentControllersToStore();
     HapticFeedback.heavyImpact();
-    setState(() => _isSaved = true);
+    UrbanLoadingService.show('Publishing weekly meal plan...');
+    bool allSuccessful = true;
+    try {
+      setState(() => _isSaved = true);
+      if (_propertyId != null) {
+        final propName = widget.propertyName ??
+            SupabaseService.instance.activePropertyName ??
+            OwnerAppState.instance.activePropertyName;
 
-    if (_propertyId != null) {
-      final propName = widget.propertyName ??
-          OwnerAppState.instance.activePropertyName;
+        // Clean up any extra weeks if owner reduced cycle (e.g. from 4 to 2)
+        if (_selectedCycleWeeks < 4) {
+          await SupabaseService.instance.client
+              .from('food_menus')
+              .delete()
+              .eq('property_id', _propertyId!)
+              .gt('week_number', _selectedCycleWeeks);
+        }
 
-      // Clean up any extra weeks if owner reduced cycle (e.g. from 4 to 2)
-      if (_selectedCycleWeeks < 4) {
-        SupabaseService.instance.client
-            .from('food_menus')
-            .delete()
-            .eq('property_id', _propertyId!)
-            .gt('week_number', _selectedCycleWeeks)
-            .then((_) {})
-            .catchError((_) {});
-      }
-
-      for (int w = 0; w < _selectedCycleWeeks; w++) {
-        for (int d = 0; d < 7; d++) {
-          final plan = _menuStore[w]?[d];
-          if (plan != null) {
-            final menuModel = FoodMenuModel(
-              id: '',
-              propertyId: _propertyId!,
-              propertyName: propName.isNotEmpty ? propName : 'My PG',
-              cycleWeeks: _selectedCycleWeeks,
-              weekNumber: w + 1,
-              dayOfWeek: _dayNames[d],
-              breakfast: plan.breakfast.dishes,
-              lunch: plan.lunch.dishes,
-              dinner: plan.dinner.dishes,
-              updatedAt: DateTime.now(),
-            );
-            SupabaseService.instance.upsertFoodMenuModel(menuModel);
+        for (int w = 0; w < _selectedCycleWeeks; w++) {
+          for (int d = 0; d < 7; d++) {
+            final plan = _menuStore[w]?[d];
+            if (plan != null) {
+              final menuModel = FoodMenuModel(
+                id: '',
+                propertyId: _propertyId!,
+                propertyName: propName,
+                cycleWeeks: _selectedCycleWeeks,
+                weekNumber: w + 1,
+                dayOfWeek: _dayNames[d],
+                breakfast: plan.breakfast.dishes,
+                lunch: plan.lunch.dishes,
+                dinner: plan.dinner.dishes,
+                updatedAt: DateTime.now(),
+              );
+              final ok =
+                  await SupabaseService.instance.upsertFoodMenuModel(menuModel);
+              if (!ok) allSuccessful = false;
+            }
           }
         }
       }
+    } finally {
+      UrbanLoadingService.hide();
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppColors.green,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded,
-                color: Colors.white, size: 20),
-            const SizedBox(width: 10),
-            Text(
-              'Food menu published successfully',
-              style: GoogleFonts.outfit(
-                  color: Colors.white, fontWeight: FontWeight.w600),
-            ),
-          ],
+    if (allSuccessful) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.green,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded,
+                  color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'Food menu published successfully',
+                style: GoogleFonts.outfit(
+                    color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.warning,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded,
+                  color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'Some meals failed to save. Please try again.',
+                style: GoogleFonts.outfit(
+                    color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted) setState(() => _isSaved = false);

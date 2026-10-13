@@ -14,11 +14,13 @@ import '../theme/app_colors.dart';
 class UrbanSpinner extends StatefulWidget {
   final double size;
   final Duration duration;
+  final Color? color;
 
   const UrbanSpinner({
     super.key,
     this.size = 56.0,
     this.duration = const Duration(milliseconds: 900),
+    this.color,
   });
 
   @override
@@ -50,7 +52,7 @@ class _UrbanSpinnerState extends State<UrbanSpinner>
       turns: _controller,
       child: CustomPaint(
         size: Size(widget.size, widget.size),
-        painter: _SpokePillPainter(),
+        painter: _SpokePillPainter(color: widget.color),
       ),
     );
   }
@@ -58,6 +60,9 @@ class _UrbanSpinnerState extends State<UrbanSpinner>
 
 /// Custom painter that renders the 8 radial pill spokes in alternating UrbanStay greens
 class _SpokePillPainter extends CustomPainter {
+  final Color? color;
+  _SpokePillPainter({this.color});
+
   // Brand colors from the verified design
   static const Color lightGreen = Color(0xFF77C943);
   static const Color darkGreen = Color(0xFF2C863E);
@@ -72,16 +77,27 @@ class _SpokePillPainter extends CustomPainter {
 
     // 8 spokes positioned at 45-degree intervals
     // Index 7 (top-right at 315 deg) is omitted to create the signature gap
-    final List<Color?> spokeColors = [
-      lightGreen, // 0: Top (270°)
-      darkGreen,  // 1: Top-Left (225°)
-      lightGreen, // 2: Left (180°)
-      darkGreen,  // 3: Bottom-Left (135°)
-      lightGreen, // 4: Bottom (90°)
-      darkGreen,  // 5: Bottom-Right (45°)
-      lightGreen, // 6: Right (0°)
-      null,       // 7: Top-Right (gap/omitted)
-    ];
+    final List<Color?> spokeColors = color != null
+        ? [
+            color!,
+            color!.withValues(alpha: 0.5),
+            color!,
+            color!.withValues(alpha: 0.5),
+            color!,
+            color!.withValues(alpha: 0.5),
+            color!,
+            null,
+          ]
+        : [
+            lightGreen, // 0: Top (270°)
+            darkGreen,  // 1: Top-Left (225°)
+            lightGreen, // 2: Left (180°)
+            darkGreen,  // 3: Bottom-Left (135°)
+            lightGreen, // 4: Bottom (90°)
+            darkGreen,  // 5: Bottom-Right (45°)
+            lightGreen, // 6: Right (0°)
+            null,       // 7: Top-Right (gap/omitted)
+          ];
 
     for (int i = 0; i < 8; i++) {
       final color = spokeColors[i];

@@ -23,6 +23,7 @@ import '../../../owner_setup/presentation/screens/owner_setup_screen.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// Screen 5: Owner Command Center Dashboard.
 /// 1-to-1 exact translation of `ProductionCode/owner_dashboard.html`.
@@ -165,9 +166,53 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           final pct = total > 0
               ? '${((occupied / total) * 100).round()}% Full'
               : '0% Full';
+          final staffMembers =
+              await SupabaseService.instance.getStaffMembers(propId);
+          final realStaffCount = staffMembers.length;
+          // 1. Live Payments & Real Collection Sum
+          double totalCollected = 0.0;
+          int realPaidCount = 0;
+          try {
+            final approvals = await SupabaseService.instance.client
+                .from('payment_approvals')
+                .select('amount, status')
+                .eq('property_id', propId)
+                .eq('status', 'approved');
+            for (final a in approvals) {
+              totalCollected += (a['amount'] as num?)?.toDouble() ?? 0.0;
+              realPaidCount++;
+            }
+          } catch (_) {}
+
+          try {
+            final ledgers = await SupabaseService.instance.client
+                .from('rent_ledgers')
+                .select('amount, status')
+                .eq('property_id', propId)
+                .eq('status', 'PAID');
+            for (final l in ledgers) {
+              totalCollected += (l['amount'] as num?)?.toDouble() ?? 0.0;
+              realPaidCount++;
+            }
+          } catch (_) {}
+
+          final realPendingCount =
+              (occupied - realPaidCount).clamp(0, occupied);
+
+          // 2. Live Move-Out Notices
+          int realNoticeCount = 0;
+          try {
+            final notices = await SupabaseService.instance.client
+                .from('move_out_notices')
+                .select('id, status')
+                .eq('property_id', propId)
+                .neq('status', 'cancelled');
+            realNoticeCount = (notices as List).length;
+          } catch (_) {}
+
           loaded.add({
             'id': propId,
-            'name': p.propertyName.isNotEmpty ? p.propertyName : 'PG Property',
+            'name': p.propertyName,
             'ownerName': (p.ownerLegalName != null && p.ownerLegalName!.isNotEmpty)
                 ? p.ownerLegalName!
                 : (p.bankHolderName ?? 'Owner'),
@@ -177,12 +222,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             'totalBeds': total,
             'occupancyPct': pct,
             'vacantBeds': (total - occupied) > 0 ? (total - occupied) : 0,
-            'noticeBeds': 0,
-            'monthlyCollected': '₹0',
-            'collectedRatio': '$occupied/$total Beds',
-            'paidCount': 0,
-            'pendingCount': occupied,
-            'staffCount': 0,
+            'noticeBeds': realNoticeCount,
+            'monthlyCollected': totalCollected > 0
+                ? '₹${totalCollected.round()}'
+                : '₹0',
+            'collectedRatio': '$realPaidCount/$occupied Paid',
+            'paidCount': realPaidCount,
+            'pendingCount': realPendingCount,
+            'staffCount': realStaffCount,
           });
         }
         setState(() {
@@ -309,8 +356,53 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         ? _properties[_activePropertyIndex]
         : (widget.initialProperty ?? const <String, dynamic>{});
 
-    return Scaffold(
-      backgroundColor: Colors.white,
+    final hasActiveModal = _showApprovalModal ||
+        _showRentModal ||
+        _showExpenseModal ||
+        _showPoliceModal ||
+        _showNoticeModal ||
+        _showComplaintsModal ||
+        _showStaffModal ||
+        _showAnnouncementModal;
+
+    final isSubScreenActive =
+        _activeSubScreen != 'dashboard' || _activeNavIndex != 0;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+
+        // 1. If any modal bottom sheet is open, close it first
+        if (hasActiveModal) {
+          setState(() {
+            _showApprovalModal = false;
+            _showRentModal = false;
+            _showExpenseModal = false;
+            _showPoliceModal = false;
+            _showNoticeModal = false;
+            _showComplaintsModal = false;
+            _showStaffModal = false;
+            _showAnnouncementModal = false;
+          });
+          return;
+        }
+
+        // 2. If inside ANY sub-screen or tab, return cleanly to Main Dashboard
+        if (isSubScreenActive) {
+          setState(() {
+            _activeSubScreen = 'dashboard';
+            _activeNavIndex = 0;
+          });
+          _loadPropertiesFromSupabase();
+          return;
+        }
+
+        // 3. If on root Dashboard, exit/minimize cleanly to Android Home Screen
+        SystemNavigator.pop();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
       body: SafeArea(
         child: Stack(
           children: [
@@ -402,7 +494,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             else if (_activeSubScreen == 'food_menu')
               OwnerFoodMenuScreen(
                 propertyId: _currentPropertyId,
-                propertyName: (activeProp['name'] as String?) ?? 'My PG Building',
+                propertyName: _currentPropertyName ?? (activeProp['property_name'] ?? activeProp['name'])?.toString() ?? '',
                 onBack: () {
                   setState(() => _activeSubScreen = 'dashboard');
                   _loadPropertiesFromSupabase();
@@ -421,7 +513,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               OwnerSaaSBillingScreen(
                 propertyId: activeProp['id']?.toString(),
                 propertyName:
-                    (activeProp['name'] as String?) ?? 'My PG Building',
+                    _currentPropertyName ?? (activeProp['property_name'] ?? activeProp['name'])?.toString() ?? '',
                 totalBeds: (activeProp['totalBeds'] as num?)?.toInt() ?? 0,
                 ownerName: _currentOwnerName,
                 onBack: () {
@@ -497,8 +589,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ===========================================================================
   // 1. ELEVATED SOLID WHITE HEADER BANNER CONTAINER
@@ -1164,15 +1257,29 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _activePropertyIndex = idx;
-                        SupabaseService.instance.activePropertyId =
-                            prop['id']?.toString();
-                      });
+                    onTap: () async {
                       Navigator.of(ctx).pop();
-                      _showToast(
-                          'Switched to ${prop['name']} (${prop['location']})');
+                      final rawName = prop['name']?.toString().trim();
+                      final pName = (rawName != null && rawName.isNotEmpty)
+                          ? rawName
+                          : (prop['property_name']?.toString().trim() ?? '');
+                      final loadingMsg = pName.isNotEmpty
+                          ? 'Switching to $pName...'
+                          : 'Switching property...';
+                      UrbanLoadingService.show(loadingMsg);
+                      try {
+                        setState(() {
+                          _activePropertyIndex = idx;
+                          SupabaseService.instance.activePropertyId =
+                              prop['id']?.toString();
+                        });
+                        await Future.delayed(const Duration(milliseconds: 350));
+                      } finally {
+                        UrbanLoadingService.hide();
+                      }
+                      _showToast(pName.isNotEmpty
+                          ? 'Switched to $pName (${prop['location'] ?? ''})'
+                          : 'Switched property successfully');
                     },
                     borderRadius: BorderRadius.circular(14),
                     child: Container(

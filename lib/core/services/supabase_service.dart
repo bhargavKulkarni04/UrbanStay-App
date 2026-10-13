@@ -43,9 +43,11 @@ class SupabaseService {
 
   /// Phone number authentication (OTP dispatch)
   Future<void> sendOtp({required String phone}) async {
-    await client.auth.signInWithOtp(
-      phone: phone,
-    );
+    return await _withLoading('Sending OTP...', () async {
+      await client.auth.signInWithOtp(
+        phone: phone,
+      );
+    });
   }
 
   /// Verify 6-digit OTP
@@ -53,11 +55,13 @@ class SupabaseService {
     required String phone,
     required String token,
   }) async {
-    return await client.auth.verifyOTP(
-      phone: phone,
-      token: token,
-      type: OtpType.sms,
-    );
+    return await _withLoading('Verifying OTP...', () async {
+      return await client.auth.verifyOTP(
+        phone: phone,
+        token: token,
+        type: OtpType.sms,
+      );
+    });
   }
 
   /// Sign out current session
@@ -446,33 +450,35 @@ class SupabaseService {
     String? screenshotUrl,
     String? paymentApp,
   }) async {
-    final pName = (propertyName != null && propertyName.isNotEmpty)
-        ? propertyName
-        : (activePropertyName ?? '');
-    final payload = {
-      'tenant_id': tenantId,
-      'property_id': propertyId,
-      if (pName.isNotEmpty) 'property_name': pName,
-      if (tenantName != null && tenantName.isNotEmpty)
-        'tenant_name': tenantName,
-      if (roomNumber != null && roomNumber.isNotEmpty)
-        'room_number': roomNumber,
-      'amount': amount,
-      'utr_number': utrNumber,
-      'payment_app': paymentApp ?? 'Google Pay',
-      'proof_image_url': screenshotUrl,
-      'status': 'pending',
-      'created_at': DateTime.now().toIso8601String(),
-    };
-    try {
-      await client.from('payment_approvals').insert(payload);
-    } catch (_) {
+    return await _withLoading('Submitting payment proof...', () async {
+      final pName = (propertyName != null && propertyName.isNotEmpty)
+          ? propertyName
+          : (activePropertyName ?? '');
+      final payload = {
+        'tenant_id': tenantId,
+        'property_id': propertyId,
+        if (pName.isNotEmpty) 'property_name': pName,
+        if (tenantName != null && tenantName.isNotEmpty)
+          'tenant_name': tenantName,
+        if (roomNumber != null && roomNumber.isNotEmpty)
+          'room_number': roomNumber,
+        'amount': amount,
+        'utr_number': utrNumber,
+        'payment_app': paymentApp ?? 'Google Pay',
+        'proof_image_url': screenshotUrl,
+        'status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      };
       try {
-        await client.from('upi_payment_submissions').insert(payload);
-      } catch (e) {
-        debugPrint('Error submitting payment proof: $e');
+        await client.from('payment_approvals').insert(payload);
+      } catch (_) {
+        try {
+          await client.from('upi_payment_submissions').insert(payload);
+        } catch (e) {
+          debugPrint('Error submitting payment proof: $e');
+        }
       }
-    }
+    });
   }
 
   /// Fetch paid receipts for tenant rent payments
@@ -959,7 +965,10 @@ class SupabaseService {
         payload['property_name'] = activePropertyName!;
       }
       payload['updated_at'] = DateTime.now().toIso8601String();
-      await client.from('food_menus').upsert(payload);
+      await client.from('food_menus').upsert(
+            payload,
+            onConflict: 'property_id,week_number,day_of_week',
+          );
       return true;
     } catch (e) {
       debugPrint('Error upserting food menu model: $e');

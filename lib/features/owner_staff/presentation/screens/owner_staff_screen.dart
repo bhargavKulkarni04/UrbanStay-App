@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// Screen 11: Staff Directory & Payroll Management.
 /// Strict Design System:
@@ -690,8 +691,7 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                       const Center(
                         child: Padding(
                           padding: EdgeInsets.symmetric(vertical: 40),
-                          child:
-                              CircularProgressIndicator(color: AppColors.green),
+                          child: UrbanSpinner(size: 38),
                         ),
                       )
                     else if (filtered.isEmpty)

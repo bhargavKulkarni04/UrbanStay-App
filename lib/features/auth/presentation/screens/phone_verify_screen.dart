@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/urban_loading.dart';
 import 'role_selector_screen.dart';
 
 /// Screen 2: Phone Number & 6-Digit OTP Verification.
@@ -156,20 +157,26 @@ class _PhoneVerifyScreenState extends State<PhoneVerifyScreen>
     // Dismiss keyboard
     FocusScope.of(context).unfocus();
 
-    setState(() {
-      _isVerified = true;
-    });
-
-    _verifiedAnimController.forward(from: 0.0);
-
-    // Auto-navigate to Screen 3: Role Selector after smooth verification pop-up
-    Future.delayed(const Duration(milliseconds: 1400), () {
+    UrbanLoadingService.show('Verifying OTP & logging in...');
+    Future.delayed(const Duration(milliseconds: 650), () {
       if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => const RoleSelectorScreen(),
-        ),
-      );
+      UrbanLoadingService.hide();
+
+      setState(() {
+        _isVerified = true;
+      });
+
+      _verifiedAnimController.forward(from: 0.0);
+
+      // Auto-navigate to Screen 3: Role Selector after smooth verification pop-up
+      Future.delayed(const Duration(milliseconds: 1400), () {
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const RoleSelectorScreen(),
+          ),
+        );
+      });
     });
   }
 

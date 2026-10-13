@@ -8,6 +8,7 @@ import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 import 'shift_bed_screen.dart';
 
 /// Screen 6: Tenants & Rooms Matrix.
@@ -85,7 +86,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       if (propId == null || propId.isEmpty || pName == null || pName.isEmpty) {
         final prop = await SupabaseService.instance.getOwnerProperty();
         propId ??= prop?['id']?.toString();
-        pName ??= prop?['name']?.toString();
+        pName ??= (prop?['property_name'] ?? prop?['name'])?.toString();
       }
 
       if (propId != null && propId.isNotEmpty) {
@@ -823,14 +824,19 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       final dmgAmount = double.tryParse(amount) ?? 0.0;
 
                       final propId = widget.propertyId ??
+                          _propertyId ??
                           SupabaseService.instance.activePropertyId;
-                      final propName =
-                          OwnerAppState.instance.activePropertyName;
+                      final propName = (_propertyName != null && _propertyName!.isNotEmpty)
+                          ? _propertyName!
+                          : ((widget.propertyName != null && widget.propertyName!.isNotEmpty)
+                              ? widget.propertyName!
+                              : (SupabaseService.instance.activePropertyName ??
+                                  OwnerAppState.instance.activePropertyName));
 
                       final success =
                           await SupabaseService.instance.addDamageDeduction(
                         propertyId: propId ?? '',
-                        propertyName: propName.isNotEmpty ? propName : 'My PG',
+                        propertyName: propName,
                         bedId: bedId,
                         tenantName: resident['name'] ?? 'Resident',
                         roomNumber: roomName,
@@ -1430,7 +1436,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(color: AppColors.green),
+          child: UrbanSpinner(size: 38),
         ),
       );
     }

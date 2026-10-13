@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// Screen 7: 0% Direct UPI Payment Approvals & Verification Hub with Audit History.
 /// Design System: Pure enterprise UrbanStay aesthetic (Stripe/Linear precision),
@@ -599,7 +600,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(color: AppColors.green),
+          child: UrbanSpinner(size: 38),
         ),
       );
     }

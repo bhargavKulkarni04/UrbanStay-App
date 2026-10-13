@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// Screen: Owner Business Intelligence & Master Reports Hub.
 /// Specific Updates:
@@ -352,7 +353,7 @@ class _OwnerReportsScreenState extends State<OwnerReportsScreen> {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(color: AppColors.green),
+          child: UrbanSpinner(size: 38),
         ),
       );
     }

@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// Screen 8: Rent Collection Hub & WhatsApp Dues Chaser.
 /// 3-Tier Hierarchy: Floor -> Room (Sharing Type & Rent Total) -> Beds & Resident Cards.
@@ -1011,7 +1012,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(color: AppColors.green),
+          child: UrbanSpinner(size: 38),
         ),
       );
     }

@@ -9,6 +9,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_responsive.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/models/models.dart';
+import '../../../../core/widgets/urban_loading.dart';
 import '../../../owner_dashboard/presentation/screens/owner_dashboard_screen.dart';
 
 /// Screen 4: 4-Step PG Owner Onboarding & Property Setup Wizard.
@@ -990,9 +991,15 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             ? _bankHolderNameController.text.trim()
             : 'Owner');
 
-    // Await persistence to Supabase
-    final createdProp = await _persistPropertyToSupabase(
-        calcBeds: calcBeds, calcRooms: calcRooms);
+    // Await persistence to Supabase with signature 8-pillar loader
+    UrbanLoadingService.show('Creating rooms & generating beds in database...');
+    Map<String, dynamic>? createdProp;
+    try {
+      createdProp = await _persistPropertyToSupabase(
+          calcBeds: calcBeds, calcRooms: calcRooms);
+    } finally {
+      UrbanLoadingService.hide();
+    }
 
     final propModel =
         createdProp != null ? PropertyModel.fromJson(createdProp) : null;

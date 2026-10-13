@@ -29,9 +29,12 @@ class OwnerAppState extends ChangeNotifier {
   }
 
   String get activePropertyId =>
-      activeProperty?['id']?.toString() ?? '';
+      activeProperty?['id']?.toString() ??
+      SupabaseService.instance.activePropertyId ??
+      '';
 
   String get activePropertyName =>
+      activeProperty?['property_name']?.toString() ??
       activeProperty?['name']?.toString() ??
       activeProperty?['brand_name']?.toString() ??
       '';
@@ -47,7 +50,9 @@ class OwnerAppState extends ChangeNotifier {
       '';
 
   int get totalBeds =>
-      (activeProperty?['totalBeds'] as num?)?.toInt() ?? 0;
+      (activeProperty?['total_beds'] as num?)?.toInt() ??
+      (activeProperty?['totalBeds'] as num?)?.toInt() ??
+      0;
 
   int get occupiedBeds =>
       (activeProperty?['occupiedBeds'] as num?)?.toInt() ?? 0;
@@ -85,7 +90,8 @@ class OwnerAppState extends ChangeNotifier {
     int total = 0;
     for (final r in _rentLedgers) {
       if (r['status'] == 'paid' || r['status'] == 'PAID') {
-        total += ((r['amount'] as num?)?.toInt() ?? 0);
+        final rawAmt = r['rent_amount'] ?? r['amount'] ?? r['due_amount'];
+        total += ((rawAmt as num?)?.toInt() ?? 0);
       }
     }
     return '₹$total';
