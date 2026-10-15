@@ -750,10 +750,20 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       final floorsMap = _getFlatsPerFloor();
       final floorsList = _getFloorNames();
 
-      int fIndex = 0;
+      int fIndex = 1;
       for (final entry in floorsMap.entries) {
         final floorName = entry.key;
         final roomNames = entry.value;
+
+        int calculatedFloorNumber = fIndex;
+        if (floorName.toLowerCase().contains('ground')) {
+          calculatedFloorNumber = 0;
+        } else {
+          final digit = RegExp(r'\d+').firstMatch(floorName);
+          if (digit != null) {
+            calculatedFloorNumber = int.tryParse(digit.group(0)!) ?? fIndex;
+          }
+        }
 
         for (final roomName in roomNames) {
           String sharingType = '2-Sharing';
@@ -848,7 +858,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
           }
 
           roomsData.add({
-            'floor_number': fIndex,
+            'floor_number': calculatedFloorNumber,
             'floor_label': floorName,
             'room_number': roomName,
             'sharing_type': sharingType,

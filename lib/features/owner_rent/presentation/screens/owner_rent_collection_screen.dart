@@ -61,8 +61,18 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   List<String> get _cycleList {
     final now = DateTime.now();
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return List.generate(6, (i) {
       final d = DateTime(now.year, now.month - i, 1);
@@ -75,8 +85,18 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
     super.initState();
     final now = DateTime.now();
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     _selectedCycle = '${months[now.month - 1]} ${now.year}';
     _loadRentLedgerFromSupabase();
@@ -84,8 +104,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
 
   Future<void> _loadRentLedgerFromSupabase() async {
     try {
-      final targetPropId = widget.propertyId ??
-          SupabaseService.instance.activePropertyId;
+      final targetPropId =
+          widget.propertyId ?? SupabaseService.instance.activePropertyId;
       String? propId = targetPropId;
       if (propId == null || propId.isEmpty) {
         final prop = await SupabaseService.instance.getOwnerProperty();
@@ -93,9 +113,11 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       }
 
       if (propId != null && propId.isNotEmpty) {
-        final prop = await SupabaseService.instance.getOwnerProperty(propertyId: propId);
+        final prop =
+            await SupabaseService.instance.getOwnerProperty(propertyId: propId);
         if (prop != null) {
-          _propName = (prop['property_name'] ?? prop['name'] ?? 'My PG').toString();
+          OwnerAppState.instance.setActiveProperty(prop);
+          _propName = (prop['property_name'] ?? prop['name'] ?? '').toString();
           _totalBedsCount = (prop['total_beds'] as num?)?.toInt() ?? 0;
 
           final ownerName = (prop['owner_legal_name'] ?? 'Owner').toString();
@@ -116,8 +138,16 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           }
         }
 
-        final ledgerModels = await SupabaseService.instance.getRentLedgerModels(propId);
-        final Map<String, Map<String, List<Map<String, dynamic>>>> floorMap = {};
+        // Auto-generate current monthly ledgers in Supabase if not yet present
+        await SupabaseService.instance.ensureMonthlyRentLedgers(
+          propertyId: propId,
+          cycleMonth: _selectedCycle,
+        );
+
+        final ledgerModels =
+            await SupabaseService.instance.getRentLedgerModels(propId);
+        final Map<String, Map<String, List<Map<String, dynamic>>>> floorMap =
+            {};
 
         if (ledgerModels.isNotEmpty) {
           for (final model in ledgerModels) {
@@ -131,7 +161,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             floorMap[floorId]!.putIfAbsent(roomNum, () => []);
 
             final isPaid = model.isPaid;
-            final tenantName = model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
+            final tenantName =
+                model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
             final nameParts = tenantName.trim().split(' ');
             final computedInitials = nameParts.length >= 2
                 ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
@@ -148,24 +179,32 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               'work': 'Resident',
               'phone': model.phone ?? '',
               'amount': model.rentAmount.toInt(),
+              'payDay': model.dueDate.day,
               'status': isPaid ? 'paid' : 'overdue',
-              'paidLabel': isPaid ? 'Paid (Direct UPI)' : null,
+              'paidLabel': isPaid ? 'Paid (${model.paymentMode})' : null,
               'tag': isPaid ? 'Settled 0% Fee' : null,
               'ref': 'UPI-REF',
-              'paidDate': model.paidDate != null ? model.paidDate.toString().split('T').first : null,
+              'paidDate': model.paidDate != null
+                  ? model.paidDate.toString().split('T').first
+                  : null,
               'overdueDays': !isPaid ? 'Payment Pending' : null,
               'dueLabel': !isPaid ? 'Due this month' : null,
             });
           }
         } else {
           // Auto-populate active occupied residents from beds table
-          final roomsWithBeds = await SupabaseService.instance.getRoomsWithBeds(propId);
+          final roomsWithBeds =
+              await SupabaseService.instance.getRoomsWithBeds(propId);
           for (final r in roomsWithBeds) {
             final bedsList = (r['beds'] as List?) ?? [];
-            final occBeds = bedsList.where((b) => b['is_occupied'] == true).toList();
+            final occBeds =
+                bedsList.where((b) => b['is_occupied'] == true).toList();
             if (occBeds.isNotEmpty) {
               final roomNum = r['room_number']?.toString() ?? '';
-              final floorName = r['floor_name']?.toString() ?? (r['floor_id'] != null ? 'Floor ${r['floor_id']}' : '1st Floor');
+              final floorName = r['floor_name']?.toString() ??
+                  (r['floor_id'] != null
+                      ? 'Floor ${r['floor_id']}'
+                      : '1st Floor');
               final floorId = floorName.split(' ').first.toLowerCase();
 
               floorMap.putIfAbsent(floorId, () => {});
@@ -177,20 +216,26 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 final parts = tenantName.trim().split(' ');
                 final computedInitials = parts.length >= 2
                     ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
-                    : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'RS');
+                    : (tenantName.isNotEmpty
+                        ? tenantName[0].toUpperCase()
+                        : 'RS');
                 final actualBedRent = (b['rent'] as num?)?.toInt() ?? roomRent;
+                final bedDueDay = (b['rent_due_day'] as num?)?.toInt() ?? 5;
 
                 floorMap[floorId]![roomNum]!.add({
                   'id': b['id'].toString(),
                   'name': tenantName,
                   'initials': computedInitials,
-                  'bed': b['bed_number']?.toString() ?? b['bed_label']?.toString() ?? '',
+                  'bed': b['bed_number']?.toString() ??
+                      b['bed_label']?.toString() ??
+                      '',
                   'room': roomNum,
                   'roomNum': roomNum,
                   'floor': floorId,
                   'work': 'Resident',
                   'phone': b['tenant_phone']?.toString() ?? '',
                   'amount': actualBedRent,
+                  'payDay': bedDueDay,
                   'status': 'overdue',
                   'paidLabel': null,
                   'tag': null,
@@ -209,17 +254,25 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           floorMap.forEach((fId, roomsMap) {
             final List<Map<String, dynamic>> roomsList = [];
             roomsMap.forEach((rNum, beds) {
+              final bedCount = beds.length;
+              final dynamicSharing = bedCount == 1
+                  ? '1-Sharing'
+                  : (bedCount == 2
+                      ? '2-Sharing'
+                      : (bedCount == 3 ? '3-Sharing' : '$bedCount-Sharing'));
               roomsList.add({
                 'room': rNum,
-                'type': '2-Sharing',
-                'monthlyExpected': beds.fold<int>(0, (acc, b) => acc + (b['amount'] as int)),
+                'type': dynamicSharing,
+                'monthlyExpected':
+                    beds.fold<int>(0, (acc, b) => acc + (b['amount'] as int)),
                 'beds': beds,
               });
             });
             loadedFloors.add({
               'id': fId,
               'title': '$fId Floor',
-              'roomsSubtitle': '${roomsList.length} Rooms • ${roomsList.fold<int>(0, (acc, r) => acc + (r['beds'] as List).length)} Beds',
+              'roomsSubtitle':
+                  '${roomsList.length} Rooms • ${roomsList.fold<int>(0, (acc, r) => acc + (r['beds'] as List).length)} Beds',
               'rooms': roomsList,
             });
           });
@@ -283,22 +336,61 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   }
 
   // Extension Flow Actions
-  void _approveExtension(Map<String, dynamic> tenant) {
+  void _approveExtension(Map<String, dynamic> tenant) async {
+    final targetPropId =
+        widget.propertyId ?? SupabaseService.instance.activePropertyId;
+    String? propId = targetPropId;
+    if (propId == null || propId.isEmpty) {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      propId = prop?['id']?.toString();
+    }
+
     setState(() {
       tenant['status'] = 'extension_approved';
       tenant['extensionDate'] = tenant['requestedDate'] ?? 'Not Set';
       tenant['dueLabel'] =
           'Extension Approved • Due ${tenant['extensionDate']}';
     });
+
+    if (propId != null && propId.isNotEmpty) {
+      await SupabaseService.instance.approveRentExtension(
+        propertyId: propId,
+        tenantName: tenant['name']?.toString() ?? '',
+        roomNumber: tenant['room']?.toString(),
+        ledgerId: tenant['id']?.toString(),
+        extensionId: tenant['extensionId']?.toString(),
+        requestedDueDate: tenant['requestedDate']?.toString(),
+      );
+    }
+
     _showToast(
         'Extension Approved for ${tenant['name']} till ${tenant['extensionDate']} • Reminders paused ✓');
   }
 
-  void _declineExtension(Map<String, dynamic> tenant) {
+  void _declineExtension(Map<String, dynamic> tenant) async {
+    final targetPropId =
+        widget.propertyId ?? SupabaseService.instance.activePropertyId;
+    String? propId = targetPropId;
+    if (propId == null || propId.isEmpty) {
+      final prop = await SupabaseService.instance.getOwnerProperty();
+      propId = prop?['id']?.toString();
+    }
+
     setState(() {
       tenant['status'] = 'overdue';
       tenant['dueLabel'] = 'Extension Declined • Due Immediately';
     });
+
+    if (propId != null && propId.isNotEmpty) {
+      await SupabaseService.instance.declineRentExtension(
+        propertyId: propId,
+        tenantName: tenant['name']?.toString() ?? '',
+        roomNumber: tenant['room']?.toString(),
+        ledgerId: tenant['id']?.toString(),
+        extensionId: tenant['extensionId']?.toString(),
+      );
+    }
+
     _showToast(
         'Extension Declined for ${tenant['name']}. Reminder sent on WhatsApp.');
   }
@@ -381,27 +473,47 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                         return;
                       }
 
-                      final prop = await SupabaseService.instance.getOwnerProperty();
-                      if (prop != null) {
-                        final success = await SupabaseService.instance.recordCashCollection(
-                          propertyId: prop['id'].toString(),
+                      final targetPropId = widget.propertyId ??
+                          SupabaseService.instance.activePropertyId;
+                      String? propId = targetPropId;
+                      if (propId == null || propId.isEmpty) {
+                        final prop =
+                            await SupabaseService.instance.getOwnerProperty();
+                        propId = prop?['id']?.toString();
+                      }
+
+                      if (propId != null && propId.isNotEmpty) {
+                        final success = await SupabaseService.instance
+                            .recordCashPaymentForRentLedger(
+                          propertyId: propId,
+                          propertyName: _propName,
                           tenantName: tenant['name'] ?? 'Resident',
+                          roomNumber: tenant['room']?.toString() ?? '',
                           amount: amountReceived.toDouble(),
                           collectedBy: currentStaff,
-                          roomNumber: tenant['room']?.toString(),
+                          ledgerId: tenant['id']?.toString(),
+                          notes: _cashNotesController.text.trim(),
                         );
                         if (!success) {
-                          _showToast('Failed to record cash in database. Please check connection.');
+                          _showToast(
+                              'Failed to record cash in database. Please check connection.');
                           return;
                         }
                       }
 
+                      // Instantly update local card state so it reflects as paid without latency
                       setState(() {
                         tenant['status'] = 'paid';
-                        tenant['paidLabel'] = 'Paid in Cash';
-                        tenant['paidDate'] = 'Today';
-                        tenant['approvedBy'] = currentStaff;
+                        tenant['paidLabel'] = 'Paid (CASH)';
+                        tenant['tag'] = 'Settled 0% Fee';
+                        tenant['ref'] = 'CASH-REC';
+                        tenant['paidDate'] =
+                            DateTime.now().toString().split(' ').first;
+                        tenant['overdueDays'] = null;
+                        tenant['dueLabel'] = null;
                       });
+
+                      await _loadRentLedgerFromSupabase();
 
                       if (ctx.mounted) {
                         Navigator.of(ctx).pop();
@@ -513,12 +625,37 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       hint: 'e.g. Salary credited on 10th from employer'),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      setState(() {
-                        tenant['payDay'] = selectedDay;
-                        tenant['payDayReason'] = reasonCtrl.text.trim();
-                      });
+                    onPressed: () async {
+                      final targetPropId = widget.propertyId ??
+                          SupabaseService.instance.activePropertyId;
+                      String? propId = targetPropId;
+                      if (propId == null || propId.isEmpty) {
+                        final prop =
+                            await SupabaseService.instance.getOwnerProperty();
+                        propId = prop?['id']?.toString();
+                      }
+
+                      if (propId != null && propId.isNotEmpty) {
+                        final success =
+                            await SupabaseService.instance.updateRentDueDate(
+                          propertyId: propId,
+                          roomNumber: tenant['room']?.toString() ?? '',
+                          tenantName: tenant['name'],
+                          ledgerId: tenant['id']?.toString(),
+                          newDueDay: selectedDay,
+                          reason: reasonCtrl.text.trim(),
+                        );
+                        if (!success) {
+                          _showToast('Failed to update due date in database.');
+                          return;
+                        }
+                      }
+
+                      await _loadRentLedgerFromSupabase();
+
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast(
                           'Pay Date updated to ${selectedDay}th of month for ${tenant['name']} ✓');
                     },
@@ -578,9 +715,12 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 child: Column(
                   children: [
                     Text(
-                      OwnerAppState.instance.activePropertyName.isNotEmpty
-                          ? OwnerAppState.instance.activePropertyName
-                          : 'My PG',
+                      _propName.isNotEmpty
+                          ? _propName
+                          : (OwnerAppState
+                                  .instance.activePropertyName.isNotEmpty
+                              ? OwnerAppState.instance.activePropertyName
+                              : 'UrbanStay PG'),
                       style: GoogleFonts.outfit(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -703,8 +843,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                         'Submitted UTR / Ref:', tenant['ref'] ?? 'Pending UTR',
                         isMonospace: true),
                     const SizedBox(height: 8),
-                    _buildReceiptRow(
-                        'Submission Time:', tenant['submissionTime'] ?? 'Today'),
+                    _buildReceiptRow('Submission Time:',
+                        tenant['submissionTime'] ?? 'Today'),
                   ],
                 ),
               ),
@@ -764,14 +904,29 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       onPressed: () {
                         Navigator.of(ctx).pop();
                         final now = DateTime.now();
-                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                        final dateStr = '${now.day} ${months[now.month - 1]} ${now.year}';
+                        const months = [
+                          'Jan',
+                          'Feb',
+                          'Mar',
+                          'Apr',
+                          'May',
+                          'Jun',
+                          'Jul',
+                          'Aug',
+                          'Sep',
+                          'Oct',
+                          'Nov',
+                          'Dec'
+                        ];
+                        final dateStr =
+                            '${now.day} ${months[now.month - 1]} ${now.year}';
                         setState(() {
                           tenant['status'] = 'paid';
                           tenant['paidLabel'] =
                               'Paid on ${now.day} ${months[now.month - 1]} (Verified by $_selectedStaffActor)';
                           tenant['tag'] = 'Direct UPI';
-                          tenant['ref'] = tenant['ref'] ?? 'UTR-${now.millisecondsSinceEpoch}';
+                          tenant['ref'] = tenant['ref'] ??
+                              'UTR-${now.millisecondsSinceEpoch}';
                           tenant['paidDate'] = dateStr;
                           tenant['approvedBy'] = _selectedStaffActor;
                         });
@@ -976,7 +1131,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                     onPressed: () {
                       setState(() {
                         tenant['status'] = 'overdue';
-                        tenant['dueLabel'] = 'Payment Rejected ($selectedReason)';
+                        tenant['dueLabel'] =
+                            'Payment Rejected ($selectedReason)';
                       });
                       Navigator.of(ctx).pop();
                       _showToast(
@@ -1192,13 +1348,25 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                       color: AppColors.ink,
                     ),
                   ),
-                  Text(
-                    '${_propName.isNotEmpty ? _propName : (OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG")} • ${_totalBedsCount > 0 ? _totalBedsCount : OwnerAppState.instance.totalBeds} Beds',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.muted,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final name = _propName.isNotEmpty
+                          ? _propName
+                          : OwnerAppState.instance.activePropertyName;
+                      final beds = _totalBedsCount > 0
+                          ? _totalBedsCount
+                          : OwnerAppState.instance.totalBeds;
+                      final subtitle =
+                          name.isNotEmpty ? '$name • $beds Beds' : '$beds Beds';
+                      return Text(
+                        subtitle,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.muted,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -1248,10 +1416,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
   // ===========================================================================
   Widget _buildStatsStrip(int totalPendingCount, int overdueSum) {
     final allOccupied = _getAllOccupiedTenants();
-    final totalExpected = allOccupied.fold<int>(0, (sum, item) => sum + ((item['amount'] as num?)?.toInt() ?? 0));
-    final collected = allOccupied
-        .where((t) => t['status'] == 'paid')
-        .fold<int>(0, (sum, item) => sum + ((item['amount'] as num?)?.toInt() ?? 0));
+    final totalExpected = allOccupied.fold<int>(
+        0, (sum, item) => sum + ((item['amount'] as num?)?.toInt() ?? 0));
+    final collected = allOccupied.where((t) => t['status'] == 'paid').fold<int>(
+        0, (sum, item) => sum + ((item['amount'] as num?)?.toInt() ?? 0));
 
     return Row(
       children: [
@@ -1348,8 +1516,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                 'Payment Reminders sent to $overdueCount Due Residents ✓'),
             borderRadius: BorderRadius.circular(8),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.green,
                 borderRadius: BorderRadius.circular(8),
@@ -1936,143 +2103,50 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               ],
             )
           else ...[
-            // Verification Bar: View Proof, Reject (Not in Bank), and Accept
+            // Real Unpaid Actions: Record Cash & Change Pay Date
             Row(
               children: [
                 Expanded(
-                  flex: 3,
                   child: OutlinedButton.icon(
-                    onPressed: () => _openViewProofModal(tenant),
-                    icon: const Icon(Icons.remove_red_eye_outlined,
-                        size: 13, color: AppColors.ink),
+                    onPressed: () => _openRecordCashModal(tenant),
+                    icon: const Icon(Icons.payments_outlined,
+                        size: 14, color: AppColors.greenDark),
                     label: Text(
-                      'View Proof',
-                      style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.ink,
-                      side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 3,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      _showToast(
-                          'Payment rejected: Not received in owner bank account. Alert sent to ${tenant['name']}');
-                    },
-                    icon: const Icon(Icons.close_rounded,
-                        size: 13, color: Color(0xFFDC2626)),
-                    label: Text(
-                      'Reject',
-                      style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFFDC2626)),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFDC2626),
-                      side: const BorderSide(color: Color(0xFFFCA5A5)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 4,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      final now = DateTime.now();
-                      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                      final dateStr = '${now.day} ${months[now.month - 1]} ${now.year}';
-                      setState(() {
-                        tenant['status'] = 'paid';
-                        tenant['paidLabel'] =
-                            'Paid on ${now.day} ${months[now.month - 1]} (Verified by $_selectedStaffActor)';
-                        tenant['tag'] = 'Direct UPI';
-                        tenant['ref'] = tenant['ref'] ?? 'UTR-${now.millisecondsSinceEpoch}';
-                        tenant['paidDate'] = dateStr;
-                        tenant['approvedBy'] = _selectedStaffActor;
-                      });
-                      _showToast(
-                          'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
-                    },
-                    icon: const Icon(Icons.check_rounded,
-                        size: 14, color: Colors.white),
-                    label: Text(
-                      'Accept',
+                      'Record Cash',
                       style: GoogleFonts.outfit(
                           fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.greenDark),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.green,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.greenDark,
+                      side: BorderSide(
+                          color: AppColors.green.withValues(alpha: 0.3)),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Secondary Option: Manual Record Cash / Change Date
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _openRecordCashModal(tenant),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFEEF0F2)),
-                      ),
-                      child: Text(
-                        'Record Cash Instead',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.muted),
-                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: InkWell(
-                    onTap: () => _openChangePayDateModal(tenant),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFEEF0F2)),
-                      ),
-                      child: Text(
-                        'Change Pay Date',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.muted),
-                      ),
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openChangePayDateModal(tenant),
+                    icon: const Icon(Icons.calendar_today_outlined,
+                        size: 13, color: AppColors.muted),
+                    label: Text(
+                      'Change Pay Date',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.muted),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.muted,
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -2368,8 +2442,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(6),
@@ -2386,8 +2460,8 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
               ),
               const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(6),
@@ -2827,117 +2901,136 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             ),
           ] else ...[
             const SizedBox(height: 8),
-            // Row 1: Verification Bar: View Proof, Reject, Accept
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openViewProofModal(tenant),
-                    icon: const Icon(Icons.remove_red_eye_outlined,
-                        size: 13, color: AppColors.ink),
-                    label: Text(
-                      'View Proof',
-                      style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.ink),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.ink,
-                      side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 3,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openRejectPaymentModal(tenant),
-                    icon: const Icon(Icons.close_rounded,
-                        size: 13, color: Color(0xFFDC2626)),
-                    label: Text(
-                      'Reject',
-                      style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFFDC2626)),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFDC2626),
-                      side: const BorderSide(color: Color(0xFFFCA5A5)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+            // Verification Bar ONLY if tenant has submitted proof:
+            if (tenant['status'] == 'under_review' ||
+                tenant['hasProof'] == true ||
+                tenant['tag'] == 'Proof Submitted') ...[
+              Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openViewProofModal(tenant),
+                      icon: const Icon(Icons.remove_red_eye_outlined,
+                          size: 13, color: AppColors.ink),
+                      label: Text(
+                        'View Proof',
+                        style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.ink,
+                        side: const BorderSide(color: Color(0xFFE5E7EB)),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 4,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      final now = DateTime.now();
-                      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                      final dateStr = '${now.day} ${months[now.month - 1]} ${now.year}';
-                      setState(() {
-                        tenant['status'] = 'paid';
-                        tenant['paidLabel'] =
-                            'Paid on ${now.day} ${months[now.month - 1]} (Verified by $_selectedStaffActor)';
-                        tenant['tag'] = 'Direct UPI';
-                        tenant['ref'] = tenant['ref'] ?? 'UTR-${now.millisecondsSinceEpoch}';
-                        tenant['paidDate'] = dateStr;
-                        tenant['approvedBy'] = _selectedStaffActor;
-                      });
-                      _showToast(
-                          'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
-                    },
-                    icon: const Icon(Icons.check_rounded,
-                        size: 14, color: Colors.white),
-                    label: Text(
-                      'Accept',
-                      style: GoogleFonts.outfit(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.green,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 3,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openRejectPaymentModal(tenant),
+                      icon: const Icon(Icons.close_rounded,
+                          size: 13, color: Color(0xFFDC2626)),
+                      label: Text(
+                        'Reject',
+                        style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFFDC2626)),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFDC2626),
+                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 4,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        final targetPropId = widget.propertyId ??
+                            SupabaseService.instance.activePropertyId ??
+                            '';
+                        final success = await SupabaseService.instance
+                            .recordCashPaymentForRentLedger(
+                          propertyId: targetPropId,
+                          propertyName: _propName,
+                          tenantName: tenant['name'] ?? 'Resident',
+                          roomNumber: tenant['room']?.toString() ?? '',
+                          amount: ((tenant['amount'] as num?)?.toDouble() ??
+                              8500.0),
+                          collectedBy: _selectedStaffActor,
+                          ledgerId: tenant['id']?.toString(),
+                          notes: 'Verified direct UPI payment',
+                        );
+                        if (success) {
+                          await _loadRentLedgerFromSupabase();
+                          _showToast(
+                              'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
+                        }
+                      },
+                      icon: const Icon(Icons.check_rounded,
+                          size: 14, color: Colors.white),
+                      label: Text(
+                        'Accept',
+                        style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.green,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
 
-            // Row 2: Secondary Options: Record Cash Instead / Change Pay Date
+            // Real Unpaid Actions: Record Cash & Change Pay Date
             Row(
               children: [
                 Expanded(
                   child: InkWell(
                     onTap: () => _openRecordCashModal(tenant),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFEEF0F2)),
+                        color: AppColors.greenLight,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: AppColors.green.withValues(alpha: 0.3)),
                       ),
-                      child: Text(
-                        'Record Cash Instead',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.muted),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.payments_outlined,
+                              size: 14, color: AppColors.greenDark),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Record Cash',
+                            style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.greenDark),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -2947,19 +3040,27 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                   child: InkWell(
                     onTap: () => _openChangePayDateModal(tenant),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFEEF0F2)),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
-                      child: Text(
-                        'Change Pay Date',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.muted),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.calendar_today_outlined,
+                              size: 13, color: AppColors.ink),
+                          const SizedBox(width: 5),
+                          Text(
+                            'Change Pay Date',
+                            style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink),
+                          ),
+                        ],
                       ),
                     ),
                   ),

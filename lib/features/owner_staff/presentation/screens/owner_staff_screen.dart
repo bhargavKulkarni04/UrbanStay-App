@@ -37,7 +37,6 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   bool _isCustomRole = false;
   final TextEditingController _customRoleController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _workTitleController = TextEditingController();
   final TextEditingController _salaryController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
 
@@ -46,6 +45,19 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   bool _isLoading = false;
   String? _propertyId;
   String? _propertyName;
+
+  List<String> get _customRolesFromList {
+    const standard = {'warden', 'cook', 'housekeeping', 'security'};
+    final list = <String>{};
+    for (var s in _staffList) {
+      final r = s.displayWorkTitle.trim();
+      final key = s.role.trim().toLowerCase();
+      if (key.isNotEmpty && !standard.contains(key)) {
+        list.add(r);
+      }
+    }
+    return list.toList();
+  }
 
   @override
   void initState() {
@@ -109,7 +121,6 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     _searchController.dispose();
     _customRoleController.dispose();
     _nameController.dispose();
-    _workTitleController.dispose();
     _salaryController.dispose();
     _phoneController.dispose();
     super.dispose();
@@ -407,181 +418,643 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
     _isCustomRole = false;
     _customRoleController.clear();
     _nameController.clear();
-    _workTitleController.clear();
     _salaryController.clear();
     _phoneController.clear();
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (modalCtx, setModalState) {
-            return _buildNativeBottomSheetWrapper(
-              title: 'Add New Staff Member',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Role Selector Chips
-                  _buildFormLabel('Staff Category / Role'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _buildModalRoleChip(
-                          'Warden', Icons.badge_outlined, setModalState),
-                      _buildModalRoleChip(
-                          'Cook', Icons.restaurant_rounded, setModalState),
-                      _buildModalRoleChip('Housekeeping',
-                          Icons.cleaning_services_outlined, setModalState),
-                      _buildModalRoleChip(
-                          'Security', Icons.shield_outlined, setModalState),
-                      _buildModalRoleChip('+ Other (Custom)',
-                          Icons.add_circle_outline_rounded, setModalState,
-                          isCustom: true),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 20, color: AppColors.ink),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+              title: Text(
+                'Add Staff Member',
+                style: GoogleFonts.outfit(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(color: const Color(0xFFE5E7EB), height: 1),
+              ),
+            ),
+            body: SafeArea(
+              child: StatefulBuilder(
+                builder: (modalCtx, setModalState) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Role Selector Chips
+                        _buildFormLabel('Staff Category / Role'),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildModalRoleChip(
+                                'Warden', Icons.badge_outlined, setModalState),
+                            _buildModalRoleChip(
+                                'Cook', Icons.restaurant_rounded, setModalState),
+                            _buildModalRoleChip('Housekeeping',
+                                Icons.cleaning_services_outlined, setModalState),
+                            _buildModalRoleChip(
+                                'Security', Icons.shield_outlined, setModalState),
+                            for (final customName in _customRolesFromList)
+                              _buildModalRoleChip(
+                                customName,
+                                Icons.work_outline_rounded,
+                                setModalState,
+                              ),
+                            _buildModalRoleChip('+ Other (Custom)',
+                                Icons.add_circle_outline_rounded, setModalState,
+                                isCustom: true),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
 
-                  // Inline Custom Role Input (If + Other selected)
-                  if (_isCustomRole) ...[
-                    _buildFormLabel('Enter Custom Role Name'),
-                    _buildTextInput(
-                      _customRoleController,
-                      hint: 'e.g. Electrician, Plumber, Gardener, Driver',
+                        // Inline Custom Role Input (If + Other selected)
+                        if (_isCustomRole) ...[
+                          _buildFormLabel('Enter Custom Role Name'),
+                          _buildTextInput(
+                            _customRoleController,
+                            hint: 'e.g. Electrician, Plumber, Gardener, Driver',
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        // Full Legal Name
+                        _buildFormLabel('Full Name'),
+                        _buildTextInput(_nameController, hint: 'e.g. Rajesh Kumar'),
+                        const SizedBox(height: 12),
+
+                        // Monthly Salary & Phone Number Row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildFormLabel('Monthly Salary (₹)'),
+                                  _buildTextInput(
+                                    _salaryController,
+                                    hint: '₹ Amount',
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildFormLabel('Phone Number'),
+                                  _buildTextInput(
+                                    _phoneController,
+                                    hint: '10-digit Mobile',
+                                    keyboardType: TextInputType.phone,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Submit Button
+                        ElevatedButton(
+                          onPressed: () async {
+                            final name = _nameController.text.trim();
+                            final salaryStr = _salaryController.text.trim();
+                            final phone = _phoneController.text.trim();
+
+                            if (name.isEmpty || salaryStr.isEmpty || phone.isEmpty) {
+                              _showToast('Please fill all required fields');
+                              return;
+                            }
+
+                            final salary = int.tryParse(salaryStr
+                                    .replaceAll(',', '')
+                                    .replaceAll('₹', '')) ??
+                                0;
+                            final roleKey = _isCustomRole &&
+                                    _customRoleController.text.trim().isNotEmpty
+                                ? _customRoleController.text.trim().toLowerCase()
+                                : _selectedModalRole.toLowerCase();
+
+                            final displayRole = _isCustomRole &&
+                                    _customRoleController.text.trim().isNotEmpty
+                                ? _customRoleController.text.trim()
+                                : _selectedModalRole;
+
+                            final staffMember = StaffModel(
+                              id: '',
+                              propertyId: _propertyId ?? '',
+                              propertyName: _propertyName ?? '',
+                              name: name,
+                              role: roleKey,
+                              workTitle: displayRole,
+                              phone: phone,
+                              monthlySalary: salary.toDouble(),
+                              salaryStatus: 'pending',
+                            );
+
+                            if (_propertyId != null) {
+                              final success = await SupabaseService.instance
+                                  .addStaffMember(staffMember);
+                              if (!success) {
+                                _showToast(
+                                    'Failed to add staff in database. Please check connection.');
+                                return;
+                              }
+                              await _loadStaffFromSupabase();
+                            } else {
+                              setState(() {
+                                _staffList.insert(0, staffMember);
+                              });
+                            }
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('$name added to Staff Directory ✓');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.green,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Save Staff Member',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13.5, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                  ],
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-                  // Full Legal Name
-                  _buildFormLabel('Full Name'),
-                  _buildTextInput(_nameController, hint: 'e.g. Rajesh Kumar'),
-                  const SizedBox(height: 12),
+  // ===========================================================================
+  // PAGE: EDIT STAFF MEMBER (Prefilled Details, Save Changes, & Delete Staff)
+  // ===========================================================================
+  void _openEditStaffScreen(StaffModel staff) {
+    final nameController = TextEditingController(text: staff.name);
+    final salaryController = TextEditingController(
+        text: staff.monthlySalary > 0
+            ? staff.monthlySalary.toInt().toString()
+            : '');
+    final phoneController = TextEditingController(text: staff.phone);
+    final customRoleController = TextEditingController();
 
-                  // Work Title
-                  _buildFormLabel('Designation / Work Title'),
-                  _buildTextInput(_workTitleController,
-                      hint: 'e.g. Assistant Cook / Day Cleaner'),
-                  const SizedBox(height: 12),
+    const standardRoles = ['warden', 'cook', 'housekeeping', 'security'];
+    final normalizedRole = staff.role.toLowerCase().trim();
+    bool isCustom = !standardRoles.contains(normalizedRole);
+    String selectedRole = 'Warden';
 
-                  // Monthly Salary & Phone Number Row
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildFormLabel('Monthly Salary (₹)'),
-                            _buildTextInput(
-                              _salaryController,
-                              hint: '₹ Amount',
-                              keyboardType: TextInputType.number,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildFormLabel('Phone Number'),
-                            _buildTextInput(
-                              _phoneController,
-                              hint: '10-digit Mobile',
-                              keyboardType: TextInputType.phone,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+    if (!isCustom) {
+      if (normalizedRole == 'cook') selectedRole = 'Cook';
+      else if (normalizedRole == 'housekeeping') selectedRole = 'Housekeeping';
+      else if (normalizedRole == 'security') selectedRole = 'Security';
+      else selectedRole = 'Warden';
+    } else {
+      selectedRole = '+ Other (Custom)';
+      customRoleController.text = staff.displayWorkTitle;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 20, color: AppColors.ink),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Edit Staff Member',
+                    style: GoogleFonts.outfit(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
                   ),
-                  const SizedBox(height: 20),
+                  Text(
+                    '${staff.name} • ${staff.displayWorkTitle}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(color: const Color(0xFFE5E7EB), height: 1),
+              ),
+            ),
+            body: SafeArea(
+              child: StatefulBuilder(
+                builder: (pageCtx, setPageState) {
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Role Selector Chips
+                        _buildFormLabel('Staff Category / Role'),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildModalRoleChipHelper(
+                              'Warden',
+                              Icons.badge_outlined,
+                              selectedRole: selectedRole,
+                              isCustomRole: isCustom,
+                              onSelect: () => setPageState(() {
+                                isCustom = false;
+                                selectedRole = 'Warden';
+                              }),
+                            ),
+                            _buildModalRoleChipHelper(
+                              'Cook',
+                              Icons.restaurant_rounded,
+                              selectedRole: selectedRole,
+                              isCustomRole: isCustom,
+                              onSelect: () => setPageState(() {
+                                isCustom = false;
+                                selectedRole = 'Cook';
+                              }),
+                            ),
+                            _buildModalRoleChipHelper(
+                              'Housekeeping',
+                              Icons.cleaning_services_outlined,
+                              selectedRole: selectedRole,
+                              isCustomRole: isCustom,
+                              onSelect: () => setPageState(() {
+                                isCustom = false;
+                                selectedRole = 'Housekeeping';
+                              }),
+                            ),
+                            _buildModalRoleChipHelper(
+                              'Security',
+                              Icons.shield_outlined,
+                              selectedRole: selectedRole,
+                              isCustomRole: isCustom,
+                              onSelect: () => setPageState(() {
+                                isCustom = false;
+                                selectedRole = 'Security';
+                              }),
+                            ),
+                            for (final customName in _customRolesFromList)
+                              _buildModalRoleChipHelper(
+                                customName,
+                                Icons.work_outline_rounded,
+                                selectedRole: selectedRole,
+                                isCustomRole: isCustom,
+                                onSelect: () => setPageState(() {
+                                  isCustom = false;
+                                  selectedRole = customName;
+                                }),
+                              ),
+                            _buildModalRoleChipHelper(
+                              '+ Other (Custom)',
+                              Icons.add_circle_outline_rounded,
+                              selectedRole: selectedRole,
+                              isCustomRole: isCustom,
+                              isCustomItem: true,
+                              onSelect: () => setPageState(() {
+                                isCustom = true;
+                                selectedRole = '+ Other (Custom)';
+                              }),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
 
-                  // Submit Button
-                  ElevatedButton(
+                        // Inline Custom Role Input
+                        if (isCustom) ...[
+                          _buildFormLabel('Enter Custom Role Name'),
+                          _buildTextInput(
+                            customRoleController,
+                            hint: 'e.g. Electrician, Plumber, Gardener, Driver',
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+
+                        // Full Legal Name
+                        _buildFormLabel('Full Name'),
+                        _buildTextInput(nameController, hint: 'e.g. Rajesh Kumar'),
+                        const SizedBox(height: 12),
+
+                        // Monthly Salary & Phone Number Row
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildFormLabel('Monthly Salary (₹)'),
+                                  _buildTextInput(
+                                    salaryController,
+                                    hint: '₹ Amount',
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildFormLabel('Phone Number'),
+                                  _buildTextInput(
+                                    phoneController,
+                                    hint: '10-digit Mobile',
+                                    keyboardType: TextInputType.phone,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Save Changes Button (Brand Green)
+                        ElevatedButton(
+                          onPressed: () async {
+                            final name = nameController.text.trim();
+                            final salaryStr = salaryController.text.trim();
+                            final phone = phoneController.text.trim();
+
+                            if (name.isEmpty || salaryStr.isEmpty || phone.isEmpty) {
+                              _showToast('Please fill all required fields');
+                              return;
+                            }
+
+                            final salary = int.tryParse(salaryStr
+                                    .replaceAll(',', '')
+                                    .replaceAll('₹', '')) ??
+                                0;
+                            final roleKey = isCustom &&
+                                    customRoleController.text.trim().isNotEmpty
+                                ? customRoleController.text.trim().toLowerCase()
+                                : selectedRole.toLowerCase();
+
+                            final displayRole = isCustom &&
+                                    customRoleController.text.trim().isNotEmpty
+                                ? customRoleController.text.trim()
+                                : selectedRole;
+
+                            final updatedStaff = staff.copyWith(
+                              name: name,
+                              role: roleKey,
+                              workTitle: displayRole,
+                              phone: phone,
+                              monthlySalary: salary.toDouble(),
+                            );
+
+                            if (staff.id.isNotEmpty) {
+                              final success = await SupabaseService.instance
+                                  .updateStaffMember(updatedStaff);
+                              if (!success) {
+                                _showToast('Failed to save changes. Please try again.');
+                                return;
+                              }
+                              await _loadStaffFromSupabase();
+                            } else {
+                              setState(() {
+                                final idx = _staffList.indexWhere((s) => s.id == staff.id);
+                                if (idx != -1) _staffList[idx] = updatedStaff;
+                              });
+                            }
+
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('${updatedStaff.name}\'s details updated ✓');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.green,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Save Changes',
+                            style: GoogleFonts.outfit(
+                                fontSize: 14, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Delete Staff Member Button (Red Destructive Action)
+                        OutlinedButton(
+                          onPressed: () => _confirmDeleteStaff(ctx, staff),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFDC2626),
+                            side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.delete_outline_rounded,
+                                  size: 18, color: Color(0xFFDC2626)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Delete Staff Member',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFDC2626),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // DIALOG: CONFIRM DELETE STAFF MEMBER
+  // ===========================================================================
+  void _confirmDeleteStaff(BuildContext pageCtx, StaffModel staff) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Text(
+            'Delete Staff Member?',
+            style: GoogleFonts.outfit(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: AppColors.ink,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to remove ${staff.name} from the staff directory? This cannot be undone.',
+            style: GoogleFonts.outfit(
+              fontSize: 13,
+              color: AppColors.muted,
+              height: 1.4,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(dialogCtx).pop(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.muted,
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: Text('Cancel',
+                        style: GoogleFonts.outfit(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
                     onPressed: () async {
-                      final name = _nameController.text.trim();
-                      final workTitle = _workTitleController.text.trim();
-                      final salaryStr = _salaryController.text.trim();
-                      final phone = _phoneController.text.trim();
-
-                      if (name.isEmpty || salaryStr.isEmpty || phone.isEmpty) {
-                        _showToast('Please fill all required fields');
-                        return;
-                      }
-
-                      final salary = int.tryParse(salaryStr
-                              .replaceAll(',', '')
-                              .replaceAll('₹', '')) ??
-                          0;
-                      final roleKey = _isCustomRole &&
-                              _customRoleController.text.trim().isNotEmpty
-                          ? _customRoleController.text.trim().toLowerCase()
-                          : _selectedModalRole.toLowerCase();
-
-                      final initials = name
-                          .split(' ')
-                          .map((n) => n.isNotEmpty ? n[0] : '')
-                          .join('')
-                          .toUpperCase();
-
-                      final staffMember = StaffModel(
-                        id: '',
-                        propertyId: _propertyId ?? '',
-                        propertyName: _propertyName ?? '',
-                        name: name,
-                        role: roleKey,
-                        workTitle: workTitle.isNotEmpty
-                            ? workTitle
-                            : _selectedModalRole,
-                        phone: phone,
-                        monthlySalary: salary.toDouble(),
-                        salaryStatus: 'pending',
-                      );
-
-                      if (_propertyId != null) {
+                      Navigator.of(dialogCtx).pop(); // close dialog
+                      if (staff.id.isNotEmpty) {
                         final success = await SupabaseService.instance
-                            .addStaffMember(staffMember);
+                            .deleteStaffMember(staff.id);
                         if (!success) {
-                          _showToast(
-                              'Failed to add staff in database. Please check connection.');
+                          _showToast('Failed to delete staff member. Try again.');
                           return;
                         }
                         await _loadStaffFromSupabase();
                       } else {
                         setState(() {
-                          _staffList.insert(0, staffMember);
+                          _staffList.removeWhere((s) => s.name == staff.name);
                         });
                       }
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
+                      if (pageCtx.mounted) {
+                        Navigator.of(pageCtx).pop(); // close edit page
                       }
-                      _showToast('$name added to Staff Directory ✓');
+                      _showToast('${staff.name} removed from Staff Directory');
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.ink,
+                      backgroundColor: const Color(0xFFDC2626),
                       foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
-                    child: Text(
-                      'Save Staff Member',
-                      style: GoogleFonts.outfit(
-                          fontSize: 13.5, fontWeight: FontWeight.w700),
-                    ),
+                    child: Text('Delete',
+                        style: GoogleFonts.outfit(
+                            fontSize: 13, fontWeight: FontWeight.w700)),
                   ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            );
-          },
+                ),
+              ],
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _buildModalRoleChipHelper(
+    String label,
+    IconData icon, {
+    required String selectedRole,
+    required bool isCustomRole,
+    bool isCustomItem = false,
+    required VoidCallback onSelect,
+  }) {
+    final isSelected = isCustomItem
+        ? isCustomRole
+        : (!isCustomRole && selectedRole == label);
+
+    return InkWell(
+      onTap: onSelect,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.green : const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon,
+                size: 14,
+                color: isSelected ? Colors.white : AppColors.inkSecondary),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: GoogleFonts.outfit(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: isSelected ? Colors.white : AppColors.inkSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -607,10 +1080,10 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.ink : const Color(0xFFF3F4F6),
+          color: isSelected ? AppColors.green : const Color(0xFFF3F4F6),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? AppColors.ink : const Color(0xFFE5E7EB),
+            color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
           ),
         ),
         child: Row(
@@ -880,13 +1353,26 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
   // 3. ROLE FILTER CHIPS
   // ===========================================================================
   Widget _buildRoleFilterChips() {
-    final roles = [
+    final roles = <Map<String, String>>[
       {'id': 'all', 'label': 'All Staff (${_staffList.length})'},
       {'id': 'warden', 'label': 'Warden'},
       {'id': 'cook', 'label': 'Cook'},
       {'id': 'housekeeping', 'label': 'Housekeeping'},
       {'id': 'security', 'label': 'Security'},
     ];
+
+    const standardIds = {'all', 'warden', 'cook', 'housekeeping', 'security'};
+    for (final staff in _staffList) {
+      final r = staff.role.trim().toLowerCase();
+      if (r.isNotEmpty && !standardIds.contains(r)) {
+        if (!roles.any((existing) => existing['id'] == r)) {
+          roles.add({
+            'id': r,
+            'label': staff.displayWorkTitle,
+          });
+        }
+      }
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1127,28 +1613,33 @@ class _OwnerStaffScreenState extends State<OwnerStaffScreen> {
                   ),
                 ),
 
-                // Status Badge Pill
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color:
-                        isPaid ? AppColors.greenLight : const Color(0xFFFFFBEB),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: isPaid
-                          ? AppColors.green.withValues(alpha: 0.25)
-                          : const Color(0xFFFDE68A),
+                // Edit Button
+                InkWell(
+                  onTap: () => _openEditStaffScreen(staff),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
                     ),
-                  ),
-                  child: Text(
-                    isPaid ? 'Paid' : 'Pending',
-                    style: GoogleFonts.outfit(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w800,
-                      color: isPaid
-                          ? AppColors.greenDark
-                          : const Color(0xFF92400E),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.edit_outlined,
+                            size: 13, color: AppColors.ink),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Edit',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

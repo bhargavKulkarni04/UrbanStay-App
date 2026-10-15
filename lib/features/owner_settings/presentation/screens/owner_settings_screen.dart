@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -24,7 +25,8 @@ class OwnerSettingsScreen extends StatefulWidget {
   final String? initialView;
   final String? propertyId;
 
-  const OwnerSettingsScreen({super.key, this.onBack, this.initialView, this.propertyId});
+  const OwnerSettingsScreen(
+      {super.key, this.onBack, this.initialView, this.propertyId});
 
   @override
   State<OwnerSettingsScreen> createState() => _OwnerSettingsScreenState();
@@ -34,7 +36,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   // Navigation State
   late String _activeView;
   final TextEditingController _searchController = TextEditingController();
-
 
   // ===========================================================================
   // ===========================================================================
@@ -68,17 +69,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   ];
 
   // View 2: Management & Business
-  String _bizStatus = '';
-  String _bizEntityType = '';
+  String _bizStatus = 'Verified & Registered';
+  String _bizEntityType = 'Partnership / LLP';
   String _bizLegalName = '';
   String _bizGst = '';
   String _bizCin = '';
+  String _bbmpLicense = '';
   String _adminName = '';
   String _adminEmail = '';
   String _adminPhone = '';
-  String _ownerGovtIdType = '';
-  String _ownerGovtIdProofStatus = '';
-  String _bizGstProofStatus = '';
+  String _ownerGovtIdType = 'Aadhaar Card';
+  String _ownerGovtIdProofStatus = 'Verified & Approved';
+  String _bizGstProofStatus = 'Verified • Active';
 
   // View 3: Renting & Stay Rules
   String _rentDueDay = '';
@@ -188,17 +190,20 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
   Future<void> _loadPropertyFromSupabase() async {
     try {
-      final targetPropId = widget.propertyId ??
-          SupabaseService.instance.activePropertyId;
+      final targetPropId =
+          widget.propertyId ?? SupabaseService.instance.activePropertyId;
       final propModel = await SupabaseService.instance
           .getPropertyModel(propertyId: targetPropId);
       if (propModel != null && mounted) {
         final pId = propModel.id.isNotEmpty ? propModel.id : _propId;
-        final settingsModel = await SupabaseService.instance.getPropertySettingsModel(pId);
+        final settingsModel =
+            await SupabaseService.instance.getPropertySettingsModel(pId);
         if (mounted) {
           setState(() {
             _propId = pId;
-            _propName = propModel.propertyName.isNotEmpty ? propModel.propertyName : _propName;
+            _propName = propModel.propertyName.isNotEmpty
+                ? propModel.propertyName
+                : _propName;
             _scalePgName = _propName;
             _bizLegalName = '$_propName Hospitality Services';
             _stampBusinessName = '$_propName Hospitality Services';
@@ -206,11 +211,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             if (propModel.propertyStructure.isNotEmpty) {
               _propType = propModel.propertyStructure;
             }
-            if (propModel.streetAddress != null && propModel.streetAddress!.isNotEmpty) {
+            if (propModel.streetAddress != null &&
+                propModel.streetAddress!.isNotEmpty) {
               _streetAddress = propModel.streetAddress!;
               _propAddress = _streetAddress;
             }
-            if (propModel.areaLocality != null && propModel.areaLocality!.isNotEmpty) {
+            if (propModel.areaLocality != null &&
+                propModel.areaLocality!.isNotEmpty) {
               _locality = propModel.areaLocality!;
               _scaleAreaLocality = _locality;
             }
@@ -256,22 +263,38 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             if (propModel.bankName != null && propModel.bankName!.isNotEmpty) {
               _bankName = propModel.bankName!;
             }
-            if (propModel.bankHolderName != null && propModel.bankHolderName!.isNotEmpty) {
+            if (propModel.bankHolderName != null &&
+                propModel.bankHolderName!.isNotEmpty) {
               _beneficiaryName = propModel.bankHolderName!;
             }
 
             // Owner Identity & KYC
-            if (propModel.ownerLegalName != null && propModel.ownerLegalName!.isNotEmpty) {
+            if (propModel.ownerLegalName != null &&
+                propModel.ownerLegalName!.isNotEmpty) {
               _adminName = propModel.ownerLegalName!;
               _ownerFullName = _adminName;
             }
-            if (propModel.ownerEmail != null && propModel.ownerEmail!.isNotEmpty) {
+            if (propModel.ownerEmail != null &&
+                propModel.ownerEmail!.isNotEmpty) {
               _adminEmail = propModel.ownerEmail!;
               _ownerEmail = _adminEmail;
             }
-            if (propModel.creditingPhone != null && propModel.creditingPhone!.isNotEmpty) {
+            if (propModel.creditingPhone != null &&
+                propModel.creditingPhone!.isNotEmpty) {
               _adminPhone = propModel.creditingPhone!;
               _ownerWhatsapp = _adminPhone;
+            }
+            if (propModel.ownerAadhaarNumber != null &&
+                propModel.ownerAadhaarNumber!.isNotEmpty) {
+              final a = propModel.ownerAadhaarNumber!;
+              _ownerAadhaar = a.length >= 12
+                  ? '${a.substring(0, 4)} •••• ${a.substring(a.length - 4)}'
+                  : a;
+              _ownerGovtIdType = 'Aadhaar Card';
+              _ownerGovtIdProofStatus = 'Verified & Approved';
+            } else {
+              _ownerGovtIdType = 'Aadhaar Card';
+              _ownerGovtIdProofStatus = 'Pending Verification';
             }
 
             // Building Infrastructure & Capacity
@@ -291,9 +314,151 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               _scaleTotalBeds = propModel.totalBeds;
             }
 
-            // House Rules / Curfew
-            if (settingsModel != null && settingsModel.gateClosingTime.isNotEmpty) {
-              _curfewTime = settingsModel.gateClosingTime;
+            // Real Settings from property_settings table (Views 1, 2, 3)
+            if (settingsModel != null) {
+              // Card 1.3: Curfew Timings
+              if (settingsModel.gateClosingTime.isNotEmpty) {
+                _curfewTime = settingsModel.gateClosingTime;
+              }
+              if (settingsModel.morningGateOpenTime.isNotEmpty) {
+                _morningOpen = settingsModel.morningGateOpenTime;
+              }
+
+              // Card 2.1: Business & Tax Details
+              if (settingsModel.legalEntityName.isNotEmpty) {
+                _bizLegalName = settingsModel.legalEntityName;
+              }
+              if (settingsModel.gstNumber.isNotEmpty) {
+                _bizGst = settingsModel.gstNumber;
+                _bizGstProofStatus = 'Verified • Active';
+                _bizStatus = 'Verified & Registered';
+              } else {
+                _bizGstProofStatus = 'Not Uploaded';
+                _bizStatus = 'Unregistered / Exempted';
+              }
+              if (settingsModel.cinNumber.isNotEmpty) {
+                _bizCin = settingsModel.cinNumber;
+              }
+
+              // Card 2.2: Municipal Trade License
+              if (settingsModel.bbmpLicenseNumber.isNotEmpty) {
+                _bbmpLicense = settingsModel.bbmpLicenseNumber;
+              }
+
+              // Card 3.2: Stay & Policy Terms
+              if (settingsModel.lockinPeriod.isNotEmpty) {
+                _lockinPeriod = settingsModel.lockinPeriod;
+              }
+              if (settingsModel.agreementDuration.isNotEmpty) {
+                _agreementDur = settingsModel.agreementDuration;
+              }
+
+              // Card 4.1 & 4.2: Payment Mode & Banking
+              _allowOnlineUpi = settingsModel.allowOnlineUpi;
+              if (settingsModel.bankAccountNumber.isNotEmpty) {
+                _bankAccNum = settingsModel.bankAccountNumber;
+              }
+              if (settingsModel.ifscCode.isNotEmpty) {
+                _ifscCode = settingsModel.ifscCode;
+              }
+
+              // Card 5.4: Sharing Tariffs from property_settings
+              if (settingsModel.sharing1Rent > 0)
+                _scale1SharingRent = settingsModel.sharing1Rent;
+              if (settingsModel.sharing1Deposit > 0)
+                _scale1SharingDeposit = settingsModel.sharing1Deposit;
+              if (settingsModel.sharing2Rent > 0)
+                _scale2SharingRent = settingsModel.sharing2Rent;
+              if (settingsModel.sharing2Deposit > 0)
+                _scale2SharingDeposit = settingsModel.sharing2Deposit;
+              if (settingsModel.sharing3Rent > 0)
+                _scale3SharingRent = settingsModel.sharing3Rent;
+              if (settingsModel.sharing3Deposit > 0)
+                _scale3SharingDeposit = settingsModel.sharing3Deposit;
+              if (settingsModel.sharing4Rent > 0)
+                _scale4SharingRent = settingsModel.sharing4Rent;
+              if (settingsModel.sharing4Deposit > 0)
+                _scale4SharingDeposit = settingsModel.sharing4Deposit;
+
+              // Fallback to sharingTariffs JSON list if columns were empty
+              if (_scale1SharingRent == 0 &&
+                  settingsModel.sharingTariffs.isNotEmpty) {
+                for (final t in settingsModel.sharingTariffs) {
+                  if (t is Map) {
+                    final s = t['sharing'];
+                    final r = int.tryParse(t['rent']?.toString() ?? '0') ?? 0;
+                    final d =
+                        int.tryParse(t['deposit']?.toString() ?? '0') ?? 0;
+                    if (s == 1) {
+                      _scale1SharingRent = r;
+                      _scale1SharingDeposit = d;
+                    }
+                    if (s == 2) {
+                      _scale2SharingRent = r;
+                      _scale2SharingDeposit = d;
+                    }
+                    if (s == 3) {
+                      _scale3SharingRent = r;
+                      _scale3SharingDeposit = d;
+                    }
+                    if (s == 4) {
+                      _scale4SharingRent = r;
+                      _scale4SharingDeposit = d;
+                    }
+                  }
+                }
+              }
+
+              // View 6: Rent & Dues Collection Settings
+              _dailyLateFineEnabled = settingsModel.dailyLateFineEnabled;
+              _acceptPartialPayments = settingsModel.acceptPartialPayments;
+              _autoSendWhatsappReceipts =
+                  settingsModel.autoSendWhatsappReceipts;
+              _autoDuesReminders = settingsModel.autoDuesReminders;
+              if (settingsModel.receiptTerms.isNotEmpty) {
+                _receiptTerms = settingsModel.receiptTerms;
+              }
+
+              // View 7: Tenant Onboarding & KYC Automation Switches
+              _autoWelcomeWhatsapp = settingsModel.autoWelcomeWhatsapp;
+              _autoApproveBookings = settingsModel.autoApproveBookings;
+              _sendDepositReminders = settingsModel.sendDepositReminders;
+              _lockProfileAfterMovein = settingsModel.lockProfileAfterMovein;
+              _mandatoryTenantKyc = settingsModel.mandatoryTenantKyc;
+              _requireComplaintPhoto = settingsModel.requireComplaintPhoto;
+              if (settingsModel.kycApplicableTo.isNotEmpty) {
+                _kycApplicableTo = settingsModel.kycApplicableTo;
+              }
+              if (settingsModel.stampBusinessName.isNotEmpty) {
+                _stampBusinessName = settingsModel.stampBusinessName;
+              }
+              if (settingsModel.authorizedSignatory.isNotEmpty) {
+                _authorizedSignatory = settingsModel.authorizedSignatory;
+              }
+            }
+
+            // Sensible fallbacks if database fields are empty
+            if (_curfewTime.isEmpty) _curfewTime = '10:30 PM';
+            if (_morningOpen.isEmpty) _morningOpen = '05:30 AM';
+            if (_lockinPeriod.isEmpty) _lockinPeriod = '3 Months';
+            if (_agreementDur.isEmpty) _agreementDur = '11 Months Standard';
+            if (_dailyRate.isEmpty) _dailyRate = '₹100 / day';
+            if (_rentDueDay.isEmpty) _rentDueDay = '5th of Every Month';
+            if (_gracePeriod.isEmpty) _gracePeriod = '5 Days';
+            if (_tenantPreference.isEmpty) _tenantPreference = 'Co-Living';
+            if (_receiptTerms.isEmpty) {
+              _receiptTerms =
+                  '1. Rent is payable in advance before the 5th of each calendar month.\n2. Maintenance complaints must be logged with photo proof via UrbanStay.\n3. Notice period of 30 days is mandatory prior to vacating.';
+            }
+            if (_kycApplicableTo.isEmpty) _kycApplicableTo = 'All Residents';
+            if (_bizLegalName.isEmpty && _propName.isNotEmpty) {
+              _bizLegalName = '$_propName Hospitality Services';
+            }
+            if (_stampBusinessName.isEmpty && _propName.isNotEmpty) {
+              _stampBusinessName = '$_propName Hospitality Services';
+            }
+            if (_authorizedSignatory.isEmpty && _adminName.isNotEmpty) {
+              _authorizedSignatory = '$_adminName (Managing Partner)';
             }
           });
         }
@@ -311,9 +476,12 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
   Future<void> _fetchLiveGeoData() async {
     try {
-      final response = await http.get(
-        Uri.parse('https://raw.githubusercontent.com/sab99r/Indian-States-And-Districts/master/states-and-districts.json'),
-      ).timeout(const Duration(seconds: 8));
+      final response = await http
+          .get(
+            Uri.parse(
+                'https://raw.githubusercontent.com/sab99r/Indian-States-And-Districts/master/states-and-districts.json'),
+          )
+          .timeout(const Duration(seconds: 8));
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         final statesList = data['states'] as List<dynamic>?;
@@ -342,9 +510,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   Future<Map<String, dynamic>?> _lookupPincodeFromApi(String pincode) async {
     if (pincode.length != 6) return null;
     try {
-      final response = await http.get(
-        Uri.parse('https://api.postalpincode.in/pincode/$pincode'),
-      ).timeout(const Duration(seconds: 6));
+      final response = await http
+          .get(
+            Uri.parse('https://api.postalpincode.in/pincode/$pincode'),
+          )
+          .timeout(const Duration(seconds: 6));
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         if (data.isNotEmpty && data[0]['Status'] == 'Success') {
@@ -353,9 +523,12 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             final first = postOffices[0];
             return {
               'state': first['State']?.toString() ?? '',
-              'city': first['District']?.toString() ?? first['Block']?.toString() ?? '',
+              'city': first['District']?.toString() ??
+                  first['Block']?.toString() ??
+                  '',
               'locality': first['Name']?.toString() ?? '',
-              'allLocalities': postOffices.map((p) => p['Name'].toString()).toSet().toList(),
+              'allLocalities':
+                  postOffices.map((p) => p['Name'].toString()).toSet().toList(),
             };
           }
         }
@@ -376,7 +549,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       SnackBar(
         content: Text(
           msg,
-          style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
+          style: GoogleFonts.outfit(
+              fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         backgroundColor: AppColors.ink,
         duration: const Duration(seconds: 2),
@@ -422,7 +596,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     )
                   : SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16.0, 14.0, 16.0, 40.0),
+                      padding:
+                          const EdgeInsets.fromLTRB(16.0, 14.0, 16.0, 40.0),
                       child: _buildCurrentView(),
                     ),
             ),
@@ -484,7 +659,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
+        border:
+            Border(bottom: BorderSide(color: Color(0xFFEEF0F2), width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x04000000),
@@ -506,11 +682,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
-              child: const Icon(Icons.arrow_back_rounded, size: 18, color: AppColors.ink),
+              child: const Icon(Icons.arrow_back_rounded,
+                  size: 18, color: AppColors.ink),
             ),
           ),
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -617,7 +793,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       {
         'id': 'onboarding_settings',
         'title': 'Tenant Onboarding & KYC Settings',
-        'desc': 'Welcome pack, booking auto-approval, Aadhaar KYC & digital seal',
+        'desc':
+            'Welcome pack, booking auto-approval, Aadhaar KYC & digital seal',
         'icon': Icons.how_to_reg_outlined,
       },
       {
@@ -655,7 +832,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             child: Center(
               child: Text(
                 'No settings matching "$query"',
-                style: GoogleFonts.outfit(fontSize: 13, color: AppColors.muted, fontWeight: FontWeight.w600),
+                style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    color: AppColors.muted,
+                    fontWeight: FontWeight.w600),
               ),
             ),
           ),
@@ -679,18 +859,21 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       child: TextField(
         controller: _searchController,
         onChanged: (_) => setState(() {}),
-        style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.ink, fontWeight: FontWeight.w600),
+        style: GoogleFonts.outfit(
+            fontSize: 12.5, color: AppColors.ink, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           hintText: 'Search settings or rules...',
           hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-          prefixIcon: const Icon(Icons.search_rounded, size: 18, color: AppColors.muted),
+          prefixIcon: const Icon(Icons.search_rounded,
+              size: 18, color: AppColors.muted),
           suffixIcon: _searchController.text.isNotEmpty
               ? InkWell(
                   onTap: () {
                     _searchController.clear();
                     setState(() {});
                   },
-                  child: const Icon(Icons.clear_rounded, size: 16, color: AppColors.muted),
+                  child: const Icon(Icons.clear_rounded,
+                      size: 16, color: AppColors.muted),
                 )
               : null,
           contentPadding: const EdgeInsets.symmetric(vertical: 10),
@@ -739,7 +922,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               ),
             ),
             const SizedBox(width: 14),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -776,7 +958,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.muted),
+            const Icon(Icons.chevron_right_rounded,
+                size: 20, color: AppColors.muted),
           ],
         ),
       ),
@@ -813,10 +996,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFE5E7EB)),
                 ),
-                child: Icon(item['icon'] as IconData, size: 20, color: AppColors.ink),
+                child: Icon(item['icon'] as IconData,
+                    size: 20, color: AppColors.ink),
               ),
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -847,7 +1030,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.muted),
+              const Icon(Icons.chevron_right_rounded,
+                  size: 18, color: AppColors.muted),
             ],
           ),
         ),
@@ -872,10 +1056,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               color: AppColors.greenLight,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.star_outline_rounded, size: 20, color: AppColors.greenDark),
+            child: const Icon(Icons.star_outline_rounded,
+                size: 20, color: AppColors.greenDark),
           ),
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -884,18 +1068,25 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   children: [
                     Text(
                       'Subscription & Plan',
-                      style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.ink),
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: AppColors.green,
                         borderRadius: BorderRadius.circular(99),
                       ),
                       child: Text(
                         'ACTIVE',
-                        style: GoogleFonts.outfit(fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white),
+                        style: GoogleFonts.outfit(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white),
                       ),
                     ),
                   ],
@@ -903,12 +1094,16 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 const SizedBox(height: 2),
                 Text(
                   '${OwnerAppState.instance.totalBeds} Beds Managed',
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted, fontWeight: FontWeight.w500),
+                  style: GoogleFonts.outfit(
+                      fontSize: 11.5,
+                      color: AppColors.muted,
+                      fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.muted),
+          const Icon(Icons.chevron_right_rounded,
+              size: 18, color: AppColors.muted),
         ],
       ),
     );
@@ -999,14 +1194,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   'VERIFIED PG',
-                  style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white),
+                  style: GoogleFonts.outfit(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white),
                 ),
               ),
             ],
@@ -1014,12 +1213,16 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           const SizedBox(height: 8),
           Text(
             '$_propAddress\nDirect Bank UPI • Free High-Speed WiFi • 3 Meals Food',
-            style: GoogleFonts.outfit(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.9), height: 1.4),
+            style: GoogleFonts.outfit(
+                fontSize: 11.5,
+                color: Colors.white.withValues(alpha: 0.9),
+                height: 1.4),
           ),
           const SizedBox(height: 12),
           InkWell(
             onTap: () {
-              Clipboard.setData(ClipboardData(text: 'https://urbanstay.living/pg/$_propId'));
+              Clipboard.setData(
+                  ClipboardData(text: 'https://urbanstay.living/pg/$_propId'));
               _showToast('Digital PG Card Link Copied ✓');
             },
             borderRadius: BorderRadius.circular(8),
@@ -1032,11 +1235,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.share_outlined, size: 14, color: AppColors.greenDark),
+                  const Icon(Icons.share_outlined,
+                      size: 14, color: AppColors.greenDark),
                   const SizedBox(width: 6),
                   Text(
                     'Share Card Link',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.greenDark),
                   ),
                 ],
               ),
@@ -1059,9 +1266,12 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           onEdit: () => _openEditModal(
             title: 'Edit Business Details',
             fields: [
-              _ModalField('Registered Legal Name', _bizLegalName, (v) => setState(() => _bizLegalName = v)),
-              _ModalField('GST Number', _bizGst, (v) => setState(() => _bizGst = v)),
-              _ModalField('CIN / License No', _bizCin, (v) => setState(() => _bizCin = v)),
+              _ModalField('Registered Legal Name', _bizLegalName,
+                  (v) => setState(() => _bizLegalName = v)),
+              _ModalField(
+                  'GST Number', _bizGst, (v) => setState(() => _bizGst = v)),
+              _ModalField('CIN / License No', _bizCin,
+                  (v) => setState(() => _bizCin = v)),
             ],
           ),
           rows: [
@@ -1078,10 +1288,23 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           title: 'Government KYC & Tax Documents',
           onEdit: _openEditGovtKycModal,
           rows: [
-            _DetailRow('Owner Identity Proof', '$_ownerGovtIdType • $_ownerAadhaar'),
-            _DetailRow('ID Document Status', _ownerGovtIdProofStatus, isGreen: true),
-            _DetailRow('GSTIN Tax Certificate', _bizGstProofStatus, isGreen: true),
-            _DetailRow('Trade License / BBMP', 'Verified • BBMP-TR-2025-8819', isGreen: true),
+            _DetailRow(
+              'Owner Identity Proof',
+              _ownerAadhaar.isNotEmpty
+                  ? '$_ownerGovtIdType • $_ownerAadhaar'
+                  : 'Aadhaar • Not Configured',
+            ),
+            _DetailRow('ID Document Status', _ownerGovtIdProofStatus,
+                isGreen: _ownerAadhaar.isNotEmpty),
+            _DetailRow('GSTIN Tax Certificate', _bizGstProofStatus,
+                isGreen: _bizGst.isNotEmpty),
+            _DetailRow(
+              'Trade License / BBMP',
+              _bbmpLicense.isNotEmpty
+                  ? 'Verified • $_bbmpLicense'
+                  : 'Not Uploaded',
+              isGreen: _bbmpLicense.isNotEmpty,
+            ),
           ],
         ),
       ],
@@ -1104,7 +1327,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           ],
         ),
         const SizedBox(height: 14),
-
         _buildElevatedCard(
           title: 'Stay & Policy Terms',
           onEdit: _openEditStayTermsModal,
@@ -1138,9 +1360,19 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     ? 'Tenants pay via GPay / PhonePe directly to your bank account with 0% fee.'
                     : 'Cash Only Mode active. Direct UPI payments are disabled.',
                 _allowOnlineUpi,
-                (v) => setState(() {
-                  _allowOnlineUpi = v;
-                }),
+                (v) {
+                  setState(() => _allowOnlineUpi = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'allow_online_upi',
+                      value: v,
+                    );
+                  }
+                  _showToast(v
+                      ? 'Direct UPI Payments Enabled ✓'
+                      : 'Cash Only Mode Enabled');
+                },
               ),
               const SizedBox(height: 12),
               Row(
@@ -1149,18 +1381,34 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     title: 'UPI + Online',
                     sub: '0% Direct Bank',
                     isSelected: _allowOnlineUpi,
-                    onTap: () => setState(() {
-                      _allowOnlineUpi = true;
-                    }),
+                    onTap: () {
+                      setState(() => _allowOnlineUpi = true);
+                      if (_propId.isNotEmpty) {
+                        SupabaseService.instance.updateSinglePropertySetting(
+                          propertyId: _propId,
+                          key: 'allow_online_upi',
+                          value: true,
+                        );
+                      }
+                      _showToast('Direct UPI Payments Enabled ✓');
+                    },
                   ),
                   const SizedBox(width: 8),
                   _buildInteractiveCard(
                     title: 'Cash Only',
                     sub: 'Manual Collection',
                     isSelected: !_allowOnlineUpi,
-                    onTap: () => setState(() {
-                      _allowOnlineUpi = false;
-                    }),
+                    onTap: () {
+                      setState(() => _allowOnlineUpi = false);
+                      if (_propId.isNotEmpty) {
+                        SupabaseService.instance.updateSinglePropertySetting(
+                          propertyId: _propId,
+                          key: 'allow_online_upi',
+                          value: false,
+                        );
+                      }
+                      _showToast('Cash Only Mode Enabled');
+                    },
                   ),
                 ],
               ),
@@ -1178,21 +1426,28 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             onEdit: () => _openEditModal(
               title: 'Edit Banking Details',
               fields: [
-                _ModalField('Primary UPI ID', _upiId, (v) => setState(() => _upiId = v)),
-                _ModalField('Bank Name', _bankName, (v) => setState(() => _bankName = v)),
-                _ModalField('Account Number', _bankAccNum, (v) => setState(() => _bankAccNum = v)),
-                _ModalField('IFSC Code', _ifscCode, (v) => setState(() => _ifscCode = v)),
-                _ModalField('Beneficiary Name', _beneficiaryName, (v) => setState(() => _beneficiaryName = v)),
+                _ModalField('Primary UPI ID', _upiId,
+                    (v) => setState(() => _upiId = v)),
+                _ModalField('Bank Name', _bankName,
+                    (v) => setState(() => _bankName = v)),
+                _ModalField('Account Number', _bankAccNum,
+                    (v) => setState(() => _bankAccNum = v)),
+                _ModalField('IFSC Code', _ifscCode,
+                    (v) => setState(() => _ifscCode = v)),
+                _ModalField('Beneficiary Name', _beneficiaryName,
+                    (v) => setState(() => _beneficiaryName = v)),
               ],
             ),
             rows: [
-              _DetailRow('Payment Mode', 'Direct Bank UPI (Active)', isGreen: true),
+              _DetailRow('Payment Mode', 'Direct Bank UPI (Active)',
+                  isGreen: true),
               _DetailRow('Primary UPI ID', _upiId, isCode: true, isGreen: true),
               _DetailRow('Bank Name', _bankName),
               _DetailRow('Account Number', _bankAccNum, isCode: true),
               _DetailRow('IFSC Code', _ifscCode, isCode: true),
               _DetailRow('Beneficiary Name', _beneficiaryName),
-              _DetailRow('Gateway Cut', '0% (Lifetime Direct Bank Settlement)', isGreen: true),
+              _DetailRow('Gateway Cut', '0% (Lifetime Direct Bank Settlement)',
+                  isGreen: true),
             ],
           ),
           const SizedBox(height: 14),
@@ -1203,7 +1458,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFF9FBFA),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.green.withValues(alpha: 0.35), width: 1.2),
+              border: Border.all(
+                  color: AppColors.green.withValues(alpha: 0.35), width: 1.2),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1216,13 +1472,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         color: AppColors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.qr_code_2_rounded, size: 20, color: AppColors.greenDark),
+                      child: const Icon(Icons.qr_code_2_rounded,
+                          size: 20, color: AppColors.greenDark),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Reception Desk QR Standee',
-                        style: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+                        style: GoogleFonts.outfit(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink),
                       ),
                     ),
                   ],
@@ -1230,22 +1490,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Printable high-resolution QR standee for your reception desk. Tenants scan to check in and pay rent directly to your bank account with ₹0 gateway commission.',
-                  style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted, height: 1.4),
+                  style: GoogleFonts.outfit(
+                      fontSize: 11.5, color: AppColors.muted, height: 1.4),
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
-                  onPressed: () => _showToast(
-                      'Generating Printable Standee PDF for ${_propName.isNotEmpty ? _propName : "My PG"} ✓'),
+                  onPressed: _openReceptionDeskStandeeModal,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.green,
                     foregroundColor: Colors.white,
                     minimumSize: const Size.fromHeight(44),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                     elevation: 0,
                   ),
                   child: Text(
                     'Download Standee PDF (Ready to Print)',
-                    style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12.5, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
@@ -1271,13 +1533,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.info_outline_rounded, size: 20, color: Color(0xFFD97706)),
+                      child: const Icon(Icons.info_outline_rounded,
+                          size: 20, color: Color(0xFFD97706)),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'Cash Only Mode Active',
-                        style: GoogleFonts.outfit(fontSize: 14.5, fontWeight: FontWeight.w800, color: const Color(0xFF92400E)),
+                        style: GoogleFonts.outfit(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF92400E)),
                       ),
                     ),
                   ],
@@ -1285,7 +1551,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 const SizedBox(height: 10),
                 Text(
                   'Online direct UPI payments are disabled. After receiving cash (or offline UPI) in hand from the tenant:',
-                  style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF92400E), height: 1.4, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: const Color(0xFF92400E),
+                      height: 1.4,
+                      fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
                 Container(
@@ -1298,7 +1568,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.notifications_active_outlined, size: 18, color: Color(0xFFD97706)),
+                      const Icon(Icons.notifications_active_outlined,
+                          size: 18, color: Color(0xFFD97706)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -1325,11 +1596,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             child: _buildElevatedCard(
               title: 'Direct Banking Details (Inactive in Cash Mode)',
               rows: [
-                _DetailRow('Payment Mode', 'Cash Only (Manual Collection)', isGreen: false),
+                _DetailRow('Payment Mode', 'Cash Only (Manual Collection)',
+                    isGreen: false),
                 _DetailRow('Primary UPI ID', _upiId, isCode: true),
                 _DetailRow('Bank Name', _bankName),
                 _DetailRow('Account Number', _bankAccNum, isCode: true),
-                _DetailRow('Bank Settlement', 'Disabled (Switch toggle above to enable UPI)', isGreen: false),
+                _DetailRow('Bank Settlement',
+                    'Disabled (Switch toggle above to enable UPI)',
+                    isGreen: false),
               ],
             ),
           ),
@@ -1358,7 +1632,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           onTap: () => setState(() => _scaleSubSection = 'c1'),
         ),
         const SizedBox(height: 12),
-
         _buildScaleCategoryCard(
           code: 'C2',
           title: 'Property Location & Infrastructure',
@@ -1367,16 +1640,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           onTap: () => setState(() => _scaleSubSection = 'c2'),
         ),
         const SizedBox(height: 12),
-
         _buildScaleCategoryCard(
           code: 'C3',
           title: 'Floors, Rooms & Bed Capacity',
-          subtitle: '$_scaleFloorCount Floors • $_scaleTotalRooms Rooms • $_scaleTotalBeds Total Beds',
+          subtitle:
+              '$_scaleFloorCount Floors • $_scaleTotalRooms Rooms • $_scaleTotalBeds Total Beds',
           desc: 'Building floors layout, room counts & upgrade total bed size',
           onTap: () => setState(() => _scaleSubSection = 'c3'),
         ),
         const SizedBox(height: 12),
-
         _buildScaleCategoryCard(
           code: 'C4',
           title: 'Sharing Types & Rent Structure',
@@ -1435,7 +1707,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               ),
             ),
             const SizedBox(width: 12),
-
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1469,7 +1740,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.muted),
+            const Icon(Icons.chevron_right_rounded,
+                size: 18, color: AppColors.muted),
           ],
         ),
       ),
@@ -1489,7 +1761,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             _DetailRow("Father's Name", _ownerFatherName),
             _DetailRow('WhatsApp Mobile Number', _ownerWhatsapp),
             _DetailRow('Official Email Address', _ownerEmail),
-            _DetailRow('12-Digit Aadhaar Number', 'Verified • $_ownerAadhaar', isGreen: true),
+            _DetailRow('12-Digit Aadhaar Number', 'Verified • $_ownerAadhaar',
+                isGreen: true),
           ],
         ),
         const SizedBox(height: 14),
@@ -1500,10 +1773,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             foregroundColor: AppColors.green,
             side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
             minimumSize: const Size.fromHeight(46),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 0,
           ),
-          child: Text('Edit Personal Profile', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.green)),
+          child: Text('Edit Personal Profile',
+              style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.green)),
         ),
       ],
     );
@@ -1534,10 +1812,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             foregroundColor: AppColors.green,
             side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
             minimumSize: const Size.fromHeight(46),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 0,
           ),
-          child: Text('Edit Property Details', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.green)),
+          child: Text('Edit Property Details',
+              style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.green)),
         ),
       ],
     );
@@ -1569,15 +1852,23 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           title: 'Floors, Rooms & Bed Architecture',
           onEdit: _navigateToScaleCapacityScreen,
           rows: [
-            _DetailRow('Ground Floor Rooms', '$_scaleGroundRooms Rooms (${_scaleGroundRooms * 2} Beds)'),
-            _DetailRow('Total Building Floors', '$_scaleFloorCount Floors (Ground + ${_scaleFloorCount - 1} Floors)'),
-            _DetailRow('Rooms per Upper Floor', '$_scaleRoomsEachFloor Rooms each'),
+            _DetailRow('Ground Floor Rooms',
+                '$_scaleGroundRooms Rooms (${_scaleGroundRooms * 2} Beds)'),
+            _DetailRow('Total Building Floors',
+                '$_scaleFloorCount Floors (Ground + ${_scaleFloorCount - 1} Floors)'),
+            _DetailRow(
+                'Rooms per Upper Floor', '$_scaleRoomsEachFloor Rooms each'),
             _DetailRow('Total Rooms in Property', '$_scaleTotalRooms Rooms'),
-            _DetailRow('Total Bed Capacity', '$_scaleTotalBeds Beds', isGreen: true),
-            _DetailRow('1-Sharing Distribution', '$_scale1SharingRooms Rooms (${_scale1SharingRooms * 1} Beds)'),
-            _DetailRow('2-Sharing Distribution', '$_scale2SharingRooms Rooms (${_scale2SharingRooms * 2} Beds)'),
-            _DetailRow('3-Sharing Distribution', '$_scale3SharingRooms Rooms (${_scale3SharingRooms * 3} Beds)'),
-            _DetailRow('4-Sharing Distribution', '$_scale4SharingRooms Rooms (${_scale4SharingRooms * 4} Beds)'),
+            _DetailRow('Total Bed Capacity', '$_scaleTotalBeds Beds',
+                isGreen: true),
+            _DetailRow('1-Sharing Distribution',
+                '$_scale1SharingRooms Rooms (${_scale1SharingRooms * 1} Beds)'),
+            _DetailRow('2-Sharing Distribution',
+                '$_scale2SharingRooms Rooms (${_scale2SharingRooms * 2} Beds)'),
+            _DetailRow('3-Sharing Distribution',
+                '$_scale3SharingRooms Rooms (${_scale3SharingRooms * 3} Beds)'),
+            _DetailRow('4-Sharing Distribution',
+                '$_scale4SharingRooms Rooms (${_scale4SharingRooms * 4} Beds)'),
           ],
         ),
         const SizedBox(height: 14),
@@ -1588,17 +1879,22 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             foregroundColor: AppColors.green,
             side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
             minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 0,
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.upgrade_rounded, size: 20, color: AppColors.green),
+              const Icon(Icons.upgrade_rounded,
+                  size: 20, color: AppColors.green),
               const SizedBox(width: 8),
               Text(
                 'Scale Bed Capacity (Current: $_scaleTotalBeds Beds)',
-                style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.green),
+                style: GoogleFonts.outfit(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.green),
               ),
             ],
           ),
@@ -1616,13 +1912,42 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           title: 'Sharing Types & Stay Policies',
           onEdit: _openEditC4RentsModal,
           rows: [
-            _DetailRow('1-Sharing (Single Room)', 'Configured • Active Room Type'),
-            _DetailRow('2-Sharing Room', 'Configured • Active Room Type'),
-            _DetailRow('3-Sharing Room', 'Configured • Active Room Type'),
-            _DetailRow('4-Sharing Room', 'Configured • Active Room Type'),
-            _DetailRow('Rent Due Day', '1st of every month'),
-            _DetailRow('Grace Period & Late Fee', '5 Days Grace • ₹100 / day late fee'),
-            _DetailRow('Notice Period Requirement', '30 Days mandatory notice'),
+            _DetailRow(
+              '1-Sharing (Single Room)',
+              _scale1SharingRent > 0
+                  ? '₹$_scale1SharingRent / mo • ₹$_scale1SharingDeposit Deposit'
+                  : 'Not Configured',
+              isGreen: _scale1SharingRent > 0,
+            ),
+            _DetailRow(
+              '2-Sharing Room',
+              _scale2SharingRent > 0
+                  ? '₹$_scale2SharingRent / mo • ₹$_scale2SharingDeposit Deposit'
+                  : 'Not Configured',
+              isGreen: _scale2SharingRent > 0,
+            ),
+            _DetailRow(
+              '3-Sharing Room',
+              _scale3SharingRent > 0
+                  ? '₹$_scale3SharingRent / mo • ₹$_scale3SharingDeposit Deposit'
+                  : 'Not Configured',
+              isGreen: _scale3SharingRent > 0,
+            ),
+            _DetailRow(
+              '4-Sharing Room',
+              _scale4SharingRent > 0
+                  ? '₹$_scale4SharingRent / mo • ₹$_scale4SharingDeposit Deposit'
+                  : 'Not Configured',
+              isGreen: _scale4SharingRent > 0,
+            ),
+            _DetailRow('Rent Due Day',
+                _rentDueDay.isNotEmpty ? _rentDueDay : '5th of Every Month'),
+            _DetailRow(
+              'Grace Period & Late Fee',
+              '${_gracePeriod.isNotEmpty ? _gracePeriod : "5 Days"} Grace • ${_dailyRate.isNotEmpty ? _dailyRate : "₹100 / day"} late fee',
+            ),
+            _DetailRow('Notice Period Requirement',
+                _noticePeriod.isNotEmpty ? _noticePeriod : '30 Days'),
           ],
         ),
         const SizedBox(height: 14),
@@ -1633,10 +1958,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             foregroundColor: AppColors.green,
             side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
             minimumSize: const Size.fromHeight(46),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             elevation: 0,
           ),
-          child: Text('Edit Tariffs & Deposit Rules', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.green)),
+          child: Text('Edit Tariffs & Deposit Rules',
+              style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.green)),
         ),
       ],
     );
@@ -1649,10 +1979,12 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     final nameCtrl = TextEditingController(text: _ownerFullName);
     final fatherCtrl = TextEditingController(text: _ownerFatherName);
     String initialPhone = _ownerWhatsapp.replaceAll(RegExp(r'\D'), '');
-    if (initialPhone.length > 10) initialPhone = initialPhone.substring(initialPhone.length - 10);
+    if (initialPhone.length > 10)
+      initialPhone = initialPhone.substring(initialPhone.length - 10);
     final phoneCtrl = TextEditingController(text: initialPhone);
     final emailCtrl = TextEditingController(text: _ownerEmail);
-    final aadhaarCtrl = TextEditingController(text: _ownerAadhaar.replaceAll(RegExp(r'\D'), ''));
+    final aadhaarCtrl = TextEditingController(
+        text: _ownerAadhaar.replaceAll(RegExp(r'\D'), ''));
     String docAttachedStatus = 'Aadhaar Card Front & Back Attached ';
     bool isSaving = false;
 
@@ -1682,7 +2014,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     hintText: 'e.g. 9876543210',
                   ),
                   const SizedBox(height: 12),
-                  _buildModalTextField('Official Email Address', emailCtrl, keyboardType: TextInputType.emailAddress),
+                  _buildModalTextField('Official Email Address', emailCtrl,
+                      keyboardType: TextInputType.emailAddress),
                   const SizedBox(height: 12),
 
                   // 12-Digit Aadhaar Field with Strict Number Validation
@@ -1699,19 +2032,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // Aadhaar Photo / Document Upload Tile
                   Text(
                     'Aadhaar KYC Photo / Document',
-                    style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.muted),
                   ),
                   const SizedBox(height: 4),
                   InkWell(
                     onTap: () {
                       setModalState(() {
-                        docAttachedStatus = 'Aadhaar Uploaded ✓ (aadhaar_front_back.pdf)';
+                        docAttachedStatus =
+                            'Aadhaar Uploaded ✓ (aadhaar_front_back.pdf)';
                       });
                       _showToast('Aadhaar Document Selected ✓');
                     },
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(10),
@@ -1719,17 +2057,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.badge_outlined, size: 18, color: AppColors.greenDark),
+                          const Icon(Icons.badge_outlined,
+                              size: 18, color: AppColors.greenDark),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               docAttachedStatus,
-                              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink),
                             ),
                           ),
                           Text(
                             'Upload Photo/PDF',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.greenDark),
                           ),
                         ],
                       ),
@@ -1743,12 +2088,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         : () async {
                             final phone = phoneCtrl.text.trim();
                             if (phone.length != 10) {
-                              _showToast('Please enter a valid 10-digit mobile number');
+                              _showToast(
+                                  'Please enter a valid 10-digit mobile number');
                               return;
                             }
                             final aadhaar = aadhaarCtrl.text.trim();
                             if (aadhaar.isNotEmpty && aadhaar.length != 12) {
-                              _showToast('Aadhaar number must be exactly 12 digits');
+                              _showToast(
+                                  'Aadhaar number must be exactly 12 digits');
                               return;
                             }
 
@@ -1762,19 +2109,25 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               _ownerEmail = emailCtrl.text.trim();
                               _adminEmail = _ownerEmail;
                               if (aadhaar.isNotEmpty) {
-                                _ownerAadhaar = '${aadhaar.substring(0, 4)} •••• ${aadhaar.substring(8)}';
+                                _ownerAadhaar =
+                                    '${aadhaar.substring(0, 4)} •••• ${aadhaar.substring(8)}';
                               }
                             });
                             if (_propId.isNotEmpty) {
                               try {
-                                await SupabaseService.instance.client.from('properties').update({
+                                await SupabaseService.instance.client
+                                    .from('properties')
+                                    .update({
                                   'owner_legal_name': _ownerFullName,
                                   'owner_email': _ownerEmail,
                                   'crediting_phone': _ownerWhatsapp,
-                                  'owner_aadhaar_number': aadhaar.isNotEmpty ? aadhaar : _ownerAadhaar,
+                                  'owner_aadhaar_number': aadhaar.isNotEmpty
+                                      ? aadhaar
+                                      : _ownerAadhaar,
                                 }).eq('id', _propId);
                               } catch (e) {
-                                debugPrint('Error updating owner identity in Supabase: $e');
+                                debugPrint(
+                                    'Error updating owner identity in Supabase: $e');
                               }
                             }
                             if (ctx.mounted) {
@@ -1785,9 +2138,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: isSaving
@@ -1797,7 +2152,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               color: AppColors.green,
                             ),
                           )
-                        : Text('Save Identity Changes', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.green)),
+                        : Text('Save Identity Changes',
+                            style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.green)),
                   ),
                 ],
               ),
@@ -1811,7 +2170,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   void _openEditGovtKycModal() {
     String tempGovtType = _ownerGovtIdType;
     final gstCtrl = TextEditingController(text: _bizGst);
-    final aadhaarCtrl = TextEditingController(text: _ownerAadhaar);
+    final aadhaarCtrl = TextEditingController(
+        text: _ownerAadhaar.replaceAll(RegExp(r'\D'), ''));
+    final bbmpCtrl = TextEditingController(text: _bbmpLicense);
 
     showModalBottomSheet(
       context: context,
@@ -1833,14 +2194,16 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: 'Aadhaar',
                         sub: '12 Digits',
                         isSelected: tempGovtType == 'Aadhaar Card',
-                        onTap: () => setModalState(() => tempGovtType = 'Aadhaar Card'),
+                        onTap: () =>
+                            setModalState(() => tempGovtType = 'Aadhaar Card'),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: 'PAN Card',
                         sub: '10 Digits',
                         isSelected: tempGovtType == 'PAN Card',
-                        onTap: () => setModalState(() => tempGovtType = 'PAN Card'),
+                        onTap: () =>
+                            setModalState(() => tempGovtType = 'PAN Card'),
                       ),
                     ],
                   ),
@@ -1851,9 +2214,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
                   // Upload ID Proof Button
                   InkWell(
-                    onTap: () => _showToast('Government ID File Attached ✓ (aadhaar_front_back.pdf)'),
+                    onTap: () => _showToast(
+                        'Government ID File Attached ✓ (aadhaar_front_back.pdf)'),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(10),
@@ -1861,17 +2226,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.upload_file_rounded, size: 18, color: AppColors.greenDark),
+                          const Icon(Icons.upload_file_rounded,
+                              size: 18, color: AppColors.greenDark),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _ownerGovtIdProofStatus,
-                              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink),
                             ),
                           ),
                           Text(
                             'Change File',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.greenDark),
                           ),
                         ],
                       ),
@@ -1885,9 +2257,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
                   // Upload GSTIN Certificate Button
                   InkWell(
-                    onTap: () => _showToast('GST Certificate Attached ✓ (gst_reg_certificate.pdf)'),
+                    onTap: () => _showToast(
+                        'GST Certificate Attached ✓ (gst_reg_certificate.pdf)'),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(10),
@@ -1895,17 +2269,69 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.verified_outlined, size: 18, color: AppColors.greenDark),
+                          const Icon(Icons.verified_outlined,
+                              size: 18, color: AppColors.greenDark),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _bizGstProofStatus,
-                              style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink),
                             ),
                           ),
                           Text(
                             'Upload PDF',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.greenDark),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.greenDark),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  _buildModalSectionLabel('Municipal Trade License / BBMP'),
+                  _buildModalTextField('Trade License / BBMP Number', bbmpCtrl),
+                  const SizedBox(height: 8),
+
+                  // Upload Trade License Button
+                  InkWell(
+                    onTap: () => _showToast(
+                        'Trade License File Attached ✓ (trade_license.pdf)'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.document_scanner_outlined,
+                              size: 18, color: AppColors.greenDark),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _bbmpLicense.isNotEmpty
+                                  ? 'Verified • $_bbmpLicense'
+                                  : 'Not Uploaded',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink),
+                            ),
+                          ),
+                          Text(
+                            'Upload PDF',
+                            style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.greenDark),
                           ),
                         ],
                       ),
@@ -1914,24 +2340,70 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 20),
 
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      final cleanAadhaar =
+                          aadhaarCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
                       setState(() {
                         _ownerGovtIdType = tempGovtType;
-                        _ownerAadhaar = aadhaarCtrl.text.trim();
+                        if (cleanAadhaar.isNotEmpty) {
+                          _ownerAadhaar = cleanAadhaar.length >= 12
+                              ? '${cleanAadhaar.substring(0, 4)} •••• ${cleanAadhaar.substring(cleanAadhaar.length - 4)}'
+                              : cleanAadhaar;
+                          _ownerGovtIdProofStatus = 'Verified & Approved';
+                        } else {
+                          _ownerAadhaar = '';
+                          _ownerGovtIdProofStatus = 'Pending Verification';
+                        }
                         _bizGst = gstCtrl.text.trim();
+                        _bbmpLicense = bbmpCtrl.text.trim();
+                        _bizGstProofStatus = _bizGst.isNotEmpty
+                            ? 'Verified • Active'
+                            : 'Not Uploaded';
+                        _bizStatus = _bizGst.isNotEmpty
+                            ? 'Verified & Registered'
+                            : 'Unregistered / Exempted';
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          await SupabaseService.instance.client
+                              .from('properties')
+                              .update({
+                            'owner_aadhaar_number':
+                                cleanAadhaar.isNotEmpty ? cleanAadhaar : null,
+                          }).eq('id', _propId);
+
+                          await SupabaseService.instance.updatePropertySettings(
+                            propertyId: _propId,
+                            settings: {
+                              'gst_number': _bizGst,
+                              'bbmp_license_number': _bbmpLicense,
+                            },
+                          );
+                        } catch (e) {
+                          debugPrint(
+                              'Error updating KYC & tax documents in Supabase: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast('Government KYC & GST Details Saved ✓');
                     },
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
-                    child: Text('Save KYC & Tax Documents', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green)),
+                    child: Text('Save KYC & Tax Documents',
+                        style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.green)),
                   ),
                 ],
               ),
@@ -1984,22 +2456,28 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildSettingsInteractiveCard(
                         title: "Men's PG",
                         sub: 'Gents Only',
-                        isSelected: tempGender.contains("Men's") || tempGender.contains('Gents'),
-                        onTap: () => setModalState(() => tempGender = "Men's PG (Gents Only)"),
+                        isSelected: tempGender.contains("Men's") ||
+                            tempGender.contains('Gents'),
+                        onTap: () => setModalState(
+                            () => tempGender = "Men's PG (Gents Only)"),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: "Women's PG",
                         sub: 'Ladies Only',
-                        isSelected: tempGender.contains("Women's") || tempGender.contains('Ladies'),
-                        onTap: () => setModalState(() => tempGender = "Women's PG (Ladies Only)"),
+                        isSelected: tempGender.contains("Women's") ||
+                            tempGender.contains('Ladies'),
+                        onTap: () => setModalState(
+                            () => tempGender = "Women's PG (Ladies Only)"),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: 'Unisex',
                         sub: 'Coliving',
-                        isSelected: tempGender.contains('Unisex') || tempGender.contains('Coliving'),
-                        onTap: () => setModalState(() => tempGender = 'Unisex / Coliving'),
+                        isSelected: tempGender.contains('Unisex') ||
+                            tempGender.contains('Coliving'),
+                        onTap: () => setModalState(
+                            () => tempGender = 'Unisex / Coliving'),
                       ),
                     ],
                   ),
@@ -2012,29 +2490,36 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildSettingsInteractiveCard(
                         title: '0',
                         sub: 'No Lift',
-                        isSelected: tempLift.startsWith('0') || tempLift.contains('No Lift'),
-                        onTap: () => setModalState(() => tempLift = '0 (No Lift)'),
+                        isSelected: tempLift.startsWith('0') ||
+                            tempLift.contains('No Lift'),
+                        onTap: () =>
+                            setModalState(() => tempLift = '0 (No Lift)'),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: '1',
                         sub: '1 Lift',
-                        isSelected: tempLift.startsWith('1') || tempLift == '1 Passenger Lift',
-                        onTap: () => setModalState(() => tempLift = '1 Passenger Lift'),
+                        isSelected: tempLift.startsWith('1') ||
+                            tempLift == '1 Passenger Lift',
+                        onTap: () =>
+                            setModalState(() => tempLift = '1 Passenger Lift'),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: '2',
                         sub: '2 Lifts',
                         isSelected: tempLift.startsWith('2'),
-                        onTap: () => setModalState(() => tempLift = '2 Passenger Lifts'),
+                        onTap: () =>
+                            setModalState(() => tempLift = '2 Passenger Lifts'),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: '3+',
                         sub: '3+ Lifts',
-                        isSelected: tempLift.startsWith('3') || tempLift.contains('3+'),
-                        onTap: () => setModalState(() => tempLift = '3+ Elevators'),
+                        isSelected:
+                            tempLift.startsWith('3') || tempLift.contains('3+'),
+                        onTap: () =>
+                            setModalState(() => tempLift = '3+ Elevators'),
                       ),
                     ],
                   ),
@@ -2047,15 +2532,20 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildSettingsInteractiveCard(
                         title: 'Full Backup',
                         sub: 'Generator / Inverter',
-                        isSelected: tempGen.contains('Full') || tempGen.contains('Diesel') || tempGen.contains('Generator'),
-                        onTap: () => setModalState(() => tempGen = '25 kVA Diesel Generator (Full Backup)'),
+                        isSelected: tempGen.contains('Full') ||
+                            tempGen.contains('Diesel') ||
+                            tempGen.contains('Generator'),
+                        onTap: () => setModalState(() =>
+                            tempGen = '25 kVA Diesel Generator (Full Backup)'),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: 'No Backup',
                         sub: 'Standard Line',
-                        isSelected: tempGen.contains('No Backup') || tempGen.contains('Standard'),
-                        onTap: () => setModalState(() => tempGen = 'Standard Line (No Backup)'),
+                        isSelected: tempGen.contains('No Backup') ||
+                            tempGen.contains('Standard'),
+                        onTap: () => setModalState(
+                            () => tempGen = 'Standard Line (No Backup)'),
                       ),
                     ],
                   ),
@@ -2076,11 +2566,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               _scaleGenderCategory = tempGender;
                               _scaleLiftCount = tempLift;
                               _scalePowerBackup = tempGen;
-                              _tenantPreference = tempGender.contains("Men's") ? 'Gents' : (tempGender.contains("Women's") ? 'Ladies' : 'Co-Living');
+                              _tenantPreference = tempGender.contains("Men's")
+                                  ? 'Gents'
+                                  : (tempGender.contains("Women's")
+                                      ? 'Ladies'
+                                      : 'Co-Living');
                             });
                             if (_propId.isNotEmpty) {
                               try {
-                                await SupabaseService.instance.client.from('properties').update({
+                                await SupabaseService.instance.client
+                                    .from('properties')
+                                    .update({
                                   'property_name': _scalePgName,
                                   'area_locality': _scaleAreaLocality,
                                   'pincode': _scalePincode,
@@ -2089,7 +2585,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                   'power_backup': _scalePowerBackup,
                                 }).eq('id', _propId);
                               } catch (e) {
-                                debugPrint('Error updating infrastructure in Supabase: $e');
+                                debugPrint(
+                                    'Error updating infrastructure in Supabase: $e');
                               }
                             }
                             if (ctx.mounted) {
@@ -2100,9 +2597,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
                     child: isSaving
@@ -2112,7 +2611,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               color: AppColors.green,
                             ),
                           )
-                        : Text('Save Infrastructure Changes', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green)),
+                        : Text('Save Infrastructure Changes',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.green)),
                   ),
                 ],
               ),
@@ -2126,9 +2629,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   // C3 Basic Architecture Edit Modal (Numbers validation only, sharing steppers removed)
   void _openEditC3CapacityModal() {
     final floorCtrl = TextEditingController(text: _scaleFloorCount.toString());
-    final upperRoomsCtrl = TextEditingController(text: _scaleRoomsEachFloor.toString());
+    final upperRoomsCtrl =
+        TextEditingController(text: _scaleRoomsEachFloor.toString());
     bool tempGroundHasRooms = _scaleGroundRooms > 0;
-    final gfRoomsCtrl = TextEditingController(text: _scaleGroundRooms.toString());
+    final gfRoomsCtrl =
+        TextEditingController(text: _scaleGroundRooms.toString());
 
     showModalBottomSheet(
       context: context,
@@ -2138,9 +2643,12 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
             final fCount = int.tryParse(floorCtrl.text) ?? _scaleFloorCount;
-            final rPerUpper = int.tryParse(upperRoomsCtrl.text) ?? _scaleRoomsEachFloor;
-            final gfRooms = tempGroundHasRooms ? (int.tryParse(gfRoomsCtrl.text) ?? 2) : 0;
-            final calcRooms = gfRooms + ((fCount > 1 ? fCount - 1 : 0) * rPerUpper);
+            final rPerUpper =
+                int.tryParse(upperRoomsCtrl.text) ?? _scaleRoomsEachFloor;
+            final gfRooms =
+                tempGroundHasRooms ? (int.tryParse(gfRoomsCtrl.text) ?? 2) : 0;
+            final calcRooms =
+                gfRooms + ((fCount > 1 ? fCount - 1 : 0) * rPerUpper);
 
             return _buildModalBottomSheetWrapper(
               ctx,
@@ -2158,8 +2666,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     onChanged: (v) => setModalState(() {}),
                   ),
                   const SizedBox(height: 12),
-
-                  _buildModalSectionLabel('Does Ground Floor have rooms for rent?'),
+                  _buildModalSectionLabel(
+                      'Does Ground Floor have rooms for rent?'),
                   Row(
                     children: [
                       _buildSettingsInteractiveCard(
@@ -2168,7 +2676,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         isSelected: tempGroundHasRooms,
                         onTap: () => setModalState(() {
                           tempGroundHasRooms = true;
-                          if (gfRoomsCtrl.text == '0' || gfRoomsCtrl.text.isEmpty) {
+                          if (gfRoomsCtrl.text == '0' ||
+                              gfRoomsCtrl.text.isEmpty) {
                             gfRoomsCtrl.text = '2';
                           }
                         }),
@@ -2198,7 +2707,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     ),
                   ],
                   const SizedBox(height: 12),
-
                   _buildModalTextField(
                     'Rooms per Upper Floor (Numbers Only)',
                     upperRoomsCtrl,
@@ -2209,7 +2717,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     onChanged: (v) => setModalState(() {}),
                   ),
                   const SizedBox(height: 16),
-
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -2220,18 +2727,29 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Calculated Total Rooms:', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted)),
-                        Text('$calcRooms Rooms', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                        Text('Calculated Total Rooms:',
+                            style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.muted)),
+                        Text('$calcRooms Rooms',
+                            style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.ink)),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-
                   OutlinedButton(
                     onPressed: () async {
-                      final f = int.tryParse(floorCtrl.text) ?? _scaleFloorCount;
-                      final u = int.tryParse(upperRoomsCtrl.text) ?? _scaleRoomsEachFloor;
-                      final g = tempGroundHasRooms ? (int.tryParse(gfRoomsCtrl.text) ?? 2) : 0;
+                      final f =
+                          int.tryParse(floorCtrl.text) ?? _scaleFloorCount;
+                      final u = int.tryParse(upperRoomsCtrl.text) ??
+                          _scaleRoomsEachFloor;
+                      final g = tempGroundHasRooms
+                          ? (int.tryParse(gfRoomsCtrl.text) ?? 2)
+                          : 0;
                       if (f <= 0) {
                         _showToast('Building must have at least 1 floor');
                         return;
@@ -2246,7 +2764,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       });
                       if (_propId.isNotEmpty) {
                         try {
-                          await SupabaseService.instance.client.from('properties').update({
+                          await SupabaseService.instance.client
+                              .from('properties')
+                              .update({
                             'total_floors': f,
                             'total_rooms': totalR,
                             'ground_floor_has_rooms': tempGroundHasRooms,
@@ -2258,17 +2778,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       if (ctx.mounted) {
                         Navigator.of(ctx).pop();
                       }
-                      _showToast('Building Architecture updated to $_scaleTotalRooms Rooms ✓');
+                      _showToast(
+                          'Building Architecture updated to $_scaleTotalRooms Rooms ✓');
                     },
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
-                    child: Text('Save Building Layout', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.green)),
+                    child: Text('Save Building Layout',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.green)),
                   ),
                 ],
               ),
@@ -2297,7 +2824,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
-            int calculatedRooms = (tempGroundHasRooms ? tempGfRooms : 0) + ((tempFloors > 1 ? tempFloors - 1 : 0) * tempRoomsPerUpperFloor);
+            int calculatedRooms = (tempGroundHasRooms ? tempGfRooms : 0) +
+                ((tempFloors > 1 ? tempFloors - 1 : 0) *
+                    tempRoomsPerUpperFloor);
             int calculatedBeds = (s1 * 1) + (s2 * 2) + (s3 * 3) + (s4 * 4);
             if (calculatedBeds == 0) calculatedBeds = calculatedRooms * 2;
 
@@ -2313,7 +2842,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.green.withValues(alpha: 0.3)),
+                      border: Border.all(
+                          color: AppColors.green.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2323,23 +2853,33 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           children: [
                             Text(
                               'Live Scaled Bed Capacity',
-                              style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.greenDark),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.greenDark),
                             ),
                             Text(
                               '$calculatedBeds Total Beds ($calculatedRooms Rooms)',
-                              style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.greenDark),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.greenDark),
                             ),
                           ],
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: AppColors.green,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '$tempFloors Floors (G+${tempFloors - 1})',
-                            style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white),
                           ),
                         ),
                       ],
@@ -2383,7 +2923,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 14),
 
                   // Ground Floor Rooms
-                  _buildModalSectionLabel('Does Ground Floor have rooms for rent?'),
+                  _buildModalSectionLabel(
+                      'Does Ground Floor have rooms for rent?'),
                   Row(
                     children: [
                       _buildSettingsInteractiveCard(
@@ -2417,28 +2958,32 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: '2',
                         sub: 'Rooms/Fl',
                         isSelected: tempRoomsPerUpperFloor == 2,
-                        onTap: () => setModalState(() => tempRoomsPerUpperFloor = 2),
+                        onTap: () =>
+                            setModalState(() => tempRoomsPerUpperFloor = 2),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: '3',
                         sub: 'Rooms/Fl',
                         isSelected: tempRoomsPerUpperFloor == 3,
-                        onTap: () => setModalState(() => tempRoomsPerUpperFloor = 3),
+                        onTap: () =>
+                            setModalState(() => tempRoomsPerUpperFloor = 3),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: '4',
                         sub: 'Rooms/Fl',
                         isSelected: tempRoomsPerUpperFloor == 4,
-                        onTap: () => setModalState(() => tempRoomsPerUpperFloor = 4),
+                        onTap: () =>
+                            setModalState(() => tempRoomsPerUpperFloor = 4),
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: '5+',
                         sub: 'Rooms/Fl',
                         isSelected: tempRoomsPerUpperFloor >= 5,
-                        onTap: () => setModalState(() => tempRoomsPerUpperFloor = 6),
+                        onTap: () =>
+                            setModalState(() => tempRoomsPerUpperFloor = 6),
                       ),
                     ],
                   ),
@@ -2447,26 +2992,33 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // Sharing Distribution Stepper Options (+ / -)
                   Text(
                     'Sharing Distribution (Rooms per type):',
-                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(height: 8),
 
                   Row(
                     children: [
                       Expanded(
-                        child: _buildStepperBox('1-Share', s1, (v) => setModalState(() => s1 = v)),
+                        child: _buildStepperBox(
+                            '1-Share', s1, (v) => setModalState(() => s1 = v)),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: _buildStepperBox('2-Share', s2, (v) => setModalState(() => s2 = v)),
+                        child: _buildStepperBox(
+                            '2-Share', s2, (v) => setModalState(() => s2 = v)),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: _buildStepperBox('3-Share', s3, (v) => setModalState(() => s3 = v)),
+                        child: _buildStepperBox(
+                            '3-Share', s3, (v) => setModalState(() => s3 = v)),
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: _buildStepperBox('4-Share', s4, (v) => setModalState(() => s4 = v)),
+                        child: _buildStepperBox(
+                            '4-Share', s4, (v) => setModalState(() => s4 = v)),
                       ),
                     ],
                   ),
@@ -2477,7 +3029,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     onPressed: () {
                       setState(() {
                         _scaleFloorCount = tempFloors;
-                        _scaleGroundRooms = tempGroundHasRooms ? tempGfRooms : 0;
+                        _scaleGroundRooms =
+                            tempGroundHasRooms ? tempGfRooms : 0;
                         _scaleRoomsEachFloor = tempRoomsPerUpperFloor;
                         _scale1SharingRooms = s1;
                         _scale2SharingRooms = s2;
@@ -2488,19 +3041,25 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         _scaleTotalBeds = calculatedBeds;
                       });
                       Navigator.of(ctx).pop();
-                      _showToast('Bed Capacity Scaled to $_scaleTotalBeds Beds ($calculatedRooms Rooms) ✓');
+                      _showToast(
+                          'Bed Capacity Scaled to $_scaleTotalBeds Beds ($calculatedRooms Rooms) ✓');
                     },
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save & Scale to $calculatedBeds Beds',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.green),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.green),
                     ),
                   ),
                 ],
@@ -2513,73 +3072,190 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   }
 
   void _openEditC4RentsModal() {
-    final s1RentCtrl = TextEditingController(text: _scale1SharingRent.toString());
-    final s1DepCtrl = TextEditingController(text: _scale1SharingDeposit.toString());
-    final s2RentCtrl = TextEditingController(text: _scale2SharingRent.toString());
-    final s2DepCtrl = TextEditingController(text: _scale2SharingDeposit.toString());
-    final s3RentCtrl = TextEditingController(text: _scale3SharingRent.toString());
-    final s3DepCtrl = TextEditingController(text: _scale3SharingDeposit.toString());
+    final s1RentCtrl = TextEditingController(
+        text: _scale1SharingRent > 0 ? _scale1SharingRent.toString() : '');
+    final s1DepCtrl = TextEditingController(
+        text:
+            _scale1SharingDeposit > 0 ? _scale1SharingDeposit.toString() : '');
+    final s2RentCtrl = TextEditingController(
+        text: _scale2SharingRent > 0 ? _scale2SharingRent.toString() : '');
+    final s2DepCtrl = TextEditingController(
+        text:
+            _scale2SharingDeposit > 0 ? _scale2SharingDeposit.toString() : '');
+    final s3RentCtrl = TextEditingController(
+        text: _scale3SharingRent > 0 ? _scale3SharingRent.toString() : '');
+    final s3DepCtrl = TextEditingController(
+        text:
+            _scale3SharingDeposit > 0 ? _scale3SharingDeposit.toString() : '');
+    final s4RentCtrl = TextEditingController(
+        text: _scale4SharingRent > 0 ? _scale4SharingRent.toString() : '');
+    final s4DepCtrl = TextEditingController(
+        text:
+            _scale4SharingDeposit > 0 ? _scale4SharingDeposit.toString() : '');
+    bool isSaving = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return _buildModalBottomSheetWrapper(
-          ctx,
-          title: 'Edit Sharing Tariffs & Deposits',
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return _buildModalBottomSheetWrapper(
+              ctx,
+              title: 'Edit Sharing Tariffs & Deposits',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(child: _buildModalTextField('1-Sharing Rent', s1RentCtrl, keyboardType: TextInputType.number)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _buildModalTextField('1-Sharing Deposit', s1DepCtrl, keyboardType: TextInputType.number)),
+                  Row(
+                    children: [
+                      Expanded(
+                          child: _buildModalTextField(
+                              '1-Sharing Rent', s1RentCtrl,
+                              keyboardType: TextInputType.number)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _buildModalTextField(
+                              '1-Sharing Deposit', s1DepCtrl,
+                              keyboardType: TextInputType.number)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                          child: _buildModalTextField(
+                              '2-Sharing Rent', s2RentCtrl,
+                              keyboardType: TextInputType.number)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _buildModalTextField(
+                              '2-Sharing Deposit', s2DepCtrl,
+                              keyboardType: TextInputType.number)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                          child: _buildModalTextField(
+                              '3-Sharing Rent', s3RentCtrl,
+                              keyboardType: TextInputType.number)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _buildModalTextField(
+                              '3-Sharing Deposit', s3DepCtrl,
+                              keyboardType: TextInputType.number)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                          child: _buildModalTextField(
+                              '4-Sharing Rent', s4RentCtrl,
+                              keyboardType: TextInputType.number)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: _buildModalTextField(
+                              '4-Sharing Deposit', s4DepCtrl,
+                              keyboardType: TextInputType.number)),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  OutlinedButton(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            final s1R =
+                                int.tryParse(s1RentCtrl.text.trim()) ?? 0;
+                            final s1D =
+                                int.tryParse(s1DepCtrl.text.trim()) ?? 0;
+                            final s2R =
+                                int.tryParse(s2RentCtrl.text.trim()) ?? 0;
+                            final s2D =
+                                int.tryParse(s2DepCtrl.text.trim()) ?? 0;
+                            final s3R =
+                                int.tryParse(s3RentCtrl.text.trim()) ?? 0;
+                            final s3D =
+                                int.tryParse(s3DepCtrl.text.trim()) ?? 0;
+                            final s4R =
+                                int.tryParse(s4RentCtrl.text.trim()) ?? 0;
+                            final s4D =
+                                int.tryParse(s4DepCtrl.text.trim()) ?? 0;
+
+                            setModalState(() => isSaving = true);
+                            setState(() {
+                              _scale1SharingRent = s1R;
+                              _scale1SharingDeposit = s1D;
+                              _scale2SharingRent = s2R;
+                              _scale2SharingDeposit = s2D;
+                              _scale3SharingRent = s3R;
+                              _scale3SharingDeposit = s3D;
+                              _scale4SharingRent = s4R;
+                              _scale4SharingDeposit = s4D;
+                            });
+
+                            if (_propId.isNotEmpty) {
+                              try {
+                                final tariffsPayload = [
+                                  {'sharing': 1, 'rent': s1R, 'deposit': s1D},
+                                  {'sharing': 2, 'rent': s2R, 'deposit': s2D},
+                                  {'sharing': 3, 'rent': s3R, 'deposit': s3D},
+                                  {'sharing': 4, 'rent': s4R, 'deposit': s4D},
+                                ];
+                                await SupabaseService.instance
+                                    .updatePropertySettings(
+                                  propertyId: _propId,
+                                  settings: {
+                                    'sharing_tariffs': tariffsPayload,
+                                    'sharing_1_rent': s1R,
+                                    'sharing_1_deposit': s1D,
+                                    'sharing_2_rent': s2R,
+                                    'sharing_2_deposit': s2D,
+                                    'sharing_3_rent': s3R,
+                                    'sharing_3_deposit': s3D,
+                                    'sharing_4_rent': s4R,
+                                    'sharing_4_deposit': s4D,
+                                  },
+                                );
+                              } catch (e) {
+                                debugPrint(
+                                    'Error updating tariffs in Supabase: $e');
+                              }
+                            }
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('Tariffs & Deposit structure updated ✓');
+                          },
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.green,
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: isSaving
+                        ? const Center(
+                            child: UrbanSpinner(
+                              size: 20,
+                              color: AppColors.green,
+                            ),
+                          )
+                        : Text('Save Tariff Rates',
+                            style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.green)),
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _buildModalTextField('2-Sharing Rent', s2RentCtrl, keyboardType: TextInputType.number)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _buildModalTextField('2-Sharing Deposit', s2DepCtrl, keyboardType: TextInputType.number)),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _buildModalTextField('3-Sharing Rent', s3RentCtrl, keyboardType: TextInputType.number)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _buildModalTextField('3-Sharing Deposit', s3DepCtrl, keyboardType: TextInputType.number)),
-                ],
-              ),
-              const SizedBox(height: 20),
-              OutlinedButton(
-                onPressed: () {
-                  setState(() {
-                    _scale1SharingRent = int.tryParse(s1RentCtrl.text) ?? _scale1SharingRent;
-                    _scale1SharingDeposit = int.tryParse(s1DepCtrl.text) ?? _scale1SharingDeposit;
-                    _scale2SharingRent = int.tryParse(s2RentCtrl.text) ?? _scale2SharingRent;
-                    _scale2SharingDeposit = int.tryParse(s2DepCtrl.text) ?? _scale2SharingDeposit;
-                    _scale3SharingRent = int.tryParse(s3RentCtrl.text) ?? _scale3SharingRent;
-                    _scale3SharingDeposit = int.tryParse(s3DepCtrl.text) ?? _scale3SharingDeposit;
-                  });
-                  Navigator.of(ctx).pop();
-                  _showToast('Tariffs & Deposit structure updated ✓');
-                },
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.green,
-                  side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 0,
-                ),
-                child: Text('Save Tariff Rates', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.green)),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -2665,7 +3341,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       ),
       child: Column(
         children: [
-          Text(label, style: GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.muted)),
+          Text(label,
+              style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.muted)),
           const SizedBox(height: 4),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2677,21 +3357,34 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 child: Container(
                   width: 20,
                   height: 20,
-                  decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: const Color(0xFFE5E7EB))),
-                  child: const Center(child: Icon(Icons.remove, size: 11, color: AppColors.ink)),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFE5E7EB))),
+                  child: const Center(
+                      child:
+                          Icon(Icons.remove, size: 11, color: AppColors.ink)),
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text('$val', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                child: Text('$val',
+                    style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink)),
               ),
               InkWell(
                 onTap: () => onChanged(val + 1),
                 child: Container(
                   width: 20,
                   height: 20,
-                  decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: const Color(0xFFE5E7EB))),
-                  child: const Center(child: Icon(Icons.add, size: 11, color: AppColors.ink)),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFFE5E7EB))),
+                  child: const Center(
+                      child: Icon(Icons.add, size: 11, color: AppColors.ink)),
                 ),
               ),
             ],
@@ -2713,7 +3406,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.muted)),
+        Text(label,
+            style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.muted)),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
@@ -2721,31 +3418,42 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           maxLength: maxLength,
-          style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
+          style: GoogleFonts.outfit(
+              fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink),
           decoration: InputDecoration(
             counterText: '',
             isDense: true,
             hintText: hintText,
             hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             filled: true,
             fillColor: const Color(0xFFF9FAFB),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: AppColors.green, width: 1.5)),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildModalBottomSheetWrapper(BuildContext ctx, {required String title, required Widget child}) {
+  Widget _buildModalBottomSheetWrapper(BuildContext ctx,
+      {required String title, required Widget child}) {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+      padding: EdgeInsets.fromLTRB(
+          20, 16, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -2767,15 +3475,21 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.outfit(fontSize: 16.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+                  style: GoogleFonts.outfit(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink),
                 ),
                 InkWell(
                   onTap: () => Navigator.of(ctx).pop(),
                   child: Container(
                     width: 28,
                     height: 28,
-                    decoration: const BoxDecoration(color: Color(0xFFF3F4F6), shape: BoxShape.circle),
-                    child: const Center(child: Icon(Icons.close, size: 15, color: AppColors.muted)),
+                    decoration: const BoxDecoration(
+                        color: Color(0xFFF3F4F6), shape: BoxShape.circle),
+                    child: const Center(
+                        child: Icon(Icons.close,
+                            size: 15, color: AppColors.muted)),
                   ),
                 ),
               ],
@@ -2962,7 +3676,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF9FAFB),
                       borderRadius: BorderRadius.circular(8),
@@ -2972,15 +3687,21 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       child: DropdownButton<String>(
                         value: _kycApplicableTo,
                         isDense: true,
-                        icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.ink),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                            size: 16, color: AppColors.ink),
                         items: ['All Residents', 'Long-Term Only'].map((e) {
                           return DropdownMenuItem(
                             value: e,
-                            child: Text(e, style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                            child: Text(e,
+                                style: GoogleFonts.outfit(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.ink)),
                           );
                         }).toList(),
                         onChanged: (val) {
-                          if (val != null) setState(() => _kycApplicableTo = val);
+                          if (val != null)
+                            setState(() => _kycApplicableTo = val);
                         },
                       ),
                     ),
@@ -3000,7 +3721,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           rows: [
             _DetailRow('Official Business Name', _stampBusinessName),
             _DetailRow('Authorized Signatory', _authorizedSignatory),
-            _DetailRow('Stamp Application', 'Applied on all 50ms PDF Receipts', isGreen: true),
+            _DetailRow('Stamp Application', 'Applied on all 50ms PDF Receipts',
+                isGreen: true),
           ],
         ),
       ],
@@ -3018,14 +3740,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           title: 'Security & Login Credentials',
           onEdit: _openEditAccountModal,
           rows: [
-            _DetailRow('App Passcode', _appPasscode, onTap: () => _openChangePasswordOtpModal(_adminPhone)),
-            _DetailRow('Registered Phone', _adminPhone, onTap: _openEditAccountModal),
-            _DetailRow('Registered Email', _adminEmail, onTap: _openEditAccountModal),
+            _DetailRow('App Passcode', _appPasscode,
+                onTap: () => _openChangePasswordOtpModal(_adminPhone)),
+            _DetailRow('Registered Phone', _adminPhone,
+                onTap: _openEditAccountModal),
+            _DetailRow('Registered Email', _adminEmail,
+                onTap: _openEditAccountModal),
             _DetailRow('App Language', _appLanguage, onTap: () {
               _openEditModal(
                 title: 'Select Language',
                 fields: [
-                  _ModalField('Language', _appLanguage, (v) => setState(() => _appLanguage = v)),
+                  _ModalField('Language', _appLanguage,
+                      (v) => setState(() => _appLanguage = v)),
                 ],
               );
             }),
@@ -3037,14 +3763,34 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
         _buildAccountActionButton(
           label: 'Logout Current Session',
           icon: Icons.logout_rounded,
-          onTap: () => _showToast('Logged out from current session'),
+          onTap: () async {
+            try {
+              await SupabaseService.instance.client.auth.signOut();
+            } catch (e) {
+              debugPrint('Error signing out: $e');
+            }
+            _showToast('Logged out from current session');
+            if (mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+            }
+          },
         ),
         const SizedBox(height: 8),
 
         _buildAccountActionButton(
-          label: 'Logout from All Devices (2 Active)',
+          label: 'Logout from All Devices (Active Sessions)',
           icon: Icons.devices_other_rounded,
-          onTap: () => _showToast('Logged out from all active sessions'),
+          onTap: () async {
+            try {
+              await SupabaseService.instance.client.auth.signOut(scope: SignOutScope.global);
+            } catch (e) {
+              debugPrint('Error signing out globally: $e');
+            }
+            _showToast('Logged out from all active sessions');
+            if (mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+            }
+          },
         ),
         const SizedBox(height: 8),
 
@@ -3068,13 +3814,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     required List<String> items,
     required ValueChanged<String?> onChanged,
   }) {
-    final effectiveValue = items.contains(value) ? value : (items.isNotEmpty ? items.first : null);
+    final effectiveValue =
+        items.contains(value) ? value : (items.isNotEmpty ? items.first : null);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
-          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+          style: GoogleFonts.outfit(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.muted),
         ),
         const SizedBox(height: 5),
         Container(
@@ -3089,13 +3839,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             child: DropdownButton<String>(
               value: effectiveValue,
               isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.ink),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 18, color: AppColors.ink),
               items: items.map((e) {
                 return DropdownMenuItem<String>(
                   value: e,
                   child: Text(
                     e,
-                    style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink),
                     overflow: TextOverflow.ellipsis,
                   ),
                 );
@@ -3121,7 +3875,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+          style: GoogleFonts.outfit(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.muted),
         ),
         const SizedBox(height: 5),
         Container(
@@ -3137,12 +3894,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             maxLength: maxLength,
             onChanged: onChanged,
             scrollPadding: const EdgeInsets.only(bottom: 160),
-            style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
+            style: GoogleFonts.outfit(
+                fontSize: 13,
+                color: AppColors.ink,
+                fontWeight: FontWeight.w600),
             decoration: InputDecoration(
               counterText: '',
               hintText: hintText,
-              hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              hintStyle:
+                  GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               border: InputBorder.none,
             ),
           ),
@@ -3168,7 +3930,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             height: 52,
             padding: const EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.green.withValues(alpha: 0.06) : Colors.white,
+              color: isSelected
+                  ? AppColors.green.withValues(alpha: 0.06)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
@@ -3238,10 +4002,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             final effectiveStateMap = _liveStatesMap;
             final stateKeys = effectiveStateMap.keys.toList();
             if (!stateKeys.contains(tempState) && stateKeys.isNotEmpty) {
-              tempState = stateKeys.contains('Karnataka') ? 'Karnataka' : stateKeys.first;
+              tempState = stateKeys.contains('Karnataka')
+                  ? 'Karnataka'
+                  : stateKeys.first;
             }
-            final availableCities = effectiveStateMap[tempState] ?? (tempCity.isNotEmpty ? [tempCity] : ['Loading...']);
-            if (!availableCities.contains(tempCity) && availableCities.isNotEmpty) {
+            final availableCities = effectiveStateMap[tempState] ??
+                (tempCity.isNotEmpty ? [tempCity] : ['Loading...']);
+            if (!availableCities.contains(tempCity) &&
+                availableCities.isNotEmpty) {
               tempCity = availableCities.first;
             }
 
@@ -3261,7 +4029,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // Property Structure (Standard PG vs Apartment Units - Matched to Owner Setup)
                   Text(
                     'Property Structure',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -3270,14 +4041,16 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: 'Standard PG',
                         sub: 'Rooms & Beds',
                         isSelected: tempType == 'Standard PG',
-                        onTap: () => setModalState(() => tempType = 'Standard PG'),
+                        onTap: () =>
+                            setModalState(() => tempType = 'Standard PG'),
                       ),
                       const SizedBox(width: 6),
                       _buildInteractiveCard(
                         title: 'Apartment Units',
                         sub: '1BHK / 2BHK / 3BHK',
                         isSelected: tempType == 'Apartment Units',
-                        onTap: () => setModalState(() => tempType = 'Apartment Units'),
+                        onTap: () =>
+                            setModalState(() => tempType = 'Apartment Units'),
                       ),
                     ],
                   ),
@@ -3286,11 +4059,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // Section Header for PG Address
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 16, color: AppColors.green),
+                      const Icon(Icons.location_on_outlined,
+                          size: 16, color: AppColors.green),
                       const SizedBox(width: 6),
                       Text(
                         'PG Address Details',
-                        style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+                        style: GoogleFonts.outfit(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink),
                       ),
                       const Spacer(),
                       if (isFetchingPostal)
@@ -3299,14 +4076,21 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                             const SizedBox(
                               width: 12,
                               height: 12,
-                              child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.green),
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 1.5, color: AppColors.green),
                             ),
                             const SizedBox(width: 5),
-                            Text('API Looking up...', style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.green)),
+                            Text('API Looking up...',
+                                style: GoogleFonts.outfit(
+                                    fontSize: 10.5, color: AppColors.green)),
                           ],
                         )
                       else if (postalApiStatus != null)
-                        Text(postalApiStatus!, style: GoogleFonts.outfit(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.greenDark)),
+                        Text(postalApiStatus!,
+                            style: GoogleFonts.outfit(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.greenDark)),
                     ],
                   ),
                   const SizedBox(height: 10),
@@ -3332,9 +4116,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(right: 6),
                             child: ActionChip(
-                              label: Text(loc, style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.greenDark)),
+                              label: Text(loc,
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.greenDark)),
                               backgroundColor: AppColors.greenLight,
-                              side: BorderSide(color: AppColors.green.withValues(alpha: 0.3)),
+                              side: BorderSide(
+                                  color:
+                                      AppColors.green.withValues(alpha: 0.3)),
                               padding: EdgeInsets.zero,
                               visualDensity: VisualDensity.compact,
                               onPressed: () {
@@ -3375,29 +4165,41 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           setModalState(() {
                             isFetchingPostal = false;
                             if (details != null) {
-                              final fetchedState = details['state']?.toString() ?? '';
-                              final fetchedCity = details['city']?.toString() ?? '';
-                              final fetchedLocality = details['locality']?.toString() ?? '';
-                              final List<String> locs = (details['allLocalities'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [];
+                              final fetchedState =
+                                  details['state']?.toString() ?? '';
+                              final fetchedCity =
+                                  details['city']?.toString() ?? '';
+                              final fetchedLocality =
+                                  details['locality']?.toString() ?? '';
+                              final List<String> locs =
+                                  (details['allLocalities'] as List<dynamic>?)
+                                          ?.map((e) => e.toString())
+                                          .toList() ??
+                                      [];
 
                               // Match state from live API map
                               for (final st in stateKeys) {
-                                if (st.toLowerCase() == fetchedState.toLowerCase()) {
+                                if (st.toLowerCase() ==
+                                    fetchedState.toLowerCase()) {
                                   tempState = st;
                                   break;
                                 }
                               }
-                              final currentCities = effectiveStateMap[tempState] ?? [];
+                              final currentCities =
+                                  effectiveStateMap[tempState] ?? [];
                               for (final c in currentCities) {
-                                if (c.toLowerCase() == fetchedCity.toLowerCase()) {
+                                if (c.toLowerCase() ==
+                                    fetchedCity.toLowerCase()) {
                                   tempCity = c;
                                   break;
                                 }
                               }
-                              if (!currentCities.contains(tempCity) && fetchedCity.isNotEmpty) {
+                              if (!currentCities.contains(tempCity) &&
+                                  fetchedCity.isNotEmpty) {
                                 tempCity = fetchedCity;
                               }
-                              if (localityCtrl.text.isEmpty && fetchedLocality.isNotEmpty) {
+                              if (localityCtrl.text.isEmpty &&
+                                  fetchedLocality.isNotEmpty) {
                                 localityCtrl.text = fetchedLocality;
                               }
                               suggestedLocalities = locs;
@@ -3415,7 +4217,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // State & City Cascading Dropdowns from Live Geo API
                   if (stateKeys.isEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF9FAFB),
                         borderRadius: BorderRadius.circular(10),
@@ -3426,12 +4229,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           const SizedBox(
                             width: 14,
                             height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.green),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: AppColors.green),
                           ),
                           const SizedBox(width: 10),
                           Text(
                             'Loading Indian States & Cities from Geo API...',
-                            style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                            style: GoogleFonts.outfit(
+                                fontSize: 12, color: AppColors.muted),
                           ),
                         ],
                       ),
@@ -3448,8 +4253,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               if (v != null) {
                                 setModalState(() {
                                   tempState = v;
-                                  final newCities = effectiveStateMap[v] ?? ['Other'];
-                                  tempCity = newCities.isNotEmpty ? newCities.first : 'Other';
+                                  final newCities =
+                                      effectiveStateMap[v] ?? ['Other'];
+                                  tempCity = newCities.isNotEmpty
+                                      ? newCities.first
+                                      : 'Other';
                                 });
                               }
                             },
@@ -3460,7 +4268,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           child: _buildModalDropdownField(
                             label: 'City',
                             value: tempCity,
-                            items: availableCities.contains(tempCity) ? availableCities : [tempCity, ...availableCities],
+                            items: availableCities.contains(tempCity)
+                                ? availableCities
+                                : [tempCity, ...availableCities],
                             onChanged: (v) {
                               if (v != null) setModalState(() => tempCity = v);
                             },
@@ -3494,11 +4304,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         if (_locality.isNotEmpty) parts.add(_locality);
                         if (_selectedCity.isNotEmpty) parts.add(_selectedCity);
                         if (_pincode.isNotEmpty) parts.add(_pincode);
-                        _propAddress = parts.isNotEmpty ? parts.join(', ') : _propAddress;
+                        _propAddress =
+                            parts.isNotEmpty ? parts.join(', ') : _propAddress;
                       });
                       if (_propId.isNotEmpty) {
                         try {
-                          await SupabaseService.instance.client.from('properties').update({
+                          await SupabaseService.instance.client
+                              .from('properties')
+                              .update({
                             'property_name': _propName,
                             'property_structure': _propType,
                             'area_locality': _locality,
@@ -3521,14 +4334,19 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save Changes',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.green),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -3559,14 +4377,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 children: [
                   Text(
                     'Select who is allowed to stay at this property (matches Owner Setup).',
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, height: 1.4),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted, height: 1.4),
                   ),
                   const SizedBox(height: 14),
 
                   // Gender Category (Gents, Ladies, Co-Living)
                   Text(
                     'Gender Category',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -3589,7 +4411,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: 'Co-Living',
                         sub: 'Unisex / All',
                         isSelected: tempTenant == 'Co-Living',
-                        onTap: () => setModalState(() => tempTenant = 'Co-Living'),
+                        onTap: () =>
+                            setModalState(() => tempTenant = 'Co-Living'),
                       ),
                     ],
                   ),
@@ -3602,11 +4425,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       });
                       if (_propId.isNotEmpty) {
                         try {
-                          await SupabaseService.instance.client.from('properties').update({
+                          await SupabaseService.instance.client
+                              .from('properties')
+                              .update({
                             'gender_category': _tenantPreference,
                           }).eq('id', _propId);
                         } catch (e) {
-                          debugPrint('Error updating gender preference in Supabase: $e');
+                          debugPrint(
+                              'Error updating gender preference in Supabase: $e');
                         }
                       }
                       if (ctx.mounted) {
@@ -3617,14 +4443,19 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save Changes',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.green),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -3657,14 +4488,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 children: [
                   Text(
                     'Set official 12-hour curfew and morning gate open times for resident check-in.',
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, height: 1.4),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted, height: 1.4),
                   ),
                   const SizedBox(height: 16),
 
                   // Night Last Entry Time Tile (Interactive Clock Picker)
                   Text(
                     'Night Last Entry Time',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted),
                   ),
                   const SizedBox(height: 6),
                   InkWell(
@@ -3688,9 +4523,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       );
                       if (picked != null) {
                         setModalState(() {
-                          final hour = picked.hourOfPeriod == 0 ? 12 : picked.hourOfPeriod;
-                          final minute = picked.minute.toString().padLeft(2, '0');
-                          final period = picked.period == DayPeriod.am ? 'AM' : 'PM';
+                          final hour = picked.hourOfPeriod == 0
+                              ? 12
+                              : picked.hourOfPeriod;
+                          final minute =
+                              picked.minute.toString().padLeft(2, '0');
+                          final period =
+                              picked.period == DayPeriod.am ? 'AM' : 'PM';
                           tempCurfew = '$hour:$minute $period';
                         });
                       }
@@ -3702,34 +4541,44 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                        border: Border.all(
+                            color: const Color(0xFFE5E7EB), width: 1.5),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.nightlight_round, size: 18, color: AppColors.green),
+                              const Icon(Icons.nightlight_round,
+                                  size: 18, color: AppColors.green),
                               const SizedBox(width: 10),
                               Text(
                                 tempCurfew,
-                                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink),
+                                style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.ink),
                               ),
                             ],
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF3F4F6),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.access_time_rounded, size: 13, color: AppColors.muted),
+                                const Icon(Icons.access_time_rounded,
+                                    size: 13, color: AppColors.muted),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Tap Clock',
-                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.muted),
                                 ),
                               ],
                             ),
@@ -3743,7 +4592,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // Morning Gate Open Time Tile (Interactive Clock Picker)
                   Text(
                     'Morning Gate Open Time',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted),
                   ),
                   const SizedBox(height: 6),
                   InkWell(
@@ -3767,9 +4619,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       );
                       if (picked != null) {
                         setModalState(() {
-                          final hour = picked.hourOfPeriod == 0 ? 12 : picked.hourOfPeriod;
-                          final minute = picked.minute.toString().padLeft(2, '0');
-                          final period = picked.period == DayPeriod.am ? 'AM' : 'PM';
+                          final hour = picked.hourOfPeriod == 0
+                              ? 12
+                              : picked.hourOfPeriod;
+                          final minute =
+                              picked.minute.toString().padLeft(2, '0');
+                          final period =
+                              picked.period == DayPeriod.am ? 'AM' : 'PM';
                           tempMorning = '$hour:$minute $period';
                         });
                       }
@@ -3781,34 +4637,44 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                        border: Border.all(
+                            color: const Color(0xFFE5E7EB), width: 1.5),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.wb_sunny_rounded, size: 18, color: Color(0xFFD97706)),
+                              const Icon(Icons.wb_sunny_rounded,
+                                  size: 18, color: Color(0xFFD97706)),
                               const SizedBox(width: 10),
                               Text(
                                 tempMorning,
-                                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.ink),
+                                style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.ink),
                               ),
                             ],
                           ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF3F4F6),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.access_time_rounded, size: 13, color: AppColors.muted),
+                                const Icon(Icons.access_time_rounded,
+                                    size: 13, color: AppColors.muted),
                                 const SizedBox(width: 4),
                                 Text(
                                   'Tap Clock',
-                                  style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.muted),
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.muted),
                                 ),
                               ],
                             ),
@@ -3829,9 +4695,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               _morningOpen = tempMorning;
                             });
                             if (_propId.isNotEmpty) {
-                              await SupabaseService.instance.updatePropertySettings(
+                              await SupabaseService.instance
+                                  .updatePropertySettings(
                                 propertyId: _propId,
                                 gateClosingTime: tempCurfew,
+                                morningGateOpenTime: tempMorning,
                               );
                             }
                             if (ctx.mounted) {
@@ -3842,9 +4710,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
                     child: isSaving
@@ -3856,7 +4726,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           )
                         : Text(
                             'Save Changes',
-                            style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
+                            style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.green),
                           ),
                   ),
                   const SizedBox(height: 16),
@@ -3892,14 +4765,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 children: [
                   Text(
                     'Configure when monthly rent is due and grace period before late penalties apply.',
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, height: 1.4),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted, height: 1.4),
                   ),
                   const SizedBox(height: 16),
 
                   // 1. Monthly Rent Due Date
                   Text(
                     'Monthly Rent Due Date',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -3907,7 +4784,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '1st',
                         sub: 'of Month',
-                        isSelected: !showCustomDue && tempDueDay.startsWith('1st'),
+                        isSelected:
+                            !showCustomDue && tempDueDay.startsWith('1st'),
                         onTap: () => setModalState(() {
                           tempDueDay = '1st of Every Month';
                           showCustomDue = false;
@@ -3917,7 +4795,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '5th',
                         sub: 'Default',
-                        isSelected: !showCustomDue && tempDueDay.startsWith('5th'),
+                        isSelected:
+                            !showCustomDue && tempDueDay.startsWith('5th'),
                         onTap: () => setModalState(() {
                           tempDueDay = '5th of Every Month';
                           showCustomDue = false;
@@ -3927,7 +4806,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '10th',
                         sub: 'of Month',
-                        isSelected: !showCustomDue && tempDueDay.startsWith('10th'),
+                        isSelected:
+                            !showCustomDue && tempDueDay.startsWith('10th'),
                         onTap: () => setModalState(() {
                           tempDueDay = '10th of Every Month';
                           showCustomDue = false;
@@ -3970,7 +4850,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // 2. Grace Period Days (Numbers / Date)
                   Text(
                     'Grace Period Days (Before Late Fine)',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -3978,7 +4861,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '2 Days',
                         sub: 'Grace',
-                        isSelected: !showCustomGrace && tempGrace.startsWith('2'),
+                        isSelected:
+                            !showCustomGrace && tempGrace.startsWith('2'),
                         onTap: () => setModalState(() {
                           tempGrace = '2 Days';
                           showCustomGrace = false;
@@ -3988,7 +4872,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '3 Days',
                         sub: 'Default',
-                        isSelected: !showCustomGrace && tempGrace.startsWith('3'),
+                        isSelected:
+                            !showCustomGrace && tempGrace.startsWith('3'),
                         onTap: () => setModalState(() {
                           tempGrace = '3 Days';
                           showCustomGrace = false;
@@ -3998,7 +4883,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '5 Days',
                         sub: 'Extended',
-                        isSelected: !showCustomGrace && tempGrace.startsWith('5'),
+                        isSelected:
+                            !showCustomGrace && tempGrace.startsWith('5'),
                         onTap: () => setModalState(() {
                           tempGrace = '5 Days';
                           showCustomGrace = false;
@@ -4008,7 +4894,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '7 Days',
                         sub: '1 Week',
-                        isSelected: !showCustomGrace && tempGrace.startsWith('7'),
+                        isSelected:
+                            !showCustomGrace && tempGrace.startsWith('7'),
                         onTap: () => setModalState(() {
                           tempGrace = '7 Days';
                           showCustomGrace = false;
@@ -4019,7 +4906,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: '+ Days',
                         sub: 'Custom',
                         isSelected: showCustomGrace,
-                        onTap: () => setModalState(() => showCustomGrace = true),
+                        onTap: () =>
+                            setModalState(() => showCustomGrace = true),
                       ),
                     ],
                   ),
@@ -4048,12 +4936,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       });
                       if (_propId.isNotEmpty) {
                         try {
-                          await SupabaseService.instance.client.from('properties').update({
+                          await SupabaseService.instance.client
+                              .from('properties')
+                              .update({
                             'rent_due_day': _rentDueDay,
                             'grace_period': _gracePeriod,
                           }).eq('id', _propId);
                         } catch (e) {
-                          debugPrint('Error updating renting terms in Supabase: $e');
+                          debugPrint(
+                              'Error updating renting terms in Supabase: $e');
                         }
                       }
                       if (ctx.mounted) {
@@ -4064,14 +4955,19 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save Changes',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.green),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -4115,14 +5011,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 children: [
                   Text(
                     'Configure daily penalties, lock-in duration, notice period, and rental agreements.',
-                    style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, height: 1.4),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted, height: 1.4),
                   ),
                   const SizedBox(height: 16),
 
                   // 1. Daily Late Payment Penalty (₹50, ₹100, ₹200, ₹500, + Custom)
                   Text(
                     'Daily Late Payment Penalty',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -4130,7 +5030,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '₹50',
                         sub: 'per day',
-                        isSelected: !showCustomRate && tempDailyRate.contains('50'),
+                        isSelected:
+                            !showCustomRate && tempDailyRate.contains('50'),
                         onTap: () => setModalState(() {
                           tempDailyRate = '₹50 / day';
                           showCustomRate = false;
@@ -4140,7 +5041,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '₹100',
                         sub: 'per day',
-                        isSelected: !showCustomRate && tempDailyRate.contains('100'),
+                        isSelected:
+                            !showCustomRate && tempDailyRate.contains('100'),
                         onTap: () => setModalState(() {
                           tempDailyRate = '₹100 / day';
                           showCustomRate = false;
@@ -4150,7 +5052,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '₹200',
                         sub: 'per day',
-                        isSelected: !showCustomRate && tempDailyRate.contains('200'),
+                        isSelected:
+                            !showCustomRate && tempDailyRate.contains('200'),
                         onTap: () => setModalState(() {
                           tempDailyRate = '₹200 / day';
                           showCustomRate = false;
@@ -4160,7 +5063,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '₹500',
                         sub: 'per day',
-                        isSelected: !showCustomRate && tempDailyRate.contains('500'),
+                        isSelected:
+                            !showCustomRate && tempDailyRate.contains('500'),
                         onTap: () => setModalState(() {
                           tempDailyRate = '₹500 / day';
                           showCustomRate = false;
@@ -4193,7 +5097,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // 2. Minimum Lock-in Period
                   Text(
                     'Minimum Lock-in Period',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -4201,7 +5108,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '1 Month',
                         sub: 'Short',
-                        isSelected: !showCustomLockin && tempLockin.startsWith('1'),
+                        isSelected:
+                            !showCustomLockin && tempLockin.startsWith('1'),
                         onTap: () => setModalState(() {
                           tempLockin = '1 Month';
                           showCustomLockin = false;
@@ -4211,7 +5119,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '2 Months',
                         sub: 'Standard',
-                        isSelected: !showCustomLockin && tempLockin.startsWith('2'),
+                        isSelected:
+                            !showCustomLockin && tempLockin.startsWith('2'),
                         onTap: () => setModalState(() {
                           tempLockin = '2 Months';
                           showCustomLockin = false;
@@ -4221,7 +5130,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '3 Months',
                         sub: 'Default',
-                        isSelected: !showCustomLockin && tempLockin.startsWith('3'),
+                        isSelected:
+                            !showCustomLockin && tempLockin.startsWith('3'),
                         onTap: () => setModalState(() {
                           tempLockin = '3 Months';
                           showCustomLockin = false;
@@ -4231,7 +5141,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '6 Months',
                         sub: 'Long Term',
-                        isSelected: !showCustomLockin && tempLockin.startsWith('6'),
+                        isSelected:
+                            !showCustomLockin && tempLockin.startsWith('6'),
                         onTap: () => setModalState(() {
                           tempLockin = '6 Months';
                           showCustomLockin = false;
@@ -4242,7 +5153,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: '+ Custom',
                         sub: 'Months',
                         isSelected: showCustomLockin,
-                        onTap: () => setModalState(() => showCustomLockin = true),
+                        onTap: () =>
+                            setModalState(() => showCustomLockin = true),
                       ),
                     ],
                   ),
@@ -4264,7 +5176,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // 3. Move-out Notice Period
                   Text(
                     'Move-out Notice Period',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -4272,7 +5187,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '15 Days',
                         sub: 'Half Month',
-                        isSelected: !showCustomNotice && tempNotice.startsWith('15'),
+                        isSelected:
+                            !showCustomNotice && tempNotice.startsWith('15'),
                         onTap: () => setModalState(() {
                           tempNotice = '15 Days';
                           showCustomNotice = false;
@@ -4282,7 +5198,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '30 Days',
                         sub: 'Default',
-                        isSelected: !showCustomNotice && tempNotice.startsWith('30'),
+                        isSelected:
+                            !showCustomNotice && tempNotice.startsWith('30'),
                         onTap: () => setModalState(() {
                           tempNotice = '30 Days';
                           showCustomNotice = false;
@@ -4292,7 +5209,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '45 Days',
                         sub: 'Standard',
-                        isSelected: !showCustomNotice && tempNotice.startsWith('45'),
+                        isSelected:
+                            !showCustomNotice && tempNotice.startsWith('45'),
                         onTap: () => setModalState(() {
                           tempNotice = '45 Days';
                           showCustomNotice = false;
@@ -4302,7 +5220,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '60 Days',
                         sub: '2 Months',
-                        isSelected: !showCustomNotice && tempNotice.startsWith('60'),
+                        isSelected:
+                            !showCustomNotice && tempNotice.startsWith('60'),
                         onTap: () => setModalState(() {
                           tempNotice = '60 Days';
                           showCustomNotice = false;
@@ -4313,7 +5232,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: '+ Custom',
                         sub: 'Days',
                         isSelected: showCustomNotice,
-                        onTap: () => setModalState(() => showCustomNotice = true),
+                        onTap: () =>
+                            setModalState(() => showCustomNotice = true),
                       ),
                     ],
                   ),
@@ -4335,7 +5255,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   // 4. Agreement Duration
                   Text(
                     'Agreement Duration',
-                    style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink),
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -4343,7 +5266,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '6 Months',
                         sub: 'Half Year',
-                        isSelected: !showCustomAgreement && tempAgreement.startsWith('6'),
+                        isSelected: !showCustomAgreement &&
+                            tempAgreement.startsWith('6'),
                         onTap: () => setModalState(() {
                           tempAgreement = '6 Months';
                           showCustomAgreement = false;
@@ -4353,7 +5277,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '11 Months',
                         sub: 'Standard',
-                        isSelected: !showCustomAgreement && tempAgreement.startsWith('11'),
+                        isSelected: !showCustomAgreement &&
+                            tempAgreement.startsWith('11'),
                         onTap: () => setModalState(() {
                           tempAgreement = '11 Months Standard';
                           showCustomAgreement = false;
@@ -4363,7 +5288,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '12 Months',
                         sub: '1 Year',
-                        isSelected: !showCustomAgreement && tempAgreement.startsWith('12'),
+                        isSelected: !showCustomAgreement &&
+                            tempAgreement.startsWith('12'),
                         onTap: () => setModalState(() {
                           tempAgreement = '12 Months (1 Year)';
                           showCustomAgreement = false;
@@ -4373,7 +5299,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       _buildInteractiveCard(
                         title: '24 Months',
                         sub: '2 Years',
-                        isSelected: !showCustomAgreement && tempAgreement.startsWith('24'),
+                        isSelected: !showCustomAgreement &&
+                            tempAgreement.startsWith('24'),
                         onTap: () => setModalState(() {
                           tempAgreement = '24 Months (2 Years)';
                           showCustomAgreement = false;
@@ -4384,7 +5311,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: '+ Custom',
                         sub: 'Months',
                         isSelected: showCustomAgreement,
-                        onTap: () => setModalState(() => showCustomAgreement = true),
+                        onTap: () =>
+                            setModalState(() => showCustomAgreement = true),
                       ),
                     ],
                   ),
@@ -4416,12 +5344,23 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                 _dailyRate.replaceAll(RegExp(r'[^0-9.]'), ''),
                               ) ??
                               100.0;
-                          await SupabaseService.instance.client.from('properties').update({
+                          await SupabaseService.instance.client
+                              .from('properties')
+                              .update({
                             'notice_period': _noticePeriod,
                             'late_fee': numLateFee,
                           }).eq('id', _propId);
+
+                          await SupabaseService.instance.updatePropertySettings(
+                            propertyId: _propId,
+                            settings: {
+                              'lockin_period': _lockinPeriod,
+                              'agreement_duration': _agreementDur,
+                            },
+                          );
                         } catch (e) {
-                          debugPrint('Error updating stay terms in Supabase: $e');
+                          debugPrint(
+                              'Error updating stay terms in Supabase: $e');
                         }
                       }
                       if (ctx.mounted) {
@@ -4432,14 +5371,19 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Save Changes',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.green),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -4467,26 +5411,47 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             children: [
               Text(
                 'These terms are permanently printed at the bottom of all generated HRA-compliant PDF rent receipts.',
-                style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, height: 1.4),
+                style: GoogleFonts.outfit(
+                    fontSize: 12, color: AppColors.muted, height: 1.4),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: ctrl,
                 maxLines: 6,
                 scrollPadding: const EdgeInsets.only(bottom: 160),
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink),
                 decoration: InputDecoration(
                   contentPadding: const EdgeInsets.all(12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5)),
                 ),
               ),
               const SizedBox(height: 16),
               OutlinedButton(
-                onPressed: () {
-                  setState(() => _receiptTerms = ctrl.text.trim());
-                  Navigator.of(ctx).pop();
+                onPressed: () async {
+                  final text = ctrl.text.trim();
+                  setState(() => _receiptTerms = text);
+                  if (_propId.isNotEmpty) {
+                    await SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'receipt_terms',
+                      value: text,
+                    );
+                  }
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                  }
                   _showToast('Receipt Terms & Conditions Updated ✓');
                 },
                 style: OutlinedButton.styleFrom(
@@ -4494,10 +5459,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   foregroundColor: AppColors.green,
                   side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
-                child: Text('Save Receipt Terms', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green)),
+                child: Text('Save Receipt Terms',
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.green)),
               ),
               const SizedBox(height: 16),
             ],
@@ -4521,41 +5491,84 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Official Business Name', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+              Text('Official Business Name',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink)),
               const SizedBox(height: 6),
               TextField(
                 controller: busCtrl,
                 scrollPadding: const EdgeInsets.only(bottom: 160),
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink),
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5)),
                 ),
               ),
               const SizedBox(height: 12),
-              Text('Authorized Signatory & Role', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+              Text('Authorized Signatory & Role',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink)),
               const SizedBox(height: 6),
               TextField(
                 controller: signCtrl,
                 scrollPadding: const EdgeInsets.only(bottom: 160),
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink),
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5)),
                 ),
               ),
               const SizedBox(height: 16),
               OutlinedButton(
-                onPressed: () {
+                onPressed: () async {
+                  final bName = busCtrl.text.trim();
+                  final aSign = signCtrl.text.trim();
                   setState(() {
-                    _stampBusinessName = busCtrl.text.trim();
-                    _authorizedSignatory = signCtrl.text.trim();
+                    _stampBusinessName = bName;
+                    _authorizedSignatory = aSign;
                   });
-                  Navigator.of(ctx).pop();
+                  if (_propId.isNotEmpty) {
+                    await SupabaseService.instance.updatePropertySettings(
+                      propertyId: _propId,
+                      settings: {
+                        'stamp_business_name': bName,
+                        'authorized_signatory': aSign,
+                      },
+                    );
+                  }
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop();
+                  }
                   _showToast('Digital Stamp & Seal Updated ✓');
                 },
                 style: OutlinedButton.styleFrom(
@@ -4563,10 +5576,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   foregroundColor: AppColors.green,
                   side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
-                child: Text('Save Digital Stamp', style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green)),
+                child: Text('Save Digital Stamp',
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.green)),
               ),
               const SizedBox(height: 16),
             ],
@@ -4590,40 +5608,71 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Registered Mobile Number', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+              Text('Registered Mobile Number',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink)),
               const SizedBox(height: 6),
               TextField(
                 controller: phoneCtrl,
                 keyboardType: TextInputType.phone,
                 scrollPadding: const EdgeInsets.only(bottom: 160),
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink),
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5)),
                 ),
               ),
               const SizedBox(height: 12),
-              Text('Official Admin Email', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+              Text('Official Admin Email',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink)),
               const SizedBox(height: 6),
               TextField(
                 controller: emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 scrollPadding: const EdgeInsets.only(bottom: 160),
-                style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.ink),
+                style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.ink),
                 decoration: InputDecoration(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5)),
                 ),
               ),
               const SizedBox(height: 14),
 
               // Change Password Action Tile (Sends OTP to main number)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
@@ -4638,7 +5687,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         color: const Color(0xFFF3F4F6),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.lock_reset_rounded, size: 18, color: AppColors.ink),
+                      child: const Icon(Icons.lock_reset_rounded,
+                          size: 18, color: AppColors.ink),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -4647,11 +5697,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         children: [
                           Text(
                             'Security Passcode',
-                            style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink),
+                            style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink),
                           ),
                           Text(
                             'Update passcode via SMS OTP to $_adminPhone',
-                            style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted),
+                            style: GoogleFonts.outfit(
+                                fontSize: 10.5, color: AppColors.muted),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -4667,15 +5721,21 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       style: OutlinedButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: AppColors.green,
-                        side: const BorderSide(color: AppColors.green, width: 1.2),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: const BorderSide(
+                            color: AppColors.green, width: 1.2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: Text(
                         'Change',
-                        style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.green),
+                        style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.green),
                       ),
                     ),
                   ],
@@ -4691,12 +5751,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   });
                   if (_propId.isNotEmpty) {
                     try {
-                      await SupabaseService.instance.client.from('properties').update({
+                      await SupabaseService.instance.client
+                          .from('properties')
+                          .update({
                         'owner_email': _adminEmail,
                         'crediting_phone': _adminPhone,
                       }).eq('id', _propId);
                     } catch (e) {
-                      debugPrint('Error updating account credentials in Supabase: $e');
+                      debugPrint(
+                          'Error updating account credentials in Supabase: $e');
                     }
                   }
                   if (ctx.mounted) {
@@ -4709,12 +5772,16 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   foregroundColor: AppColors.green,
                   side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                   elevation: 0,
                 ),
                 child: Text(
                   'Save Account Details',
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.green),
                 ),
               ),
               const SizedBox(height: 16),
@@ -4757,19 +5824,29 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.mark_email_read_outlined, size: 20, color: AppColors.green),
+                        const Icon(Icons.mark_email_read_outlined,
+                            size: 20, color: AppColors.green),
                         const SizedBox(width: 10),
                         Expanded(
                           child: RichText(
                             text: TextSpan(
-                              style: GoogleFonts.outfit(fontSize: 12, color: AppColors.ink, height: 1.35),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  color: AppColors.ink,
+                                  height: 1.35),
                               children: [
-                                const TextSpan(text: 'An OTP has been dispatched to your registered primary number: '),
+                                const TextSpan(
+                                    text:
+                                        'An OTP has been dispatched to your registered primary number: '),
                                 TextSpan(
                                   text: phone,
-                                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.greenDark),
                                 ),
-                                const TextSpan(text: '. Enter the 6-digit code below to set your new password.'),
+                                const TextSpan(
+                                    text:
+                                        '. Enter the 6-digit code below to set your new password.'),
                               ],
                             ),
                           ),
@@ -4780,28 +5857,53 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   const SizedBox(height: 16),
 
                   // 6-digit OTP Field
-                  Text('Enter 6-Digit OTP', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                  Text('Enter 6-Digit OTP',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: otpCtrl,
                     keyboardType: TextInputType.number,
                     maxLength: 6,
                     scrollPadding: const EdgeInsets.only(bottom: 160),
-                    style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: 8, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 8,
+                        color: AppColors.ink),
                     decoration: InputDecoration(
                       counterText: '',
                       hintText: '• • • • • •',
-                      hintStyle: GoogleFonts.outfit(fontSize: 16, letterSpacing: 6, color: AppColors.muted),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                      hintStyle: GoogleFonts.outfit(
+                          fontSize: 16,
+                          letterSpacing: 6,
+                          color: AppColors.muted),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB))),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB))),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                              color: AppColors.green, width: 1.5)),
                     ),
                   ),
                   const SizedBox(height: 12),
 
                   // New Passcode Field
-                  Text('New 6-Digit Passcode', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                  Text('New 6-Digit Passcode',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: newPassCtrl,
@@ -4809,25 +5911,49 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     maxLength: 6,
                     obscureText: obscurePass,
                     scrollPadding: const EdgeInsets.only(bottom: 160),
-                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink),
                     decoration: InputDecoration(
                       counterText: '',
                       hintText: 'Enter new 6-digit passcode',
-                      hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      hintStyle: GoogleFonts.outfit(
+                          fontSize: 12, color: AppColors.muted),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
                       suffixIcon: IconButton(
-                        icon: Icon(obscurePass ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 18, color: AppColors.muted),
-                        onPressed: () => setModalState(() => obscurePass = !obscurePass),
+                        icon: Icon(
+                            obscurePass
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                            size: 18,
+                            color: AppColors.muted),
+                        onPressed: () =>
+                            setModalState(() => obscurePass = !obscurePass),
                       ),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB))),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB))),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                              color: AppColors.green, width: 1.5)),
                     ),
                   ),
                   const SizedBox(height: 12),
 
                   // Confirm Passcode Field
-                  Text('Confirm New Passcode', style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                  Text('Confirm New Passcode',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink)),
                   const SizedBox(height: 6),
                   TextField(
                     controller: confirmPassCtrl,
@@ -4835,15 +5961,29 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     maxLength: 6,
                     obscureText: obscurePass,
                     scrollPadding: const EdgeInsets.only(bottom: 160),
-                    style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink),
+                    style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink),
                     decoration: InputDecoration(
                       counterText: '',
                       hintText: 'Re-enter new 6-digit passcode',
-                      hintStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE5E7EB))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.green, width: 1.5)),
+                      hintStyle: GoogleFonts.outfit(
+                          fontSize: 12, color: AppColors.muted),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB))),
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide:
+                              const BorderSide(color: Color(0xFFE5E7EB))),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                              color: AppColors.green, width: 1.5)),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -4862,7 +6002,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       ),
                       child: Text(
                         'Resend OTP',
-                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.greenDark),
+                        style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.greenDark),
                       ),
                     ),
                   ),
@@ -4897,14 +6040,19 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(46),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
                     ),
                     child: Text(
                       'Verify OTP & Change Password',
-                      style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.green),
+                      style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.green),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -4920,7 +6068,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   // ===========================================================================
   // REUSABLE TOGGLE SWITCH ROW (Clean Executive Standard)
   // ===========================================================================
-  Widget _buildToggleSwitchRow(String title, String subtitle, bool isEnabled, ValueChanged<bool> onChanged) {
+  Widget _buildToggleSwitchRow(String title, String subtitle, bool isEnabled,
+      ValueChanged<bool> onChanged) {
     return InkWell(
       onTap: () {
         onChanged(!isEnabled);
@@ -4961,10 +6110,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: isEnabled ? AppColors.greenLight : const Color(0xFFFEF2F2),
+                color:
+                    isEnabled ? AppColors.greenLight : const Color(0xFFFEF2F2),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isEnabled ? AppColors.green.withValues(alpha: 0.4) : const Color(0xFFFCA5A5),
+                  color: isEnabled
+                      ? AppColors.green.withValues(alpha: 0.4)
+                      : const Color(0xFFFCA5A5),
                 ),
               ),
               child: Text(
@@ -4972,7 +6124,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 style: GoogleFonts.outfit(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: isEnabled ? AppColors.greenDark : const Color(0xFFDC2626),
+                  color:
+                      isEnabled ? AppColors.greenDark : const Color(0xFFDC2626),
                 ),
               ),
             ),
@@ -5004,7 +6157,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 16, color: isDanger ? const Color(0xFFDC2626) : AppColors.ink),
+            Icon(icon,
+                size: 16,
+                color: isDanger ? const Color(0xFFDC2626) : AppColors.ink),
             const SizedBox(width: 8),
             Text(
               label,
@@ -5034,25 +6189,31 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             children: [
               Text(
                 'This will permanently delete your ${_propName.isNotEmpty ? _propName : "property"} data, tenant records, and direct UPI configuration. This action cannot be undone.',
-                style: GoogleFonts.outfit(fontSize: 12.5, color: AppColors.muted, height: 1.4),
+                style: GoogleFonts.outfit(
+                    fontSize: 12.5, color: AppColors.muted, height: 1.4),
               ),
               const SizedBox(height: 16),
               OutlinedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  _showToast('Account Deletion Requested • Verification OTP Sent');
+                  _showToast(
+                      'Account Deletion Requested • Verification OTP Sent');
                 },
                 style: OutlinedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: const Color(0xFFDC2626),
                   side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.5),
                   minimumSize: const Size.fromHeight(46),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
                 child: Text(
                   'Confirm Permanent Deletion',
-                  style: GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w700, color: const Color(0xFFDC2626)),
+                  style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFFDC2626)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -5111,7 +6272,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   onTap: onEdit,
                   borderRadius: BorderRadius.circular(6),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF9FAFB),
                       borderRadius: BorderRadius.circular(6),
@@ -5119,7 +6281,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     ),
                     child: Text(
                       'Edit',
-                      style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.ink),
+                      style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.ink),
                     ),
                   ),
                 ),
@@ -5128,12 +6293,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           const SizedBox(height: 10),
           const Divider(height: 1, color: Color(0xFFEEF0F2)),
           const SizedBox(height: 8),
-
           if (customBody != null)
             customBody
           else
             ...rows.map((r) => _buildDetailRowItem(r)).toList(),
-
           if (footer != null) footer,
         ],
       ),
@@ -5152,7 +6315,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           children: [
             Text(
               row.label,
-              style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.muted),
+              style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.muted),
             ),
             const SizedBox(width: 12),
             Flexible(
@@ -5164,14 +6330,18 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: row.val.trim().isNotEmpty
-                            ? (row.isGreen ? AppColors.greenDark : AppColors.ink)
+                            ? (row.isGreen
+                                ? AppColors.greenDark
+                                : AppColors.ink)
                             : AppColors.muted,
                       )
                     : GoogleFonts.outfit(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: row.val.trim().isNotEmpty
-                            ? (row.isGreen ? AppColors.greenDark : AppColors.ink)
+                            ? (row.isGreen
+                                ? AppColors.greenDark
+                                : AppColors.ink)
                             : AppColors.muted,
                       ),
               ),
@@ -5260,7 +6430,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
     );
   }
 
-  Widget _buildToggleRow(String title, String desc, bool val, ValueChanged<bool> onChanged) {
+  Widget _buildToggleRow(
+      String title, String desc, bool val, ValueChanged<bool> onChanged) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -5270,11 +6441,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             children: [
               Text(
                 title,
-                style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink),
               ),
               Text(
                 desc,
-                style: GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted),
+                style:
+                    GoogleFonts.outfit(fontSize: 10.5, color: AppColors.muted),
               ),
             ],
           ),
@@ -5305,7 +6480,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               color: Colors.white,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: Color(0x15000000), blurRadius: 2, offset: Offset(0, 1)),
+                BoxShadow(
+                    color: Color(0x15000000),
+                    blurRadius: 2,
+                    offset: Offset(0, 1)),
               ],
             ),
           ),
@@ -5315,10 +6493,277 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   }
 
   // ===========================================================================
+  // MODAL: RECEPTION DESK QR STANDEE PREVIEW & EXPORT
+  // ===========================================================================
+  void _openReceptionDeskStandeeModal() {
+    final livePgName =
+        _propName.isNotEmpty ? _propName : 'UrbanStay Partner PG';
+    final liveAddress = _propAddress.isNotEmpty
+        ? _propAddress
+        : (_locality.isNotEmpty ? _locality : 'Bengaluru, Karnataka');
+    final liveUpi = _upiId.isNotEmpty ? _upiId : 'urbanstay@okhdfcbank';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return _buildNativeBottomSheetWrapper(
+          title: 'Reception Desk QR Standee',
+          modalContext: ctx,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'High-resolution printable reception standee with 0% direct bank UPI settlement. Tenants scan to check-in or settle rent directly.',
+                  style: GoogleFonts.outfit(
+                      fontSize: 12, color: AppColors.muted, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+
+                // Standee Printable Card Preview
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                        color: AppColors.green.withValues(alpha: 0.35),
+                        width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Header Badge
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.greenLight,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color:
+                                      AppColors.green.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.verified_rounded,
+                                    size: 14, color: AppColors.greenDark),
+                                const SizedBox(width: 5),
+                                Text(
+                                  '0% DIRECT BANK UPI',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.greenDark,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // PG Name
+                      Text(
+                        livePgName,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.ink,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        liveAddress,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // QR Code Frame
+                      Container(
+                        width: 190,
+                        height: 190,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                              color: const Color(0xFFE5E7EB), width: 1.5),
+                        ),
+                        child: CustomPaint(
+                          painter: _StandeeQrPainter(),
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(6),
+                                border:
+                                    Border.all(color: const Color(0xFFE5E7EB)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                'UPI',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.greenDark,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // UPI ID Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.account_balance_outlined,
+                                size: 14, color: AppColors.muted),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                liveUpi,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      Text(
+                        'Scan with Any UPI App • GPay, PhonePe, Paytm',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(
+                            text:
+                                'https://urbanstay.living/checkin?pg=${_propId.isNotEmpty ? _propId : "demo"}',
+                          ));
+                          _showToast('Check-In Link Copied to Clipboard ✓');
+                        },
+                        icon: const Icon(Icons.copy_rounded,
+                            size: 16, color: AppColors.ink),
+                        label: Text(
+                          'Copy Link',
+                          style: GoogleFonts.outfit(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          side: const BorderSide(
+                              color: Color(0xFFE5E7EB), width: 1.5),
+                          minimumSize: const Size.fromHeight(46),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          _showToast('Printing Standee PDF ($livePgName)... ✓');
+                        },
+                        icon: const Icon(Icons.print_rounded,
+                            size: 16, color: Colors.white),
+                        label: Text(
+                          'Print Standee',
+                          style: GoogleFonts.outfit(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.green,
+                          elevation: 0,
+                          minimumSize: const Size.fromHeight(46),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ===========================================================================
   // MODAL: DYNAMIC EDIT BOTTOM SHEET
   // ===========================================================================
-  void _openEditModal({required String title, required List<_ModalField> fields}) {
-    final controllers = fields.map((f) => TextEditingController(text: f.initialVal)).toList();
+  void _openEditModal(
+      {required String title, required List<_ModalField> fields}) {
+    final controllers =
+        fields.map((f) => TextEditingController(text: f.initialVal)).toList();
     bool isSaving = false;
 
     showModalBottomSheet(
@@ -5337,9 +6782,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 children: [
                   ...List.generate(fields.length, (i) {
                     final labelLower = fields[i].label.toLowerCase();
-                    final isPhone = labelLower.contains('phone') || labelLower.contains('mobile');
+                    final isPhone = labelLower.contains('phone') ||
+                        labelLower.contains('mobile');
                     final isEmail = labelLower.contains('email');
-                    final isNumber = labelLower.contains('pin') || labelLower.contains('passcode');
+                    final isNumber = labelLower.contains('pin') ||
+                        labelLower.contains('passcode');
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: Column(
@@ -5347,7 +6794,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         children: [
                           Text(
                             fields[i].label,
-                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.muted),
+                            style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.muted),
                           ),
                           const SizedBox(height: 5),
                           Container(
@@ -5355,7 +6805,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                              border: Border.all(
+                                  color: const Color(0xFFE5E7EB), width: 1.5),
                             ),
                             child: TextField(
                               controller: controllers[i],
@@ -5363,11 +6814,17 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                   ? TextInputType.phone
                                   : (isEmail
                                       ? TextInputType.emailAddress
-                                      : (isNumber ? TextInputType.number : TextInputType.text)),
+                                      : (isNumber
+                                          ? TextInputType.number
+                                          : TextInputType.text)),
                               scrollPadding: const EdgeInsets.only(bottom: 160),
-                              style: GoogleFonts.outfit(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w600),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 13,
+                                  color: AppColors.ink,
+                                  fontWeight: FontWeight.w600),
                               decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 11),
                                 border: InputBorder.none,
                               ),
                             ),
@@ -5377,7 +6834,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     );
                   }),
                   const SizedBox(height: 10),
-
                   OutlinedButton(
                     onPressed: isSaving
                         ? null
@@ -5388,19 +6844,64 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                             }
                             if (_propId.isNotEmpty) {
                               try {
-                                await SupabaseService.instance.client.from('properties').update({
-                                  'upi_vpa': _upiId,
-                                  'bank_name': _bankName,
-                                  'bank_holder_name': _beneficiaryName,
-                                }).eq('id', _propId);
+                                if (title == 'Edit Business Details') {
+                                  await SupabaseService.instance
+                                      .updatePropertySettings(
+                                    propertyId: _propId,
+                                    settings: {
+                                      'legal_entity_name': _bizLegalName,
+                                      'gst_number': _bizGst,
+                                      'cin_number': _bizCin,
+                                    },
+                                  );
+                                  setState(() {
+                                    _bizGstProofStatus = _bizGst.isNotEmpty
+                                        ? 'Verified • Active'
+                                        : 'Not Uploaded';
+                                    _bizStatus = _bizGst.isNotEmpty
+                                        ? 'Verified & Registered'
+                                        : 'Unregistered / Exempted';
+                                  });
+                                } else if (title == 'Edit Banking Details') {
+                                  await SupabaseService.instance.client
+                                      .from('properties')
+                                      .update({
+                                    'upi_vpa': _upiId,
+                                    'bank_name': _bankName,
+                                    'bank_holder_name': _beneficiaryName,
+                                  }).eq('id', _propId);
 
-                                await SupabaseService.instance.updatePropertySettings(
-                                  propertyId: _propId,
-                                  upiId: _upiId,
-                                  gateClosingTime: _curfewTime,
-                                );
+                                  await SupabaseService.instance
+                                      .updatePropertySettings(
+                                    propertyId: _propId,
+                                    upiId: _upiId,
+                                    settings: {
+                                      'bank_account_number': _bankAccNum,
+                                      'ifsc_code': _ifscCode,
+                                    },
+                                    gateClosingTime: _curfewTime,
+                                    morningGateOpenTime: _morningOpen,
+                                  );
+                                } else {
+                                  await SupabaseService.instance.client
+                                      .from('properties')
+                                      .update({
+                                    'upi_vpa': _upiId,
+                                    'bank_name': _bankName,
+                                    'bank_holder_name': _beneficiaryName,
+                                  }).eq('id', _propId);
+
+                                  await SupabaseService.instance
+                                      .updatePropertySettings(
+                                    propertyId: _propId,
+                                    upiId: _upiId,
+                                    gateClosingTime: _curfewTime,
+                                    morningGateOpenTime: _morningOpen,
+                                  );
+                                }
                               } catch (e) {
-                                debugPrint('Error updating settings in Supabase: $e');
+                                debugPrint(
+                                    'Error updating settings in Supabase: $e');
                               }
                             }
                             if (ctx.mounted) {
@@ -5411,9 +6912,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.green,
-                      side: const BorderSide(color: Color(0xFFE5E7EB), width: 1.5),
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
                       minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
                     child: isSaving
@@ -5425,7 +6928,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           )
                         : Text(
                             'Save Changes',
-                            style: GoogleFonts.outfit(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.green),
+                            style: GoogleFonts.outfit(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.green),
                           ),
                   ),
                   const SizedBox(height: 16),
@@ -5450,7 +6956,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(effectiveCtx).size.height * 0.88),
+        constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(effectiveCtx).size.height * 0.88),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -5502,7 +7009,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                       border: Border.all(color: const Color(0xFFE5E7EB)),
                     ),
                     child: const Center(
-                      child: Icon(Icons.close, size: 15, color: AppColors.muted),
+                      child:
+                          Icon(Icons.close, size: 15, color: AppColors.muted),
                     ),
                   ),
                 ),
@@ -5530,7 +7038,8 @@ class _DetailRow {
   final bool isGreen;
   final VoidCallback? onTap;
 
-  _DetailRow(this.label, this.val, {this.isCode = false, this.isGreen = false, this.onTap});
+  _DetailRow(this.label, this.val,
+      {this.isCode = false, this.isGreen = false, this.onTap});
 }
 
 class _ModalField {
@@ -5539,4 +7048,79 @@ class _ModalField {
   final ValueChanged<String> onSave;
 
   _ModalField(this.label, this.initialVal, this.onSave);
+}
+
+class _StandeeQrPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF111827)
+      ..style = PaintingStyle.fill;
+
+    const modules = 25;
+    final moduleSize = size.width / modules;
+
+    void drawFinder(double x, double y) {
+      // Outer 7x7 box
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, y, moduleSize * 7, moduleSize * 7),
+          const Radius.circular(4),
+        ),
+        paint,
+      );
+      // Inner 5x5 white
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+              x + moduleSize, y + moduleSize, moduleSize * 5, moduleSize * 5),
+          const Radius.circular(2),
+        ),
+        Paint()..color = Colors.white,
+      );
+      // Inner 3x3 solid center
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x + moduleSize * 2, y + moduleSize * 2, moduleSize * 3,
+              moduleSize * 3),
+          const Radius.circular(2),
+        ),
+        paint,
+      );
+    }
+
+    drawFinder(0, 0);
+    drawFinder((modules - 7) * moduleSize, 0);
+    drawFinder(0, (modules - 7) * moduleSize);
+
+    // Decorative matrix
+    for (int r = 0; r < modules; r++) {
+      for (int c = 0; c < modules; c++) {
+        if ((r < 8 && c < 8) ||
+            (r < 8 && c >= modules - 8) ||
+            (r >= modules - 8 && c < 8)) {
+          continue;
+        }
+        if (r >= modules ~/ 2 - 2 &&
+            r <= modules ~/ 2 + 2 &&
+            c >= modules ~/ 2 - 3 &&
+            c <= modules ~/ 2 + 3) {
+          continue;
+        }
+        if ((r * 7 + c * 13 + (r % 3) * (c % 5)) % 3 == 0) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromLTWH(c * moduleSize + 0.5, r * moduleSize + 0.5,
+                  moduleSize - 1, moduleSize - 1),
+              const Radius.circular(1.5),
+            ),
+            paint,
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

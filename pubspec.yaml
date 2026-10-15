@@ -1,7 +1,7 @@
 name: urbanstay
 description: "UrbanStay - PG and Hostel Operations Operating System"
 publish_to: 'none'
-version: 1.0.82+83
+version: 1.0.88+88
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

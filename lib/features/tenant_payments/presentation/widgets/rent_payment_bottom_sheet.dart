@@ -85,10 +85,11 @@ class _RentPaymentBottomSheetState extends State<RentPaymentBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final formattedAmount = '₹${widget.amount.toInt().toString().replaceAllMapped(
-          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
-        )}';
+    final formattedAmount =
+        '₹${widget.amount.toInt().toString().replaceAllMapped(
+              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+              (Match m) => '${m[1]},',
+            )}';
 
     return Container(
       constraints: const BoxConstraints(maxWidth: 480),
@@ -198,7 +199,8 @@ class _RentPaymentBottomSheetState extends State<RentPaymentBottomSheet> {
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: const Color(0xFFEBF8EE),
                             borderRadius: BorderRadius.circular(6),
@@ -230,7 +232,8 @@ class _RentPaymentBottomSheetState extends State<RentPaymentBottomSheet> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
+                    const Divider(
+                        height: 1, thickness: 1, color: Color(0xFFE5E7EB)),
                     const SizedBox(height: 12),
 
                     // Beneficiary Trust Row
@@ -321,7 +324,11 @@ class _RentPaymentBottomSheetState extends State<RentPaymentBottomSheet> {
                       subtitle: 'Instant UPI authorization',
                       onTap: () => _handleAppPayment('Google Pay'),
                     ),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6), indent: 52),
+                    const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFF3F4F6),
+                        indent: 52),
                     _buildPaymentAppTile(
                       badgeColor: const Color(0xFF5F259F),
                       badgeLetter: 'Pe',
@@ -329,7 +336,11 @@ class _RentPaymentBottomSheetState extends State<RentPaymentBottomSheet> {
                       subtitle: 'Direct bank debit via PhonePe UPI',
                       onTap: () => _handleAppPayment('PhonePe'),
                     ),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6), indent: 52),
+                    const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFF3F4F6),
+                        indent: 52),
                     _buildPaymentAppTile(
                       badgeColor: const Color(0xFF00B9F1),
                       badgeLetter: 'P',
@@ -337,7 +348,11 @@ class _RentPaymentBottomSheetState extends State<RentPaymentBottomSheet> {
                       subtitle: 'Fast payments with Paytm',
                       onTap: () => _handleAppPayment('Paytm'),
                     ),
-                    const Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6), indent: 52),
+                    const Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: Color(0xFFF3F4F6),
+                        indent: 52),
                     _buildPaymentAppTile(
                       badgeColor: const Color(0xFF1F2937),
                       badgeIcon: Icons.qr_code_rounded,

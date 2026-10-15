@@ -31,14 +31,16 @@ class PropertySupportScreen extends StatelessWidget {
               children: [
                 // Top Header Bar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   child: Row(
                     children: [
                       InkWell(
                         onTap: () => Navigator.of(context).maybePop(),
                         borderRadius: BorderRadius.circular(8),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 4, horizontal: 4),
                           child: Text(
                             'Back',
                             style: GoogleFonts.outfit(
@@ -66,7 +68,8 @@ class PropertySupportScreen extends StatelessWidget {
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -149,7 +152,8 @@ class PropertySupportScreen extends StatelessWidget {
                           value: whatsappNumber,
                           actionText: 'Copy',
                           onTap: () {
-                            Clipboard.setData(ClipboardData(text: whatsappNumber));
+                            Clipboard.setData(
+                                ClipboardData(text: whatsappNumber));
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(

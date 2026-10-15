@@ -28,7 +28,8 @@ class OwnerRoomsScreen extends StatefulWidget {
   final String? propertyId;
   final String? propertyName;
 
-  const OwnerRoomsScreen({super.key, this.onBack, this.propertyId, this.propertyName});
+  const OwnerRoomsScreen(
+      {super.key, this.onBack, this.propertyId, this.propertyName});
 
   @override
   State<OwnerRoomsScreen> createState() => _OwnerRoomsScreenState();
@@ -78,38 +79,52 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
   Future<void> _loadRoomsFromSupabase() async {
     try {
-      final targetPropId = _propertyId ?? widget.propertyId ??
+      final targetPropId = _propertyId ??
+          widget.propertyId ??
           SupabaseService.instance.activePropertyId;
       String? propId = targetPropId;
-      String? pName = widget.propertyName ??
-          SupabaseService.instance.activePropertyName;
+      String? pName =
+          widget.propertyName ?? SupabaseService.instance.activePropertyName;
       if (propId == null || propId.isEmpty || pName == null || pName.isEmpty) {
         final prop = await SupabaseService.instance.getOwnerProperty();
-        propId ??= prop?['id']?.toString();
-        pName ??= (prop?['property_name'] ?? prop?['name'])?.toString();
+        if (prop != null) {
+          OwnerAppState.instance.setActiveProperty(prop);
+          propId ??= prop['id']?.toString();
+          pName ??= (prop['property_name'] ?? prop['name'])?.toString();
+        }
       }
 
       if (propId != null && propId.isNotEmpty) {
         _propertyId = propId;
         _propertyName = pName;
-        final roomsWithBeds = await SupabaseService.instance.getRoomsWithBeds(_propertyId!);
+        if (pName != null && pName.isNotEmpty && OwnerAppState.instance.activePropertyName.isEmpty) {
+          OwnerAppState.instance.setActiveProperty({'id': propId, 'property_name': pName});
+        }
+        final roomsWithBeds =
+            await SupabaseService.instance.getRoomsWithBeds(_propertyId!);
         if (mounted) {
           final List<Map<String, dynamic>> loadedRooms = [];
           for (final r in roomsWithBeds) {
             final List bedsList = (r['beds'] as List?) ?? [];
-            final int occupiedCount = bedsList.where((b) => b['is_occupied'] == true).length;
+            final int occupiedCount =
+                bedsList.where((b) => b['is_occupied'] == true).length;
             final formattedBeds = bedsList.map((b) {
               final isOcc = b['is_occupied'] == true;
               final rawName = b['tenant_name']?.toString().trim();
               final String tenantName = (rawName != null && rawName.isNotEmpty)
                   ? rawName
                   : (isOcc ? 'Resident' : '');
-              final String bedStatus = b['status'] ?? (isOcc ? 'Active' : 'Vacant');
+              final String bedStatus =
+                  b['status'] ?? (isOcc ? 'Active' : 'Vacant');
 
               // Compute initials from actual tenant name (e.g. 'Rahul Sharma' → 'RS')
               String? initials;
               if (isOcc && tenantName.isNotEmpty) {
-                final parts = tenantName.trim().split(' ').where((p) => p.isNotEmpty).toList();
+                final parts = tenantName
+                    .trim()
+                    .split(' ')
+                    .where((p) => p.isNotEmpty)
+                    .toList();
                 if (parts.length >= 2) {
                   initials = '${parts.first[0]}${parts.last[0]}'.toUpperCase();
                 } else {
@@ -131,9 +146,15 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 docsVerified = false;
               }
 
-              final bedLabel = b['bed_number']?.toString() ?? b['bed_label']?.toString() ?? b['bed_code']?.toString() ?? 'Bed';
-              final actualBedRent = isOcc ? ((b['rent'] ?? r['rent_per_bed'] ?? 0) as num) : 0;
-              final actualBedDeposit = isOcc ? ((b['deposit'] ?? r['deposit_per_bed'] ?? 0) as num) : 0;
+              final bedLabel = b['bed_number']?.toString() ??
+                  b['bed_label']?.toString() ??
+                  b['bed_code']?.toString() ??
+                  'Bed';
+              final actualBedRent =
+                  isOcc ? ((b['rent'] ?? r['rent_per_bed'] ?? 0) as num) : 0;
+              final actualBedDeposit = isOcc
+                  ? ((b['deposit'] ?? r['deposit_per_bed'] ?? 0) as num)
+                  : 0;
               return {
                 'id': b['id']?.toString() ?? '',
                 'label': bedLabel,
@@ -143,9 +164,13 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 'initials': initials ?? (isOcc ? 'RS' : ''),
                 'status': bedStatus,
                 'phone': b['tenant_phone'] ?? '',
+                'tenant_id': b['tenant_id']?.toString() ?? '',
+                'room_id': r['id']?.toString() ?? '',
+                'room_number': r['room_number']?.toString() ?? '',
                 'work': b['workplace'] ?? '',
                 'rent': actualBedRent > 0 ? actualBedRent.toString() : '0',
-                'deposit': actualBedDeposit > 0 ? actualBedDeposit.toString() : '0',
+                'deposit':
+                    actualBedDeposit > 0 ? actualBedDeposit.toString() : '0',
                 'docs': docsLabel,
                 'docsVerified': docsVerified,
                 'title': !isOcc ? 'Vacant $bedLabel — Available' : null,
@@ -153,16 +178,21 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               };
             }).toList();
 
-              loadedRooms.add({
-                'room': r['room_number']?.toString() ?? '',
-                'floor': r['floor_label']?.toString().split(' ').first.toLowerCase() ?? (r['floor_id'] != null ? 'floor_${r['floor_id']}' : ''),
-                'floorLabel': r['floor_label'] ?? (r['floor_id'] != null ? 'Floor ${r['floor_id']}' : ''),
-                'type': r['sharing_type'] ?? '${bedsList.length}-Sharing',
-                'occupied': occupiedCount,
-                'total': r['total_beds'] ?? bedsList.length,
-                'beds': formattedBeds,
-              });
-            }
+            loadedRooms.add({
+              'id': r['id']?.toString() ?? '',
+              'room': r['room_number']?.toString() ?? '',
+              'room_number': r['room_number']?.toString() ?? '',
+              'floor':
+                  r['floor_label']?.toString().split(' ').first.toLowerCase() ??
+                      (r['floor_id'] != null ? 'floor_${r['floor_id']}' : ''),
+              'floorLabel': r['floor_label'] ??
+                  (r['floor_id'] != null ? 'Floor ${r['floor_id']}' : ''),
+              'type': r['sharing_type'] ?? '${bedsList.length}-Sharing',
+              'occupied': occupiedCount,
+              'total': r['total_beds'] ?? bedsList.length,
+              'beds': formattedBeds,
+            });
+          }
 
           setState(() {
             _rooms.clear();
@@ -275,8 +305,6 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
     _workController.dispose();
     _rentController.dispose();
     _depositController.dispose();
-    _damageItemController.dispose();
-    _damageAmountController.dispose();
     _assignNameController.dispose();
     _assignPhoneController.dispose();
     _assignRentController.dispose();
@@ -371,7 +399,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   final bedId = resident['id']?.toString() ?? '';
 
                   if (bedId.isNotEmpty) {
-                    final success = await SupabaseService.instance.assignResidentToBed(
+                    final success =
+                        await SupabaseService.instance.assignResidentToBed(
                       bedId: bedId,
                       name: newName,
                       phone: newPhone,
@@ -381,7 +410,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       deposit: newDeposit,
                     );
                     if (!success) {
-                      _showToast('Failed to save resident changes. Please try again.');
+                      _showToast(
+                          'Failed to save resident changes. Please try again.');
                       return;
                     }
                     await _loadRoomsFromSupabase();
@@ -423,11 +453,13 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                       top: BorderSide(color: Color(0xFFEEF0F2), width: 1)),
                 ),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // + Add Damage Charges (with Photo)
+                    // + Add / View Damage Charges (Navigates to Full Page)
                     _buildActionSubButton(
                       Icons.warning_amber_rounded,
-                      '+ Add Damage Charges (with Photo)',
+                      '+ Add / View Damage Charges',
                       textColor: const Color(0xFFB45309),
                       bgColor: const Color(0xFFFFFBEB),
                       borderColor:
@@ -451,8 +483,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                               resident: resident,
                               roomName: roomName,
                               rooms: _rooms,
-                              onShiftSuccess: () {
-                                setState(() {});
+                              onShiftSuccess: () async {
+                                await _loadRoomsFromSupabase();
                               },
                             ),
                           ),
@@ -461,70 +493,106 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Give Move-Out Notice (30 Days) with Confirmation Dialog
-                    _buildActionSubButton(
-                      Icons.event_note_outlined,
-                      'Give Move-Out Notice (30 Days)',
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (dialogCtx) => AlertDialog(
-                            backgroundColor: Colors.white,
-                            surfaceTintColor: Colors.transparent,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16)),
-                            title: Text(
-                              'Confirm Move-Out Notice',
-                              style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.w800, fontSize: 17),
-                            ),
-                            content: Text(
-                              'Are you sure you want to start a 30-day move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName?',
-                              style: GoogleFonts.outfit(
-                                  fontSize: 13, color: AppColors.muted),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(dialogCtx).pop(),
-                                child: Text('Cancel',
-                                    style: GoogleFonts.outfit(
-                                        color: AppColors.muted,
-                                        fontWeight: FontWeight.w700)),
-                              ),
-                              ElevatedButton(
-                                onPressed: () async {
-                                  Navigator.of(dialogCtx).pop();
-                                  final bedId = resident['id']?.toString();
-                                  if (bedId != null && bedId.isNotEmpty) {
-                                    try {
-                                      await SupabaseService.instance.client
-                                          .from('beds')
-                                          .update({'status': 'Notice'})
-                                          .eq('id', bedId);
-                                    } catch (e) {
-                                      debugPrint('Error setting notice status: $e');
-                                    }
-                                  }
-                                  setState(() {
-                                    resident['status'] = 'Notice';
-                                  });
-                                  Navigator.of(ctx).pop();
-                                  _showToast(
-                                      'Initiated 30-Day Move Out Notice for ${resident['name']} ✓');
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.green,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8)),
+                    // Dynamic Notice Button: Toggle between "Give Move-Out Notice" and "Cancel Notice (Revert)"
+                    Builder(
+                      builder: (context) {
+                        final isNotice =
+                            resident['status']?.toString().toLowerCase() ==
+                                'notice';
+                        return _buildActionSubButton(
+                          isNotice
+                              ? Icons.undo_rounded
+                              : Icons.event_note_outlined,
+                          isNotice
+                              ? 'Cancel Notice (Revert to Active)'
+                              : 'Give Move-Out Notice (30 Days)',
+                          textColor: isNotice ? AppColors.greenDark : null,
+                          bgColor: isNotice ? AppColors.greenLight : null,
+                          borderColor: isNotice
+                              ? AppColors.green.withValues(alpha: 0.3)
+                              : null,
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (dialogCtx) => AlertDialog(
+                                backgroundColor: Colors.white,
+                                surfaceTintColor: Colors.transparent,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16)),
+                                title: Text(
+                                  isNotice
+                                      ? 'Cancel Move-Out Notice'
+                                      : 'Confirm Move-Out Notice',
+                                  style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 17),
                                 ),
-                                child: Text('Yes, Give Notice',
-                                    style: GoogleFonts.outfit(
-                                        fontWeight: FontWeight.w800)),
+                                content: Text(
+                                  isNotice
+                                      ? 'Are you sure you want to cancel the move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName and revert to Active Occupied?'
+                                      : 'Are you sure you want to start a 30-day move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName?',
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 13, color: AppColors.muted),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(dialogCtx).pop(),
+                                    child: Text('Cancel',
+                                        style: GoogleFonts.outfit(
+                                            color: AppColors.muted,
+                                            fontWeight: FontWeight.w700)),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.of(dialogCtx).pop();
+                                      final bedId = resident['id']?.toString();
+                                      final targetStatus =
+                                          isNotice ? 'Occupied' : 'Notice';
+                                      if (bedId != null && bedId.isNotEmpty) {
+                                        try {
+                                          await SupabaseService.instance.client
+                                              .from('beds')
+                                              .update({
+                                            'status': targetStatus
+                                          }).eq('id', bedId);
+                                        } catch (e) {
+                                          debugPrint(
+                                              'Error updating notice status: $e');
+                                        }
+                                      }
+                                      setState(() {
+                                        resident['status'] = targetStatus;
+                                      });
+                                      await _loadRoomsFromSupabase();
+                                      if (ctx.mounted) {
+                                        Navigator.of(ctx).pop();
+                                      }
+                                      _showToast(isNotice
+                                          ? 'Move-Out Notice Cancelled • Reverted to Active ✓'
+                                          : 'Initiated 30-Day Move Out Notice for ${resident['name']} ✓');
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: isNotice
+                                          ? AppColors.green
+                                          : AppColors.ink,
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8)),
+                                    ),
+                                    child: Text(
+                                        isNotice
+                                            ? 'Yes, Cancel Notice'
+                                            : 'Yes, Give Notice',
+                                        style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.w800)),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            );
+                          },
                         );
                       },
                     ),
@@ -571,7 +639,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                   final bedId = resident['id']?.toString();
                                   final oldName = resident['name'];
                                   if (bedId != null && bedId.isNotEmpty) {
-                                    await SupabaseService.instance.vacateBed(bedId: bedId);
+                                    await SupabaseService.instance
+                                        .vacateBed(bedId: bedId);
                                   }
                                   setState(() {
                                     resident['isOccupied'] = false;
@@ -623,275 +692,764 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
     _damageAttachedPhoto = null;
     _damageDeductionMode = 'dues';
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return _buildNativeBottomSheetWrapper(
-              title: 'Damage Charge: ${resident['name']} ($roomName)',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildFormField(
-                    'Damage Item / Reason',
-                    _damageItemController,
-                    hint: 'e.g. Broken Bathroom Mirror, Wall Stain, AC Remote',
-                  ),
-                  const SizedBox(height: 12),
-                  _buildFormField(
-                    'Damage Amount (₹)',
-                    _damageAmountController,
-                    hint: 'e.g. 1200',
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  ),
-                  const SizedBox(height: 14),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) {
+          List<Map<String, dynamic>> loggedDamages = [];
+          bool isLoadingDamages = true;
 
-                  // Upload Photo Proof Box
-                  Text(
-                    'Upload Photo Proof (Required)',
-                    style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.muted),
+          return StatefulBuilder(
+            builder: (context, setPageState) {
+              void loadDamages() async {
+                final pId = widget.propertyId ??
+                    _propertyId ??
+                    SupabaseService.instance.activePropertyId ??
+                    '';
+                final list = await SupabaseService.instance.getDamageDeductions(
+                  propertyId: pId,
+                  roomNumber: roomName,
+                  tenantName: resident['name']?.toString(),
+                  tenantId: resident['tenant_id']?.toString(),
+                );
+                if (context.mounted) {
+                  setPageState(() {
+                    loggedDamages = list;
+                    isLoadingDamages = false;
+                  });
+                }
+              }
+
+              if (isLoadingDamages) {
+                loadDamages();
+              }
+
+              final currentDepositStr = resident['deposit']?.toString() ?? '0';
+
+              return Scaffold(
+                backgroundColor: AppColors.pageBg,
+                appBar: AppBar(
+                  backgroundColor: Colors.white,
+                  elevation: 0,
+                  surfaceTintColor: Colors.transparent,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+                    onPressed: () => Navigator.of(ctx).pop(),
                   ),
-                  const SizedBox(height: 6),
-                  InkWell(
-                    onTap: () {
-                      setModalState(() {
-                        _damageAttachedPhoto = 'damage_proof_photo_101.jpg';
-                      });
-                      _showToast('Damage Photo Attached ✓');
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFAFAFA),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: const Color(0xFFE5E7EB), width: 1.5),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(Icons.camera_alt_outlined,
-                              size: 26, color: AppColors.muted),
-                          const SizedBox(height: 6),
-                          Text(
-                            _damageAttachedPhoto ??
-                                'Click to Upload / Take Photo',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: _damageAttachedPhoto != null
-                                  ? AppColors.greenDark
-                                  : AppColors.ink,
-                            ),
-                          ),
-                          Text(
-                            'JPEG, PNG or Camera capture',
-                            style: GoogleFonts.outfit(
-                                fontSize: 11, color: AppColors.muted),
-                          ),
-                        ],
-                      ),
+                  title: Text(
+                    'Damage Charges: ${resident['name'] ?? "Resident"} ($roomName)',
+                    style: GoogleFonts.outfit(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
                     ),
                   ),
-                  if (_damageAttachedPhoto != null) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.greenLight,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: AppColors.green.withValues(alpha: 0.2)),
+                ),
+                body: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Resident Header Card
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: AppColors.greenLight,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.person_outline_rounded,
+                                    color: AppColors.greenDark, size: 22),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    resident['name'] ?? 'Resident',
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 14.5,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.ink),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Room $roomName • ${resident['bed'] ?? "Bed"}',
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.muted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0FDF4),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppColors.green.withValues(alpha: 0.2)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text('Security Deposit',
+                                      style: GoogleFonts.outfit(
+                                          fontSize: 10,
+                                          color: AppColors.muted,
+                                          fontWeight: FontWeight.w600)),
+                                  Text('₹$currentDepositStr',
+                                      style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          color: AppColors.greenDark,
+                                          fontWeight: FontWeight.w800)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
+                      const SizedBox(height: 18),
+
+                      // Logged Damages History List
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _damageAttachedPhoto!,
+                            'Logged Damage Records',
                             style: GoogleFonts.outfit(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.greenDark),
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.ink),
                           ),
                           Text(
-                            'Attached ✓',
+                            '${loggedDamages.length} Records',
                             style: GoogleFonts.outfit(
                                 fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.greenDark),
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.muted),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
+                      const SizedBox(height: 10),
 
-                  // Deduction Option Dropdown
-                  Text(
-                    'Deduction Option',
-                    style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.muted),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: const Color(0xFFE5E7EB), width: 1.5),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _damageDeductionMode,
-                        isExpanded: true,
-                        style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            color: AppColors.ink,
-                            fontWeight: FontWeight.w600),
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'dues',
+                      if (isLoadingDamages)
+                        const Center(
+                            child: Padding(
+                                padding: EdgeInsets.all(20),
+                                child: UrbanSpinner(size: 22)))
+                      else if (loggedDamages.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 18, horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Center(
                             child: Text(
-                                "Add to Current Month's Dues (Immediate Pay)"),
-                          ),
-                          DropdownMenuItem(
-                            value: 'deposit',
-                            child: Text('Deduct from Security Deposit at Exit'),
-                          ),
-                        ],
-                        onChanged: (val) {
-                          setModalState(() {
-                            _damageDeductionMode = val ?? 'dues';
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // WhatsApp Info Banner
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.greenLight,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: AppColors.green.withValues(alpha: 0.2)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline_rounded,
-                            size: 16, color: AppColors.greenDark),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Photo receipt & damage notice will be sent to resident on WhatsApp.',
-                            style: GoogleFonts.outfit(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.greenDark,
+                              'No damage charges recorded yet.',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 12.5,
+                                  color: AppColors.muted,
+                                  fontWeight: FontWeight.w600),
                             ),
                           ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: loggedDamages.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (context, idx) {
+                            final dmg = loggedDamages[idx];
+                            final item =
+                                dmg['item_damaged']?.toString() ?? 'Damage';
+                            final amt = (dmg['amount'] as num?)?.toInt() ?? 0;
+                            final mode =
+                                dmg['deduction_mode']?.toString() ?? 'deposit';
+                            final dmgId = dmg['id']?.toString() ?? '';
+                            final bedId = resident['id']?.toString() ?? '';
+
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFEF2F2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image_outlined,
+                                          color: AppColors.danger, size: 18),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Builder(
+                                      builder: (context) {
+                                        final dRoom = dmg['room_number']?.toString().isNotEmpty == true
+                                            ? dmg['room_number'].toString()
+                                            : roomName;
+                                        final dTenantId = dmg['tenant_id']?.toString() ?? resident['tenant_id']?.toString() ?? '';
+                                        final dRoomId = dmg['room_id']?.toString() ?? resident['room_id']?.toString() ?? '';
+
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item,
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppColors.ink),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              'Room $dRoom • ${mode == 'deposit' ? 'From Deposit' : 'Added to Dues'}',
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.muted),
+                                            ),
+                                            if (dTenantId.isNotEmpty || dRoomId.isNotEmpty)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 2),
+                                                child: Text(
+                                                  '${dTenantId.isNotEmpty ? "Tenant: ${dTenantId.substring(0, dTenantId.length > 8 ? 8 : dTenantId.length)}…" : ""}${dRoomId.isNotEmpty ? " • Room ID: ${dRoomId.substring(0, dRoomId.length > 8 ? 8 : dRoomId.length)}…" : ""}',
+                                                  style: GoogleFonts.outfit(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: const Color(0xFF6B7280)),
+                                                ),
+                                              ),
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹$amt',
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.danger),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Edit Button
+                                  InkWell(
+                                    onTap: () {
+                                      final editItemCtrl =
+                                          TextEditingController(text: item);
+                                      final editAmtCtrl = TextEditingController(
+                                          text: amt.toString());
+
+                                      showDialog(
+                                        context: context,
+                                        builder: (dCtx) => AlertDialog(
+                                          backgroundColor: Colors.white,
+                                          surfaceTintColor: Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16)),
+                                          title: Text('Edit Damage Charge',
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800)),
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              TextField(
+                                                controller: editItemCtrl,
+                                                decoration: const InputDecoration(
+                                                    labelText: 'Item Name'),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              TextField(
+                                                controller: editAmtCtrl,
+                                                keyboardType:
+                                                    TextInputType.number,
+                                                decoration: const InputDecoration(
+                                                    labelText: 'Amount (₹)'),
+                                              ),
+                                            ],
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.of(dCtx).pop(),
+                                              child: Text('Cancel',
+                                                  style: GoogleFonts.outfit(
+                                                      color: AppColors.muted)),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () async {
+                                                final newName =
+                                                    editItemCtrl.text.trim();
+                                                final newAmt = double.tryParse(
+                                                        editAmtCtrl.text
+                                                            .trim()) ??
+                                                    0.0;
+                                                if (newName.isEmpty ||
+                                                    newAmt <= 0) return;
+
+                                                Navigator.of(dCtx).pop();
+                                                final ok = await SupabaseService
+                                                    .instance
+                                                    .updateDamageDeduction(
+                                                  damageId: dmgId,
+                                                  itemDamaged: newName,
+                                                  newAmount: newAmt,
+                                                  oldAmount: amt.toDouble(),
+                                                  deductionMode: mode,
+                                                  bedId: bedId,
+                                                );
+                                                if (ok) {
+                                                  if (mode == 'deposit') {
+                                                    final curDep = double.tryParse(
+                                                            resident['deposit']
+                                                                    ?.toString() ??
+                                                                '0') ??
+                                                        0.0;
+                                                    final updatedDep = (curDep +
+                                                            (amt - newAmt))
+                                                        .clamp(
+                                                            0.0, double.infinity);
+                                                    setState(() {
+                                                      resident['deposit'] =
+                                                          updatedDep
+                                                              .toInt()
+                                                              .toString();
+                                                    });
+                                                  }
+                                                  setPageState(() {
+                                                    isLoadingDamages = true;
+                                                  });
+                                                  _showToast(
+                                                      'Damage updated to ₹${newAmt.toInt()} ✓');
+                                                }
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      AppColors.green,
+                                                  foregroundColor:
+                                                      Colors.white),
+                                              child: Text('Save',
+                                                  style: GoogleFonts.outfit(
+                                                      fontWeight:
+                                                          FontWeight.w700)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3F4F6),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(Icons.edit_outlined,
+                                          size: 15, color: AppColors.ink),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  // Revert / Remove Button (Restores Security Deposit)
+                                  InkWell(
+                                    onTap: () async {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (dCtx) => AlertDialog(
+                                          backgroundColor: Colors.white,
+                                          surfaceTintColor: Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(16)),
+                                          title: Text('Revert Damage Charge',
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800)),
+                                          content: Text(
+                                            'Are you sure you want to remove this ₹$amt damage charge for "$item"?\n\n'
+                                            '${mode == 'deposit' ? '₹$amt will be immediately refunded back to the resident\'s security deposit.' : 'Pending dues will be cleared.'}',
+                                            style: GoogleFonts.outfit(
+                                                fontSize: 12.5,
+                                                color: AppColors.muted),
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.of(dCtx).pop(false),
+                                              child: Text('Cancel',
+                                                  style: GoogleFonts.outfit(
+                                                      color: AppColors.muted)),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () =>
+                                                  Navigator.of(dCtx).pop(true),
+                                              style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      AppColors.danger,
+                                                  foregroundColor:
+                                                      Colors.white),
+                                              child: Text('Yes, Revert',
+                                                  style: GoogleFonts.outfit(
+                                                      fontWeight:
+                                                          FontWeight.w800)),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+
+                                      if (confirm == true) {
+                                        final ok = await SupabaseService
+                                            .instance
+                                            .deleteDamageDeduction(
+                                          damageId: dmgId,
+                                          amount: amt.toDouble(),
+                                          deductionMode: mode,
+                                          bedId: bedId,
+                                        );
+                                        if (ok) {
+                                          if (mode == 'deposit') {
+                                            final curDep = double.tryParse(
+                                                    resident['deposit']
+                                                            ?.toString() ??
+                                                        '0') ??
+                                                0.0;
+                                            setState(() {
+                                              resident['deposit'] = (curDep + amt)
+                                                  .toInt()
+                                                  .toString();
+                                            });
+                                          }
+                                          setPageState(() {
+                                            isLoadingDamages = true;
+                                          });
+                                          _showToast(
+                                              'Reverted ₹$amt damage charge ✓');
+                                        }
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF2F2),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(
+                                          Icons.delete_outline_rounded,
+                                          size: 15,
+                                          color: AppColors.danger),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
-                      ],
-                    ),
+                      const SizedBox(height: 22),
+
+                      // Existing Add New Damage Form
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              '+ Log New Damage Deduction',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.ink),
+                            ),
+                            const SizedBox(height: 14),
+                            _buildFormField(
+                              'Damage Item / Reason',
+                              _damageItemController,
+                              hint: 'e.g. Broken Bathroom Mirror, Wall Stain, AC Remote',
+                            ),
+                            const SizedBox(height: 12),
+                            _buildFormField(
+                              'Damage Amount (₹)',
+                              _damageAmountController,
+                              hint: 'e.g. 1200',
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Upload Photo Proof Box
+                            Text(
+                              'Upload Photo Proof (Optional)',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.muted),
+                            ),
+                            const SizedBox(height: 6),
+                            InkWell(
+                              onTap: () {
+                                setPageState(() {
+                                  _damageAttachedPhoto = _damageAttachedPhoto == null
+                                      ? 'damage_proof_photo_${DateTime.now().millisecondsSinceEpoch}.jpg'
+                                      : null;
+                                });
+                                _showToast(_damageAttachedPhoto != null
+                                    ? 'Damage Photo Attached ✓'
+                                    : 'Photo Removed');
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 14, horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: _damageAttachedPhoto != null
+                                      ? AppColors.greenLight
+                                      : const Color(0xFFFAFAFA),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: _damageAttachedPhoto != null
+                                          ? AppColors.green
+                                          : const Color(0xFFE5E7EB),
+                                      width: 1.5),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _damageAttachedPhoto != null
+                                          ? Icons.check_circle_rounded
+                                          : Icons.camera_alt_outlined,
+                                      size: 22,
+                                      color: _damageAttachedPhoto != null
+                                          ? AppColors.greenDark
+                                          : AppColors.muted,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _damageAttachedPhoto ??
+                                            'Click to Attach Photo Proof',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: _damageAttachedPhoto != null
+                                              ? AppColors.greenDark
+                                              : AppColors.ink,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // Deduction Option Dropdown
+                            Text(
+                              'Deduction Option',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.muted),
+                            ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: const Color(0xFFE5E7EB), width: 1.5),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _damageDeductionMode,
+                                  isExpanded: true,
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 13,
+                                      color: AppColors.ink,
+                                      fontWeight: FontWeight.w600),
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'dues',
+                                      child: Text(
+                                          "Add to Current Month's Dues (Immediate Pay)"),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'deposit',
+                                      child: Text(
+                                          'Deduct from Security Deposit at Exit'),
+                                    ),
+                                  ],
+                                  onChanged: (val) {
+                                    setPageState(() {
+                                      _damageDeductionMode = val ?? 'dues';
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+
+                            // WhatsApp Info Banner
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: AppColors.greenLight,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: AppColors.green.withValues(alpha: 0.2)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.info_outline_rounded,
+                                      size: 16, color: AppColors.greenDark),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Photo receipt & damage notice will be sent to resident on WhatsApp.',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.greenDark,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Submit Button
+                            ElevatedButton(
+                              onPressed: () async {
+                                final item = _damageItemController.text.trim();
+                                final amount = _damageAmountController.text.trim();
+                                if (item.isEmpty || amount.isEmpty) {
+                                  _showToast(
+                                      'Please enter damage item and amount');
+                                  return;
+                                }
+
+                                final bedId = resident['id']?.toString() ?? '';
+                                final dmgAmount =
+                                    double.tryParse(amount) ?? 0.0;
+
+                                final propId = widget.propertyId ??
+                                    _propertyId ??
+                                    SupabaseService.instance.activePropertyId;
+                                final propName = (_propertyName != null &&
+                                        _propertyName!.isNotEmpty)
+                                    ? _propertyName!
+                                    : ((widget.propertyName != null &&
+                                            widget.propertyName!.isNotEmpty)
+                                        ? widget.propertyName!
+                                        : (SupabaseService.instance
+                                                .activePropertyName ??
+                                            OwnerAppState.instance
+                                                .activePropertyName));
+
+                                final success = await SupabaseService.instance
+                                    .addDamageDeduction(
+                                  propertyId: propId ?? '',
+                                  propertyName: propName,
+                                  tenantId: resident['tenant_id']?.toString(),
+                                  roomId: resident['room_id']?.toString(),
+                                  roomNumber: roomName,
+                                  bedId: bedId,
+                                  tenantName: resident['name'] ?? 'Resident',
+                                  itemDamaged: item,
+                                  amount: dmgAmount,
+                                  deductionMode: _damageDeductionMode,
+                                  photoUrl: _damageAttachedPhoto,
+                                );
+
+                                if (!success) {
+                                  _showToast(
+                                      'Failed to log damage deduction. Please check connection.');
+                                  return;
+                                }
+
+                                if (_damageDeductionMode == 'deposit') {
+                                  final currentDeposit = double.tryParse(
+                                          resident['deposit']?.toString() ??
+                                              '0') ??
+                                      0.0;
+                                  final newDeposit = (currentDeposit - dmgAmount)
+                                      .clamp(0.0, double.infinity);
+                                  setState(() {
+                                    resident['deposit'] =
+                                        newDeposit.toInt().toString();
+                                  });
+                                }
+
+                                await _loadRoomsFromSupabase();
+                                if (ctx.mounted) {
+                                  Navigator.of(ctx).pop();
+                                }
+                                final modeText = _damageDeductionMode == 'dues'
+                                    ? "Added to Dues"
+                                    : "Deducted from Deposit";
+                                _showToast(
+                                    '₹$amount Damage for $item logged ($modeText) & sent on WhatsApp ✓');
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.green,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size.fromHeight(48),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                'Save & Apply Damage Charge',
+                                style: GoogleFonts.outfit(
+                                    fontSize: 14, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-
-                  // Submit Button
-                  ElevatedButton(
-                    onPressed: () async {
-                      final item = _damageItemController.text.trim();
-                      final amount = _damageAmountController.text.trim();
-                      if (item.isEmpty || amount.isEmpty) {
-                        _showToast('Please enter damage item and amount');
-                        return;
-                      }
-
-                      final bedId = resident['id']?.toString() ?? '';
-                      final dmgAmount = double.tryParse(amount) ?? 0.0;
-
-                      final propId = widget.propertyId ??
-                          _propertyId ??
-                          SupabaseService.instance.activePropertyId;
-                      final propName = (_propertyName != null && _propertyName!.isNotEmpty)
-                          ? _propertyName!
-                          : ((widget.propertyName != null && widget.propertyName!.isNotEmpty)
-                              ? widget.propertyName!
-                              : (SupabaseService.instance.activePropertyName ??
-                                  OwnerAppState.instance.activePropertyName));
-
-                      final success =
-                          await SupabaseService.instance.addDamageDeduction(
-                        propertyId: propId ?? '',
-                        propertyName: propName,
-                        bedId: bedId,
-                        tenantName: resident['name'] ?? 'Resident',
-                        roomNumber: roomName,
-                        itemDamaged: item,
-                        amount: dmgAmount,
-                        deductionMode: _damageDeductionMode,
-                        photoUrl: _damageAttachedPhoto,
-                      );
-
-                      if (!success) {
-                        _showToast('Failed to log damage deduction. Please check connection.');
-                        return;
-                      }
-
-                      if (_damageDeductionMode == 'deposit') {
-                        final currentDeposit = double.tryParse(
-                                resident['deposit']?.toString() ?? '0') ??
-                            0.0;
-                        final newDeposit = (currentDeposit - dmgAmount)
-                            .clamp(0.0, double.infinity);
-                        setState(() {
-                          resident['deposit'] = newDeposit.toInt().toString();
-                        });
-                      }
-
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
-                      }
-                      final modeText = _damageDeductionMode == 'dues'
-                          ? "Added to Dues"
-                          : "Deducted from Deposit";
-                      _showToast(
-                          '₹$amount Damage for $item logged ($modeText) & sent on WhatsApp ✓');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.green,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      'Save & Apply Damage Charge',
-                      style: GoogleFonts.outfit(
-                          fontSize: 14, fontWeight: FontWeight.w800),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            );
-          },
-        );
-      },
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -902,531 +1460,1086 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       Map<String, dynamic> vacantBed, String roomName, String floorLabel) {
     _assignNameController.clear();
     _assignPhoneController.clear();
-    _assignRentController.text = vacantBed['rent'] ?? '8500';
-    _assignDepositController.text = vacantBed['deposit'] ?? '15000';
+    _assignRentController.clear();
+    _assignDepositController.clear();
 
     String contactSearch = '';
     bool showPhonebookPicker = true;
+    int? selectedDueDay;
 
     // Immediately trigger real contact permission & fetch on open
     _fetchDeviceContacts();
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (modalCtx, setModalState) {
-            // Build dynamic list from real device contacts
-            final List<Map<String, String>> contactsList =
-                (_deviceContacts ?? [])
-                    .map<Map<String, String>>((c) {
-                      final name = c.displayName ?? '';
-                      String phone = '';
-                      if (c.phones.isNotEmpty) {
-                        phone = c.phones.first.number
-                            .replaceAll(RegExp(r'[^0-9]'), '');
-                        if (phone.length > 10) {
-                          phone = phone.substring(phone.length - 10);
-                        }
-                      }
-                      final initials = name.isNotEmpty
-                          ? name.substring(0, 1).toUpperCase()
-                          : '+';
-                      return <String, String>{
-                        'name': name,
-                        'phone': phone,
-                        'initials': initials,
-                      };
-                    })
-                    .where((c) => c['phone']!.isNotEmpty)
-                    .toList();
-
-            final filteredContacts = contactsList.where((c) {
-              if (contactSearch.isEmpty) return true;
-              final q = contactSearch.toLowerCase();
-              return c['name']!.toLowerCase().contains(q) ||
-                  c['phone']!.contains(q);
-            }).toList();
-
-            return _buildNativeBottomSheetWrapper(
-              title: 'Assign Resident: $roomName (${vacantBed['bed']})',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    size: 20, color: AppColors.ink),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Quick Selection Accordion: Pick from Phone Contacts
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF9FAFB),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                  Text(
+                    'Assign Resident',
+                    style: GoogleFonts.outfit(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
                     ),
+                  ),
+                  Text(
+                    '$roomName (${vacantBed['bed'] ?? vacantBed['label'] ?? ""}) • $floorLabel',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(1),
+                child: Container(color: const Color(0xFFE5E7EB), height: 1),
+              ),
+            ),
+            body: SafeArea(
+              child: StatefulBuilder(
+                builder: (modalCtx, setModalState) {
+                  // Build dynamic list from real device contacts
+                  final List<Map<String, String>> contactsList =
+                      (_deviceContacts ?? [])
+                          .map<Map<String, String>>((c) {
+                            final name = c.displayName ?? '';
+                            String phone = '';
+                            if (c.phones.isNotEmpty) {
+                              phone = c.phones.first.number
+                                  .replaceAll(RegExp(r'[^0-9]'), '');
+                              if (phone.length > 10) {
+                                phone = phone.substring(phone.length - 10);
+                              }
+                            }
+                            final initials = name.isNotEmpty
+                                ? name.substring(0, 1).toUpperCase()
+                                : '+';
+                            return <String, String>{
+                              'name': name,
+                              'phone': phone,
+                              'initials': initials,
+                            };
+                          })
+                          .where((c) => c['phone']!.isNotEmpty)
+                          .toList();
+
+                  final filteredContacts = contactsList.where((c) {
+                    if (contactSearch.isEmpty) return true;
+                    final q = contactSearch.toLowerCase();
+                    return c['name']!.toLowerCase().contains(q) ||
+                        c['phone']!.contains(q);
+                  }).toList();
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    physics: const BouncingScrollPhysics(),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Header Bar with Toggle & Native System Picker
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        // Quick Selection Accordion: Pick from Phone Contacts
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF9FAFB),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              InkWell(
-                                onTap: () {
-                                  setModalState(() {
-                                    showPhonebookPicker = !showPhonebookPicker;
-                                    if (showPhonebookPicker &&
-                                        _deviceContacts == null) {
-                                      _fetchDeviceContacts(setModalState);
-                                    }
-                                  });
-                                },
+                              // Header Bar with Toggle & Native System Picker
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
                                 child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF2563EB)
-                                            .withValues(alpha: 0.1),
-                                        shape: BoxShape.circle,
+                                    InkWell(
+                                      onTap: () {
+                                        setModalState(() {
+                                          showPhonebookPicker =
+                                              !showPhonebookPicker;
+                                          if (showPhonebookPicker &&
+                                              _deviceContacts == null) {
+                                            _fetchDeviceContacts(setModalState);
+                                          }
+                                        });
+                                      },
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF2563EB)
+                                                  .withValues(alpha: 0.1),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                                Icons.contacts_rounded,
+                                                size: 16,
+                                                color: Color(0xFF2563EB)),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            'Pick from Phonebook',
+                                            style: GoogleFonts.outfit(
+                                                fontSize: 13.5,
+                                                fontWeight: FontWeight.w700,
+                                                color: AppColors.ink),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Icon(
+                                            showPhonebookPicker
+                                                ? Icons
+                                                    .keyboard_arrow_up_rounded
+                                                : Icons
+                                                    .keyboard_arrow_down_rounded,
+                                            size: 18,
+                                            color: const Color(0xFF2563EB),
+                                          ),
+                                        ],
                                       ),
-                                      child: const Icon(Icons.contacts_rounded,
-                                          size: 16, color: Color(0xFF2563EB)),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Pick from Phonebook',
-                                      style: GoogleFonts.outfit(
-                                          fontSize: 13.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.ink),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Icon(
-                                      showPhonebookPicker
-                                          ? Icons.keyboard_arrow_up_rounded
-                                          : Icons.keyboard_arrow_down_rounded,
-                                      size: 18,
-                                      color: const Color(0xFF2563EB),
+
+                                    // 1-Tap Native Android OS Contact Picker Button
+                                    InkWell(
+                                      onTap: () =>
+                                          _pickNativeContact(setModalState),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color: const Color(0xFFE5E7EB)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                                Icons.open_in_new_rounded,
+                                                size: 13,
+                                                color: Color(0xFF2563EB)),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'System Contacts',
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color:
+                                                      const Color(0xFF2563EB)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
 
-                              // 1-Tap Native Android OS Contact Picker Button
-                              InkWell(
-                                onTap: () => _pickNativeContact(setModalState),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                        color: const Color(0xFFE5E7EB)),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.open_in_new_rounded,
-                                          size: 13, color: Color(0xFF2563EB)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'System Contacts',
-                                        style: GoogleFonts.outfit(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            color: const Color(0xFF2563EB)),
+                              // Expanded Contact Picker List
+                              if (showPhonebookPicker) ...[
+                                const Divider(
+                                    height: 1, color: Color(0xFFE5E7EB)),
+
+                                // Loading State
+                                if (_isLoadingContacts) ...[
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 24),
+                                    child: Center(
+                                      child: Column(
+                                        children: [
+                                          const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2.5,
+                                                color: Color(0xFF2563EB)),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            'Reading phone contacts from device...',
+                                            style: GoogleFonts.outfit(
+                                                fontSize: 12,
+                                                color: AppColors.muted),
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                              ),
+                                ] else if (_contactsPermissionDenied) ...[
+                                  // Permission Denied State
+                                  Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: Column(
+                                      children: [
+                                        const Icon(Icons.no_accounts_rounded,
+                                            size: 28, color: AppColors.muted),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Contacts permission needed to load phonebook',
+                                          style: GoogleFonts.outfit(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.ink),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 10),
+                                        ElevatedButton(
+                                          onPressed: () => _fetchDeviceContacts(
+                                              setModalState),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                const Color(0xFF2563EB),
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(8)),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 14, vertical: 8),
+                                            elevation: 0,
+                                          ),
+                                          child: Text(
+                                              'Allow Contacts Permission',
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w700)),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        12, 10, 12, 6),
+                                    child: Container(
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: const Color(0xFFE5E7EB)),
+                                      ),
+                                      child: TextField(
+                                        onChanged: (v) => setModalState(
+                                            () => contactSearch = v),
+                                        style: GoogleFonts.outfit(
+                                            fontSize: 12.5,
+                                            color: AppColors.ink),
+                                        decoration: InputDecoration(
+                                          hintText:
+                                              'Search contacts by name or number...',
+                                          hintStyle: GoogleFonts.outfit(
+                                              fontSize: 12,
+                                              color: AppColors.muted),
+                                          prefixIcon: const Icon(Icons.search,
+                                              size: 16, color: AppColors.muted),
+                                          border: InputBorder.none,
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                  vertical: 9),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  // Contact List View
+                                  if (filteredContacts.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 16),
+                                      child: Center(
+                                        child: Text(
+                                          _deviceContacts == null
+                                              ? 'Tap "System Contacts" above to load contacts'
+                                              : 'No contacts found matching "$contactSearch"',
+                                          style: GoogleFonts.outfit(
+                                              fontSize: 12,
+                                              color: AppColors.muted),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Container(
+                                      constraints:
+                                          const BoxConstraints(maxHeight: 180),
+                                      child: ListView.separated(
+                                        shrinkWrap: true,
+                                        itemCount: filteredContacts.length,
+                                        separatorBuilder: (_, __) =>
+                                            const Divider(
+                                                height: 1,
+                                                color: Color(0xFFF3F4F6),
+                                                indent: 48),
+                                        itemBuilder: (context, idx) {
+                                          final contact = filteredContacts[idx];
+                                          return InkWell(
+                                            onTap: () {
+                                              setModalState(() {
+                                                _assignNameController.text =
+                                                    contact['name']!;
+                                                _assignPhoneController.text =
+                                                    contact['phone']!;
+                                                showPhonebookPicker = false;
+                                              });
+                                              _showToast(
+                                                  'Auto-filled from ${contact['name']}');
+                                            },
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 8),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 32,
+                                                    height: 32,
+                                                    decoration:
+                                                        const BoxDecoration(
+                                                      color: Color(0xFF2563EB),
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                    child: Center(
+                                                      child: Text(
+                                                        contact['initials']!,
+                                                        style:
+                                                            GoogleFonts.outfit(
+                                                                fontSize: 12,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                                color: Colors
+                                                                    .white),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          contact['name']!,
+                                                          style: GoogleFonts
+                                                              .outfit(
+                                                                  fontSize:
+                                                                      12.5,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w700,
+                                                                  color:
+                                                                      AppColors
+                                                                          .ink),
+                                                        ),
+                                                        Text(
+                                                          '+91 ${contact['phone']}',
+                                                          style: GoogleFonts
+                                                              .outfit(
+                                                                  fontSize: 11,
+                                                                  color: AppColors
+                                                                      .muted),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  const Icon(
+                                                      Icons
+                                                          .chevron_right_rounded,
+                                                      size: 16,
+                                                      color: AppColors.muted),
+                                                ],
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  const SizedBox(height: 6),
+                                ],
+                              ],
                             ],
                           ),
                         ),
 
-                        // Expanded Contact Picker List
-                        if (showPhonebookPicker) ...[
-                          const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                        // Resident Form Fields with Strict Validations
+                        _buildFormField(
+                          'Full Name',
+                          _assignNameController,
+                          hint: 'e.g. Siddharth Rao',
+                        ),
+                        const SizedBox(height: 12),
 
-                          // Loading State
-                          if (_isLoadingContacts) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24),
-                              child: Center(
-                                child: Column(
-                                  children: [
-                                    const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color: Color(0xFF2563EB)),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      'Reading phone contacts from device...',
-                                      style: GoogleFonts.outfit(
-                                          fontSize: 12, color: AppColors.muted),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ] else if (_contactsPermissionDenied) ...[
-                            // Permission Denied State
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                children: [
-                                  const Icon(Icons.no_accounts_rounded,
-                                      size: 28, color: AppColors.muted),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Contacts permission needed to load phonebook',
-                                    style: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.ink),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 10),
-                                  ElevatedButton(
-                                    onPressed: () =>
-                                        _fetchDeviceContacts(setModalState),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2563EB),
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8)),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 14, vertical: 8),
-                                      elevation: 0,
-                                    ),
-                                    child: Text('Allow Contacts Permission',
-                                        style: GoogleFonts.outfit(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700)),
-                                  ),
+                        // Phone Number (+91) with numeric keyboard and 10-digit limit
+                        _buildFormField(
+                          'Phone Number (+91)',
+                          _assignPhoneController,
+                          hint: '9876543210',
+                          prefixText: '+91 ',
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Rent and Security Deposit with numeric keyboard and digits only
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildFormField(
+                                'Monthly Rent (₹)',
+                                _assignRentController,
+                                prefixText: '₹ ',
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly
                                 ],
                               ),
                             ),
-                          ] else ...[
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-                              child: Container(
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                      color: const Color(0xFFE5E7EB)),
-                                ),
-                                child: TextField(
-                                  onChanged: (v) =>
-                                      setModalState(() => contactSearch = v),
-                                  style: GoogleFonts.outfit(
-                                      fontSize: 12.5, color: AppColors.ink),
-                                  decoration: InputDecoration(
-                                    hintText:
-                                        'Search contacts by name or number...',
-                                    hintStyle: GoogleFonts.outfit(
-                                        fontSize: 12, color: AppColors.muted),
-                                    prefixIcon: const Icon(Icons.search,
-                                        size: 16, color: AppColors.muted),
-                                    border: InputBorder.none,
-                                    contentPadding:
-                                        const EdgeInsets.symmetric(vertical: 9),
-                                  ),
-                                ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _buildFormField(
+                                'Security Deposit (₹)',
+                                _assignDepositController,
+                                prefixText: '₹ ',
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly
+                                ],
                               ),
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
 
-                            // Contact List View
-                            if (filteredContacts.isEmpty)
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
-                                child: Center(
-                                  child: Text(
-                                    _deviceContacts == null
-                                        ? 'Tap "System Contacts" above to load contacts'
-                                        : 'No contacts found matching "$contactSearch"',
-                                    style: GoogleFonts.outfit(
-                                        fontSize: 12, color: AppColors.muted),
+                        // Monthly Rent Due Date (Salary Cycle) Selector
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Monthly Rent Due Date',
+                              style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.ink,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Agreed monthly salary payment cycle day:',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                // 1st Button
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () =>
+                                        setModalState(() => selectedDueDay = 1),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 150),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 9),
+                                      decoration: BoxDecoration(
+                                        color: selectedDueDay == 1
+                                            ? AppColors.green
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: selectedDueDay == 1
+                                              ? AppColors.green
+                                              : const Color(0xFFE5E7EB),
+                                          width:
+                                              selectedDueDay == 1 ? 1.8 : 1.2,
+                                        ),
+                                        boxShadow: selectedDueDay == 1
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppColors.green
+                                                      .withValues(alpha: 0.25),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '1st',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13.5,
+                                              fontWeight: selectedDueDay == 1
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w600,
+                                              color: selectedDueDay == 1
+                                                  ? Colors.white
+                                                  : AppColors.ink,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 1),
+                                          Text(
+                                            'of Month',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: selectedDueDay == 1
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.9)
+                                                  : AppColors.muted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              )
-                            else
-                              Container(
-                                constraints:
-                                    const BoxConstraints(maxHeight: 180),
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  itemCount: filteredContacts.length,
-                                  separatorBuilder: (_, __) => const Divider(
-                                      height: 1,
-                                      color: Color(0xFFF3F4F6),
-                                      indent: 48),
-                                  itemBuilder: (context, idx) {
-                                    final contact = filteredContacts[idx];
-                                    return InkWell(
-                                      onTap: () {
-                                        setModalState(() {
-                                          _assignNameController.text =
-                                              contact['name']!;
-                                          _assignPhoneController.text =
-                                              contact['phone']!;
-                                          showPhonebookPicker = false;
-                                        });
-                                        _showToast(
-                                            'Auto-filled from ${contact['name']}');
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 8),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 32,
-                                              height: 32,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFF2563EB),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  contact['initials']!,
+                                const SizedBox(width: 8),
+
+                                // 3rd Button
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () =>
+                                        setModalState(() => selectedDueDay = 3),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 150),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 9),
+                                      decoration: BoxDecoration(
+                                        color: selectedDueDay == 3
+                                            ? AppColors.green
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: selectedDueDay == 3
+                                              ? AppColors.green
+                                              : const Color(0xFFE5E7EB),
+                                          width:
+                                              selectedDueDay == 3 ? 1.8 : 1.2,
+                                        ),
+                                        boxShadow: selectedDueDay == 3
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppColors.green
+                                                      .withValues(alpha: 0.25),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '3rd',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13.5,
+                                              fontWeight: selectedDueDay == 3
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w600,
+                                              color: selectedDueDay == 3
+                                                  ? Colors.white
+                                                  : AppColors.ink,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 1),
+                                          Text(
+                                            'of Month',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: selectedDueDay == 3
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.9)
+                                                  : AppColors.muted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+
+                                // 5th Button
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () =>
+                                        setModalState(() => selectedDueDay = 5),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 150),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 9),
+                                      decoration: BoxDecoration(
+                                        color: selectedDueDay == 5
+                                            ? AppColors.green
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: selectedDueDay == 5
+                                              ? AppColors.green
+                                              : const Color(0xFFE5E7EB),
+                                          width:
+                                              selectedDueDay == 5 ? 1.8 : 1.2,
+                                        ),
+                                        boxShadow: selectedDueDay == 5
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppColors.green
+                                                      .withValues(alpha: 0.25),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ]
+                                            : null,
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '5th',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13.5,
+                                              fontWeight: selectedDueDay == 5
+                                                  ? FontWeight.w800
+                                                  : FontWeight.w600,
+                                              color: selectedDueDay == 5
+                                                  ? Colors.white
+                                                  : AppColors.ink,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 1),
+                                          Text(
+                                            'of Month',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: selectedDueDay == 5
+                                                  ? Colors.white
+                                                      .withValues(alpha: 0.9)
+                                                  : AppColors.muted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+
+                                // + Custom Button
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () async {
+                                      final customCtrl = TextEditingController(
+                                        text: (selectedDueDay != null &&
+                                                selectedDueDay != 1 &&
+                                                selectedDueDay != 3 &&
+                                                selectedDueDay != 5)
+                                            ? selectedDueDay.toString()
+                                            : '',
+                                      );
+                                      final picked = await showDialog<int>(
+                                        context: ctx,
+                                        builder: (dCtx) {
+                                          return AlertDialog(
+                                            backgroundColor: Colors.white,
+                                            surfaceTintColor:
+                                                Colors.transparent,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(16)),
+                                            title: Text(
+                                              'Custom Rent Due Day',
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: AppColors.ink),
+                                            ),
+                                            content: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  'Enter monthly salary due day (1 to 31):',
                                                   style: GoogleFonts.outfit(
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      color: Colors.white),
+                                                      fontSize: 12.5,
+                                                      color: AppColors.muted),
+                                                ),
+                                                const SizedBox(height: 12),
+                                                TextField(
+                                                  controller: customCtrl,
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  autofocus: true,
+                                                  inputFormatters: [
+                                                    FilteringTextInputFormatter
+                                                        .digitsOnly,
+                                                    LengthLimitingTextInputFormatter(
+                                                        2),
+                                                  ],
+                                                  decoration: InputDecoration(
+                                                    hintText: 'e.g. 10 or 15',
+                                                    hintStyle:
+                                                        GoogleFonts.outfit(
+                                                            fontSize: 13,
+                                                            color: AppColors
+                                                                .muted),
+                                                    contentPadding:
+                                                        const EdgeInsets
+                                                            .symmetric(
+                                                            horizontal: 14,
+                                                            vertical: 12),
+                                                    border: OutlineInputBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(10),
+                                                        borderSide:
+                                                            const BorderSide(
+                                                                color: Color(
+                                                                    0xFFE5E7EB))),
+                                                    focusedBorder:
+                                                        OutlineInputBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        10),
+                                                            borderSide:
+                                                                const BorderSide(
+                                                                    color: AppColors
+                                                                        .green,
+                                                                    width:
+                                                                        1.5)),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(dCtx).pop(),
+                                                child: Text('Cancel',
+                                                    style: GoogleFonts.outfit(
+                                                        color: AppColors.muted,
+                                                        fontWeight:
+                                                            FontWeight.w600)),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  final d = int.tryParse(
+                                                      customCtrl.text.trim());
+                                                  if (d != null &&
+                                                      d >= 1 &&
+                                                      d <= 31) {
+                                                    Navigator.of(dCtx).pop(d);
+                                                  }
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      AppColors.green,
+                                                  foregroundColor: Colors.white,
+                                                  shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8)),
+                                                ),
+                                                child: Text('Confirm',
+                                                    style: GoogleFonts.outfit(
+                                                        fontWeight:
+                                                            FontWeight.w700)),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                      if (picked != null) {
+                                        setModalState(
+                                            () => selectedDueDay = picked);
+                                      }
+                                    },
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Builder(
+                                      builder: (_) {
+                                        final isCustomSelected =
+                                            selectedDueDay != null &&
+                                                selectedDueDay != 1 &&
+                                                selectedDueDay != 3 &&
+                                                selectedDueDay != 5;
+                                        String formatDaySuffix(int d) {
+                                          if (d >= 11 && d <= 13)
+                                            return '${d}th';
+                                          switch (d % 10) {
+                                            case 1:
+                                              return '${d}st';
+                                            case 2:
+                                              return '${d}nd';
+                                            case 3:
+                                              return '${d}rd';
+                                            default:
+                                              return '${d}th';
+                                          }
+                                        }
+
+                                        final label = isCustomSelected
+                                            ? formatDaySuffix(selectedDueDay!)
+                                            : '+ Custom';
+                                        final sub = isCustomSelected
+                                            ? 'Selected'
+                                            : 'Cycle';
+                                        return AnimatedContainer(
+                                          duration:
+                                              const Duration(milliseconds: 150),
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 9),
+                                          decoration: BoxDecoration(
+                                            color: isCustomSelected
+                                                ? AppColors.green
+                                                : Colors.white,
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: isCustomSelected
+                                                  ? AppColors.green
+                                                  : const Color(0xFFE5E7EB),
+                                              width:
+                                                  isCustomSelected ? 1.8 : 1.2,
+                                            ),
+                                            boxShadow: isCustomSelected
+                                                ? [
+                                                    BoxShadow(
+                                                      color: AppColors.green
+                                                          .withValues(
+                                                              alpha: 0.25),
+                                                      blurRadius: 6,
+                                                      offset:
+                                                          const Offset(0, 2),
+                                                    ),
+                                                  ]
+                                                : null,
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                label,
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 13.5,
+                                                  fontWeight: isCustomSelected
+                                                      ? FontWeight.w800
+                                                      : FontWeight.w600,
+                                                  color: isCustomSelected
+                                                      ? Colors.white
+                                                      : AppColors.ink,
                                                 ),
                                               ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    contact['name']!,
-                                                    style: GoogleFonts.outfit(
-                                                        fontSize: 12.5,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        color: AppColors.ink),
-                                                  ),
-                                                  Text(
-                                                    '+91 ${contact['phone']}',
-                                                    style: GoogleFonts.outfit(
-                                                        fontSize: 11,
-                                                        color: AppColors.muted),
-                                                  ),
-                                                ],
+                                              const SizedBox(height: 1),
+                                              Text(
+                                                sub,
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: isCustomSelected
+                                                      ? Colors.white.withValues(
+                                                          alpha: 0.9)
+                                                      : AppColors.muted,
+                                                ),
                                               ),
-                                            ),
-                                            const Icon(
-                                                Icons.chevron_right_rounded,
-                                                size: 16,
-                                                color: AppColors.muted),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            const SizedBox(height: 6),
+                              ],
+                            ),
                           ],
-                        ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Submit Button
+                        ElevatedButton(
+                          onPressed: () async {
+                            final name = _assignNameController.text.trim();
+                            final phone = _assignPhoneController.text.trim();
+                            final rent = _assignRentController.text.trim();
+                            final deposit =
+                                _assignDepositController.text.trim();
+
+                            // Strict Validation Checks
+                            if (name.isEmpty) {
+                              _showToast('Please enter resident full name');
+                              return;
+                            }
+
+                            if (phone.length != 10) {
+                              _showToast(
+                                  'Please enter valid 10-digit phone number');
+                              return;
+                            }
+
+                            final rentNum = int.tryParse(rent);
+                            if (rentNum == null || rentNum <= 0) {
+                              _showToast(
+                                  'Please enter valid monthly rent amount');
+                              return;
+                            }
+
+                            final depositNum = int.tryParse(deposit);
+                            if (depositNum == null || depositNum < 0) {
+                              _showToast(
+                                  'Please enter valid security deposit amount');
+                              return;
+                            }
+
+                            if (selectedDueDay == null) {
+                              _showToast(
+                                  'Please select Monthly Rent Due Date (1st, 3rd, 5th, or Custom)');
+                              return;
+                            }
+
+                            // Successfully assign resident to bed permanently in Supabase
+                            String bedId = vacantBed['id']?.toString() ?? '';
+                            if (bedId.isEmpty) {
+                              for (var r in _rooms) {
+                                if (r['room'] == roomName) {
+                                  final beds = r['beds'] as List;
+                                  for (var b in beds) {
+                                    if (b['bed'] == vacantBed['bed'] ||
+                                        b['label'] == vacantBed['bed']) {
+                                      bedId = b['id']?.toString() ?? '';
+                                      break;
+                                    }
+                                  }
+                                }
+                              }
+                            }
+
+                            if (bedId.isEmpty) {
+                              _showToast(
+                                  'Cannot identify bed record. Please pull to refresh.');
+                              return;
+                            }
+
+                            final success = await SupabaseService.instance
+                                .assignResidentToBed(
+                              bedId: bedId,
+                              name: name,
+                              phone: phone,
+                              propertyName: _propertyName,
+                              roomNumber: roomName,
+                              rent: double.tryParse(rent),
+                              deposit: double.tryParse(deposit),
+                              rentDueDay: selectedDueDay,
+                            );
+                            if (!success) {
+                              _showToast(
+                                  'Failed to save to database. Please check connection.');
+                              return;
+                            }
+
+                            await _loadRoomsFromSupabase();
+
+                            setState(() {
+                              for (var r in _rooms) {
+                                if (r['room'] == roomName) {
+                                  final beds = r['beds'] as List;
+                                  for (var b in beds) {
+                                    if (b['bed'] == vacantBed['bed'] ||
+                                        b['label'] == vacantBed['bed']) {
+                                      b['isOccupied'] = true;
+                                      b['name'] = name;
+                                      b['phone'] = phone;
+                                      b['rent'] = rent;
+                                      b['deposit'] = deposit;
+                                      b['status'] = 'Active';
+                                      b['work'] = 'Resident';
+                                      b['docs'] = 'Aadhaar Verified';
+                                      b['docsVerified'] = true;
+                                      b['initials'] = name.isNotEmpty
+                                          ? name.substring(0, 1).toUpperCase()
+                                          : 'US';
+                                      break;
+                                    }
+                                  }
+                                  r['occupied'] = (r['occupied'] as int) + 1;
+                                  break;
+                                }
+                              }
+                            });
+
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast(
+                                '$name assigned to $roomName (${vacantBed['bed'] ?? vacantBed['label'] ?? ""}) ✓');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.green,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Confirm Check-In & Assign Bed',
+                            style: GoogleFonts.outfit(
+                                fontSize: 14, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
                       ],
                     ),
-                  ),
-
-                  // Resident Form Fields with Strict Validations
-                  _buildFormField(
-                    'Full Name',
-                    _assignNameController,
-                    hint: 'e.g. Siddharth Rao',
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Phone Number (+91) with numeric keyboard and 10-digit limit
-                  _buildFormField(
-                    'Phone Number (+91)',
-                    _assignPhoneController,
-                    hint: '9876543210',
-                    prefixText: '+91 ',
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Rent and Security Deposit with numeric keyboard and digits only
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildFormField(
-                          'Monthly Rent (₹)',
-                          _assignRentController,
-                          prefixText: '₹ ',
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _buildFormField(
-                          'Security Deposit (₹)',
-                          _assignDepositController,
-                          prefixText: '₹ ',
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-
-                  // Submit Button
-                  ElevatedButton(
-                    onPressed: () async {
-                      final name = _assignNameController.text.trim();
-                      final phone = _assignPhoneController.text.trim();
-                      final rent = _assignRentController.text.trim();
-                      final deposit = _assignDepositController.text.trim();
-
-                      // Strict Validation Checks
-                      if (name.isEmpty) {
-                        _showToast('Please enter resident full name');
-                        return;
-                      }
-
-                      if (phone.length != 10) {
-                        _showToast('Please enter valid 10-digit phone number');
-                        return;
-                      }
-
-                      final rentNum = int.tryParse(rent);
-                      if (rentNum == null || rentNum <= 0) {
-                        _showToast('Please enter valid monthly rent amount');
-                        return;
-                      }
-
-                      final depositNum = int.tryParse(deposit);
-                      if (depositNum == null || depositNum < 0) {
-                        _showToast(
-                            'Please enter valid security deposit amount');
-                        return;
-                      }
-
-                      // Successfully assign resident to bed permanently in Supabase
-                      String bedId = vacantBed['id']?.toString() ?? '';
-                      if (bedId.isEmpty) {
-                        for (var r in _rooms) {
-                          if (r['room'] == roomName) {
-                            final beds = r['beds'] as List;
-                            for (var b in beds) {
-                              if (b['bed'] == vacantBed['bed'] || b['label'] == vacantBed['bed']) {
-                                bedId = b['id']?.toString() ?? '';
-                                break;
-                              }
-                            }
-                          }
-                        }
-                      }
-
-                      if (bedId.isEmpty) {
-                        _showToast('Cannot identify bed record. Please pull to refresh.');
-                        return;
-                      }
-
-                      final success = await SupabaseService.instance.assignResidentToBed(
-                        bedId: bedId,
-                        name: name,
-                        phone: phone,
-                        propertyName: _propertyName,
-                        roomNumber: roomName,
-                        rent: double.tryParse(rent),
-                        deposit: double.tryParse(deposit),
-                      );
-                      if (!success) {
-                        _showToast('Failed to save to database. Please check connection.');
-                        return;
-                      }
-
-                      await _loadRoomsFromSupabase();
-
-                      setState(() {
-                        for (var r in _rooms) {
-                          if (r['room'] == roomName) {
-                            final beds = r['beds'] as List;
-                            for (var b in beds) {
-                              if (b['bed'] == vacantBed['bed'] || b['label'] == vacantBed['bed']) {
-                                b['isOccupied'] = true;
-                                b['name'] = name;
-                                b['phone'] = phone;
-                                b['rent'] = rent;
-                                b['deposit'] = deposit;
-                                b['status'] = 'Active';
-                                b['work'] = 'Resident';
-                                b['docs'] = 'Aadhaar Verified';
-                                b['docsVerified'] = true;
-                                b['initials'] = name.isNotEmpty
-                                    ? name.substring(0, 1).toUpperCase()
-                                    : 'US';
-                                break;
-                              }
-                            }
-                            r['occupied'] = (r['occupied'] as int) + 1;
-                            break;
-                          }
-                        }
-                      });
-
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
-                      }
-                      _showToast(
-                          '$name assigned to $roomName (${vacantBed['bed'] ?? vacantBed['label'] ?? ""}) ✓');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.green,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      'Confirm Check-In & Assign Bed',
-                      style: GoogleFonts.outfit(
-                          fontSize: 14, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                  );
+                },
               ),
-            );
-          },
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -1603,13 +2716,25 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   color: AppColors.ink,
                 ),
               ),
-              Text(
-                '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • ${OwnerAppState.instance.activePropertyLocation.isNotEmpty ? OwnerAppState.instance.activePropertyLocation : "Bengaluru"}',
-                style: GoogleFonts.outfit(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.muted,
-                ),
+              Builder(
+                builder: (context) {
+                  final name = (_propertyName != null && _propertyName!.isNotEmpty)
+                      ? _propertyName!
+                      : OwnerAppState.instance.activePropertyName;
+                  final loc = OwnerAppState.instance.activePropertyLocation;
+                  final parts = [
+                    if (name.isNotEmpty) name,
+                    if (loc.isNotEmpty) loc,
+                  ];
+                  return Text(
+                    parts.isNotEmpty ? parts.join(' • ') : 'Room Matrix',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.muted,
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1963,12 +3088,13 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
           // Bed List in Room
           ...((room['beds'] as List).map((bed) {
             final isOcc = bed['isOccupied'] == true ||
-                (bed['name'] != null && bed['name'].toString().trim().isNotEmpty);
+                (bed['name'] != null &&
+                    bed['name'].toString().trim().isNotEmpty);
             if (isOcc) {
               return _buildTenantCard(bed, room['room']?.toString() ?? '');
             } else {
-              return _buildVacantBedCard(
-                  bed, room['room']?.toString() ?? '', room['floorLabel']?.toString() ?? '');
+              return _buildVacantBedCard(bed, room['room']?.toString() ?? '',
+                  room['floorLabel']?.toString() ?? '');
             }
           })),
         ],
@@ -2316,8 +3442,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   }
 
   Widget _buildEmptyState() {
-    final bool isSearch =
-        _searchQuery.isNotEmpty || _selectedFloor != 'all' || _selectedFilter != 'all';
+    final bool isSearch = _searchQuery.isNotEmpty ||
+        _selectedFloor != 'all' ||
+        _selectedFilter != 'all';
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       child: Center(

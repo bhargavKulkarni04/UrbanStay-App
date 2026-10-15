@@ -145,7 +145,7 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
   }
 
   // Execute Move to Empty Bed
-  void _executeMoveToEmptyBed() {
+  Future<void> _executeMoveToEmptyBed() async {
     if (_selectedEmptyRoom == null || _selectedEmptyBed == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -157,8 +157,23 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
     }
 
     final residentName = widget.resident['name'] ?? 'Resident';
-    final oldBedId = widget.resident['id']?.toString() ?? '';
+    String oldBedId = widget.resident['id']?.toString() ?? '';
     String newBedId = '';
+
+    // Fallback: look up oldBedId if not present
+    if (oldBedId.isEmpty) {
+      for (final r in widget.rooms) {
+        if (r['room'] == widget.roomName) {
+          final beds = r['beds'] as List<dynamic>;
+          for (final b in beds) {
+            if (b['bed'] == widget.resident['bed'] || b['label'] == widget.resident['bed']) {
+              oldBedId = b['id']?.toString() ?? '';
+              break;
+            }
+          }
+        }
+      }
+    }
 
     // 1. Locate and vacate the current bed
     for (final r in widget.rooms) {
@@ -215,7 +230,7 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
 
     // Persist bed shift to Supabase
     if (oldBedId.isNotEmpty && newBedId.isNotEmpty) {
-      SupabaseService.instance.shiftResidentBed(
+      final success = await SupabaseService.instance.shiftResidentBed(
         oldBedId: oldBedId,
         newBedId: newBedId,
         name: residentName,
@@ -227,20 +242,33 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
             ? _newDepositController.text
             : (widget.resident['deposit']?.toString() ?? '15000')),
       );
+      if (!success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to shift bed in database. Please check connection.'),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+        }
+        return;
+      }
     }
 
     widget.onShiftSuccess();
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$residentName successfully shifted to $_selectedEmptyRoom ✓'),
-        backgroundColor: AppColors.green,
-      ),
-    );
+    if (mounted) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$residentName successfully shifted to $_selectedEmptyRoom ✓'),
+          backgroundColor: AppColors.green,
+        ),
+      );
+    }
   }
 
   // Execute Mutual Resident Swap
-  void _executeMutualSwap() {
+  Future<void> _executeMutualSwap() async {
     if (_selectedTargetResident == null || _selectedTargetRoom == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -256,21 +284,89 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
     final targetResName = targetResData['name'] ?? 'Resident 2';
 
     // Store snapshots
-    final res1Name = widget.resident['name'];
+    final res1Name = widget.resident['name']?.toString() ?? '';
     final res1Initials = widget.resident['initials'];
-    final res1Phone = widget.resident['phone'];
+    final res1Phone = widget.resident['phone']?.toString() ?? '';
     final res1Work = widget.resident['work'];
     final res1Status = widget.resident['status'] ?? 'Active';
     final res1Docs = widget.resident['docs'];
     final res1DocsVerified = widget.resident['docsVerified'];
 
-    final res2Name = targetResData['name'];
+    final res2Name = targetResData['name']?.toString() ?? '';
     final res2Initials = targetResData['initials'];
-    final res2Phone = targetResData['phone'];
+    final res2Phone = targetResData['phone']?.toString() ?? '';
     final res2Work = targetResData['work'];
     final res2Status = targetResData['status'] ?? 'Active';
     final res2Docs = targetResData['docs'];
     final res2DocsVerified = targetResData['docsVerified'];
+
+    // Resolve bed1Id (Resident 1's current bed)
+    String bed1Id = widget.resident['id']?.toString() ?? '';
+    if (bed1Id.isEmpty) {
+      for (final r in widget.rooms) {
+        if (r['room'] == widget.roomName) {
+          final beds = r['beds'] as List<dynamic>;
+          for (final b in beds) {
+            if (b['bed'] == widget.resident['bed'] || b['label'] == widget.resident['bed']) {
+              bed1Id = b['id']?.toString() ?? '';
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Resolve bed2Id (Resident 2's target bed)
+    String bed2Id = targetResData['id']?.toString() ?? '';
+    if (bed2Id.isEmpty) {
+      for (final r in widget.rooms) {
+        if (r['room'] == _selectedTargetRoom) {
+          final beds = r['beds'] as List<dynamic>;
+          for (final b in beds) {
+            if (b['bed'] == _selectedTargetResident!['bed'] || b['label'] == _selectedTargetResident!['bed']) {
+              bed2Id = b['id']?.toString() ?? '';
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Persist mutual swap directly in Supabase
+    if (bed1Id.isNotEmpty && bed2Id.isNotEmpty) {
+      final success = await SupabaseService.instance.swapResidentBeds(
+        bed1Id: bed1Id,
+        bed2Id: bed2Id,
+        res1Name: res1Name,
+        res1Phone: res1Phone,
+        res1Rent: double.tryParse(_swapRes1RentController.text.isNotEmpty
+            ? _swapRes1RentController.text
+            : (widget.resident['rent']?.toString() ?? '8500')),
+        res1Deposit: double.tryParse(_swapRes1DepositController.text.isNotEmpty
+            ? _swapRes1DepositController.text
+            : (widget.resident['deposit']?.toString() ?? '15000')),
+        res2Name: res2Name,
+        res2Phone: res2Phone,
+        res2Rent: double.tryParse(_swapRes2RentController.text.isNotEmpty
+            ? _swapRes2RentController.text
+            : (targetResData['rent']?.toString() ?? '8500')),
+        res2Deposit: double.tryParse(_swapRes2DepositController.text.isNotEmpty
+            ? _swapRes2DepositController.text
+            : (targetResData['deposit']?.toString() ?? '15000')),
+      );
+
+      if (!success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to swap beds in database. Please check connection.'),
+              backgroundColor: AppColors.danger,
+            ),
+          );
+        }
+        return;
+      }
+    }
 
     // Update Room 1 Bed -> Assign Resident 2
     for (final r in widget.rooms) {
@@ -325,13 +421,15 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
     }
 
     widget.onShiftSuccess();
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Swapped $currentResName and $targetResName between ${widget.roomName} and $_selectedTargetRoom successfully ✓'),
-        backgroundColor: AppColors.green,
-      ),
-    );
+    if (mounted) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Swapped $currentResName and $targetResName between ${widget.roomName} and $_selectedTargetRoom successfully ✓'),
+          backgroundColor: AppColors.green,
+        ),
+      );
+    }
   }
 
   @override

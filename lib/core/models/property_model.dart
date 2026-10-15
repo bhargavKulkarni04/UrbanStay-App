@@ -33,6 +33,7 @@ class PropertyModel {
   final String? upiVpa;
   final String? creditingPhone;
   final String? bankQrUrl;
+  final String? ownerAadhaarNumber;
   final int totalFloors;
   final int totalRooms;
   final String? ownerId;
@@ -66,6 +67,7 @@ class PropertyModel {
     this.upiVpa,
     this.creditingPhone,
     this.bankQrUrl,
+    this.ownerAadhaarNumber,
     this.totalFloors = 1,
     this.totalRooms = 0,
     this.ownerId,
@@ -93,11 +95,14 @@ class PropertyModel {
 
     return PropertyModel(
       id: json['id']?.toString() ?? '',
-      propertyName: json['property_name']?.toString() ?? json['name']?.toString() ?? 'UrbanStay PG',
+      propertyName:
+          json['property_name']?.toString() ?? json['name']?.toString() ?? '',
       propertyCode: json['property_code']?.toString() ?? 'URBAN-101',
       genderCategory: json['gender_category']?.toString() ?? 'Coliving',
-      propertyStructure: json['property_structure']?.toString() ?? 'Independent Building',
-      streetAddress: json['street_address']?.toString() ?? json['address']?.toString(),
+      propertyStructure:
+          json['property_structure']?.toString() ?? 'Independent Building',
+      streetAddress:
+          json['street_address']?.toString() ?? json['address']?.toString(),
       areaLocality: json['area_locality']?.toString(),
       landmark: json['landmark']?.toString(),
       city: json['city']?.toString() ?? 'Bengaluru',
@@ -114,13 +119,15 @@ class PropertyModel {
       gracePeriod: json['grace_period']?.toString() ?? '5 Days',
       lateFee: lateFee,
       noticePeriod: json['notice_period']?.toString() ?? '30 Days',
-      ownerLegalName: json['owner_legal_name']?.toString() ?? json['owner_name']?.toString(),
+      ownerLegalName: json['owner_legal_name']?.toString() ??
+          json['owner_name']?.toString(),
       ownerEmail: json['owner_email']?.toString(),
       bankHolderName: json['bank_holder_name']?.toString(),
       bankName: json['bank_name']?.toString(),
       upiVpa: json['upi_vpa']?.toString() ?? json['upi_id']?.toString(),
       creditingPhone: json['crediting_phone']?.toString(),
       bankQrUrl: json['bank_qr_url']?.toString(),
+      ownerAadhaarNumber: json['owner_aadhaar_number']?.toString(),
       totalFloors: json['total_floors'] is int
           ? json['total_floors']
           : (int.tryParse(json['total_floors']?.toString() ?? '1') ?? 1),
@@ -164,6 +171,8 @@ class PropertyModel {
       if (upiVpa != null) 'upi_vpa': upiVpa,
       if (creditingPhone != null) 'crediting_phone': creditingPhone,
       if (bankQrUrl != null) 'bank_qr_url': bankQrUrl,
+      if (ownerAadhaarNumber != null)
+        'owner_aadhaar_number': ownerAadhaarNumber,
       'total_floors': totalFloors,
       'total_rooms': totalRooms,
       if (ownerId != null) 'owner_id': ownerId,

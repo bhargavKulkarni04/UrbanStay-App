@@ -16,8 +16,13 @@ import '../../../../core/models/models.dart';
 /// - Comprehensive Chronological Audit & History Log.
 class OwnerDayCollectionScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
 
-  const OwnerDayCollectionScreen({super.key, this.onBack});
+  const OwnerDayCollectionScreen({
+    super.key,
+    this.onBack,
+    this.propertyId,
+  });
 
   @override
   State<OwnerDayCollectionScreen> createState() =>
@@ -29,31 +34,57 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   int _selectedDay = 1;
   String _selectedStaffActor = 'Owner';
   final List<String> _staffActors = [];
+  String _propertyName = '';
 
   String _historyFilter = 'all'; // 'all', 'payments', 'rescheduled', 'rejected'
   String _selectedFloor =
       'all'; // 'all', 'Ground Floor', '1st Floor', '2nd Floor', '3rd Floor'
 
-  String _formatSubtitle(Map<String, dynamic> tenant) {
-    final floor = tenant['floor'] ?? '1st Floor';
-    final sharing = tenant['sharing'] ?? '2-Sharing';
-    String room = tenant['room'] ?? '';
-    if (room.isEmpty) {
-      final bedStr = (tenant['bed'] ?? '').toString();
-      final clean = bedStr
-          .replaceAll(RegExp(r'-[A-Za-z]$'), '')
-          .replaceAll('Bed ', 'Room ');
-      room = clean.isNotEmpty
-          ? (clean.startsWith('Room') ? clean : 'Room $clean')
-          : '';
+  // Helper to extract initials
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
-    final parts = [if (floor.isNotEmpty) floor, if (sharing.isNotEmpty) sharing, if (room.isNotEmpty) room];
+    return name.isNotEmpty ? name[0].toUpperCase() : 'TN';
+  }
+
+  // Helper to extract floor from room
+  String _getFloor(String roomNumber) {
+    final clean = roomNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (clean.isNotEmpty) {
+      final first = clean[0];
+      if (first == '1') return '1st Floor';
+      if (first == '2') return '2nd Floor';
+      if (first == '3') return '3rd Floor';
+      if (first == '4') return '4th Floor';
+      if (first == '0') return 'Ground Floor';
+      return '${first}th Floor';
+    }
+    return '1st Floor';
+  }
+
+  String _formatSubtitle(RentLedgerModel tenant) {
+    final floor = _getFloor(tenant.roomNumber);
+    final room = tenant.roomNumber.isNotEmpty
+        ? (tenant.roomNumber.startsWith('Room')
+            ? tenant.roomNumber
+            : 'Room ${tenant.roomNumber}')
+        : '';
+    final bed = tenant.bedNumber != null && tenant.bedNumber!.isNotEmpty
+        ? 'Bed ${tenant.bedNumber}'
+        : '';
+    final parts = [
+      if (floor.isNotEmpty) floor,
+      if (bed.isNotEmpty) bed,
+      if (room.isNotEmpty) room
+    ];
     return parts.join(' • ');
   }
 
   // Master Tenant List & Audit History
-  final List<Map<String, dynamic>> _tenants = [];
-  final List<Map<String, dynamic>> _historyLogs = [];
+  final List<RentLedgerModel> _tenants = [];
+  final List<WardenCashModel> _historyLogs = [];
   bool _isLoading = false;
 
   @override
@@ -68,7 +99,12 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       final prop = await SupabaseService.instance.getOwnerProperty();
       if (prop != null) {
         final propId = prop['id'].toString();
-        final ownerName = (prop['owner_legal_name'] ?? prop['name'] ?? 'Owner').toString();
+        final ownerName =
+            (prop['owner_legal_name'] ?? prop['name'] ?? 'Owner').toString();
+        _propertyName = (prop['property_name'] ??
+                prop['name'] ??
+                OwnerAppState.instance.activePropertyName)
+            .toString();
         final staffList =
             await SupabaseService.instance.getStaffMembers(propId);
         final List<String> loadedStaff = ['$ownerName (Owner)'];
@@ -83,104 +119,80 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           setState(() {
             _staffActors.clear();
             _staffActors.addAll(loadedStaff);
-            if (_staffActors.isNotEmpty && (_selectedStaffActor == 'Owner' || !_staffActors.contains(_selectedStaffActor))) {
+            if (_staffActors.isNotEmpty &&
+                (_selectedStaffActor == 'Owner' ||
+                    !_staffActors.contains(_selectedStaffActor))) {
               _selectedStaffActor = _staffActors.first;
             }
           });
         }
 
         // Load Warden Cash Collections Audit History
-        final cashModels = await SupabaseService.instance.getWardenCashModels(propId);
+        final cashModels =
+            await SupabaseService.instance.getWardenCashModels(propId);
         if (mounted && cashModels.isNotEmpty) {
-          final List<Map<String, dynamic>> loadedHistory = [];
-          for (final c in cashModels) {
-            loadedHistory.add({
-              'id': c.id,
-              'type': 'payment_verified',
-              'title': '₹${c.amount.toInt()} Cash Collection Recorded',
-              'tenant': '${c.tenantName} (${c.roomNumber})',
-              'actor': c.collectedBy,
-              'time': c.createdAt != null ? c.createdAt.toString().split('T').first : 'Recent',
-              'ref': c.isDeposited ? 'Deposited to Owner' : 'With Warden',
-              'badge': c.isDeposited ? 'Cash Settled' : 'Audit Pending',
-            });
-          }
           setState(() {
             _historyLogs.clear();
-            _historyLogs.addAll(loadedHistory);
+            _historyLogs.addAll(cashModels);
           });
         }
 
-        final ledgerModels = await SupabaseService.instance.getRentLedgerModels(propId);
-        if (mounted && ledgerModels.isNotEmpty) {
-          final List<Map<String, dynamic>> loaded = [];
-          for (final model in ledgerModels) {
-            final roomNum = model.roomNumber;
-            final floorName = roomNum.startsWith('G') ? 'Ground Floor' : (roomNum.isNotEmpty ? '${roomNum[0]}st Floor' : '');
-            final isPaid = model.isPaid;
-            final tenantName = model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
-            final nameParts = tenantName.trim().split(' ');
-            final computedInitials = nameParts.length >= 2
-                ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
-                : (tenantName.isNotEmpty ? tenantName[0].toUpperCase() : 'TN');
+        final now = DateTime.now();
+        const months = [
+          'January',
+          'February',
+          'March',
+          'April',
+          'May',
+          'June',
+          'July',
+          'August',
+          'September',
+          'October',
+          'November',
+          'December'
+        ];
+        final currentCycle = '${months[now.month - 1]} ${now.year}';
+        await SupabaseService.instance.ensureMonthlyRentLedgers(
+          propertyId: propId,
+          cycleMonth: currentCycle,
+        );
 
-            loaded.add({
-              'id': model.id,
-              'name': tenantName,
-              'initials': computedInitials,
-              'bed': model.bedNumber ?? '',
-              'room': roomNum,
-              'floor': floorName,
-              'sharing': '2-Sharing',
-              'phone': model.phone ?? '',
-              'payDay': model.dueDate.day,
-              'amount': model.rentAmount.toInt(),
-              'status': isPaid ? 'paid' : 'overdue',
-              'paidDate': model.paidDate != null ? model.paidDate.toString().split('T').first : null,
-              'dueLabel': isPaid ? 'Paid' : 'Rent Due',
-              'approvedBy': _selectedStaffActor,
-              'requestedDate': null,
-              'extensionDate': null,
-            });
-          }
+        final ledgerModels =
+            await SupabaseService.instance.getRentLedgerModels(propId);
+        if (mounted && ledgerModels.isNotEmpty) {
           setState(() {
             _tenants.clear();
-            _tenants.addAll(loaded);
+            _tenants.addAll(ledgerModels);
           });
         } else if (mounted) {
           final rooms = await SupabaseService.instance.getRoomsWithBeds(propId);
-          final List<Map<String, dynamic>> bedTenants = [];
+          final List<RentLedgerModel> bedTenants = [];
           for (final r in rooms) {
             final beds = r['beds'] as List<dynamic>? ?? [];
             final actualRoomNum = r['room_number']?.toString() ?? '';
-            final actualFloor = r['floor_name']?.toString() ?? (r['floor_id'] != null ? 'Floor ${r['floor_id']}' : '');
-            final roomRent = (r['rent_per_bed'] as num?)?.toInt() ?? 0;
+            final roomRent = (r['rent_per_bed'] as num?)?.toDouble() ?? 0.0;
             for (final b in beds) {
               if (b['is_occupied'] == true && b['tenant_name'] != null) {
                 final tName = b['tenant_name'].toString();
-                final nameParts = tName.trim().split(' ');
-                final computedInitials = nameParts.length >= 2
-                    ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
-                    : (tName.isNotEmpty ? tName[0].toUpperCase() : 'TN');
-                final actualBedRent = (b['rent'] as num?)?.toInt() ?? roomRent;
-                bedTenants.add({
-                  'id': b['id'].toString(),
-                  'name': tName,
-                  'initials': computedInitials,
-                  'bed': b['bed_number'] ?? '',
-                  'room': actualRoomNum.isNotEmpty ? 'Room $actualRoomNum' : '',
-                  'floor': actualFloor,
-                  'sharing': r['sharing_type']?.toString() ?? '${beds.length}-Sharing',
-                  'phone': b['tenant_phone'] ?? '',
-                  'payDay': 1,
-                  'amount': actualBedRent,
-                  'status': 'overdue',
-                  'paidDate': null,
-                  'dueLabel': 'Rent Due',
-                  'approvedBy': _selectedStaffActor,
-                  'requestedDate': null,
-                  'extensionDate': null,
-                });
+                final actualBedRent =
+                    (b['rent'] as num?)?.toDouble() ?? roomRent;
+                final bId = b['id']?.toString() ??
+                    'bed_${b['bed_id'] ?? DateTime.now().millisecondsSinceEpoch}';
+                bedTenants.add(RentLedgerModel(
+                  id: bId,
+                  propertyId: propId,
+                  tenantId: b['tenant_id']?.toString() ?? '',
+                  tenantName: tName,
+                  roomNumber: actualRoomNum,
+                  bedNumber: b['bed_number']?.toString(),
+                  phone: b['tenant_phone']?.toString(),
+                  cycleMonth: currentCycle,
+                  rentAmount: actualBedRent,
+                  dueDate: DateTime(now.year, now.month,
+                      (b['rent_due_day'] as num?)?.toInt() ?? 1),
+                  status: 'PENDING',
+                ));
               }
             }
           }
@@ -199,6 +211,19 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
     }
   }
 
+  String _formatDaySuffix(int d) {
+    if (d >= 11 && d <= 13) return '${d}th';
+    switch (d % 10) {
+      case 1:
+        return '${d}st';
+      case 2:
+        return '${d}nd';
+      case 3:
+        return '${d}rd';
+      default:
+        return '${d}th';
+    }
+  }
 
   void _showToast(String msg) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -221,9 +246,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   @override
   Widget build(BuildContext context) {
     final defaultDays = [1, 2, 3, 5, 7, 10, 15, 20, 25];
-    final tenantDays = _tenants
-        .map((t) => ((t['payDay'] as num?)?.toInt() ?? 1))
-        .toList();
+    final tenantDays = _tenants.map((t) => t.dueDate.day).toList();
     final availableDays = {...defaultDays, ...tenantDays}.toList()..sort();
 
     return Scaffold(
@@ -312,7 +335,11 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         ),
                       ),
                       Text(
-                        '${OwnerAppState.instance.activePropertyName.isNotEmpty ? OwnerAppState.instance.activePropertyName : "My PG"} • Salary Cycle Calendar',
+                        OwnerAppState.instance.activePropertyName.isNotEmpty
+                            ? '${OwnerAppState.instance.activePropertyName} • Salary Cycle Calendar'
+                            : (_propertyName.isNotEmpty
+                                ? '$_propertyName • Salary Cycle Calendar'
+                                : 'Salary Cycle Calendar'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.outfit(
@@ -337,7 +364,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       context: context,
                       backgroundColor: Colors.white,
                       shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(16)),
                       ),
                       builder: (ctx) => SafeArea(
                         child: Padding(
@@ -347,7 +375,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
                                 child: Text(
                                   'Select Active Operator / Staff',
                                   style: GoogleFonts.outfit(
@@ -376,7 +405,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                                             color: AppColors.green, size: 20)
                                         : null,
                                     onTap: () {
-                                      setState(() => _selectedStaffActor = actor);
+                                      setState(
+                                          () => _selectedStaffActor = actor);
                                       Navigator.pop(ctx);
                                     },
                                   )),
@@ -393,7 +423,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               decoration: BoxDecoration(
                 color: AppColors.greenLight,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.green.withValues(alpha: 0.2)),
+                border:
+                    Border.all(color: AppColors.green.withValues(alpha: 0.2)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -585,15 +616,14 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
 
   Widget _buildScheduleContent(List<int> availableDays) {
     final selectedTenants = _tenants.where((t) {
-      final matchesDay = ((t['payDay'] as num?)?.toInt() ?? 1) == _selectedDay;
-      final matchesFloor =
-          _selectedFloor == 'all' || t['floor'] == _selectedFloor;
+      final matchesDay = t.dueDate.day == _selectedDay;
+      final floor = _getFloor(t.roomNumber);
+      final matchesFloor = _selectedFloor == 'all' || floor == _selectedFloor;
       return matchesDay && matchesFloor;
     }).toList();
     final dayTotalExpected =
-        selectedTenants.fold<int>(0, (sum, t) => sum + ((t['amount'] as num?)?.toInt() ?? 0));
-    final dayPaidCount =
-        selectedTenants.where((t) => t['status'] == 'paid').length;
+        selectedTenants.fold<int>(0, (sum, t) => sum + t.rentAmount.toInt());
+    final dayPaidCount = selectedTenants.where((t) => t.isPaid).length;
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -629,10 +659,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             child: Row(
               children: availableDays.map((d) {
                 final count = _tenants.where((t) {
-                  final matchesDay =
-                      ((t['payDay'] as num?)?.toInt() ?? 1) == d;
+                  final matchesDay = t.dueDate.day == d;
+                  final floor = _getFloor(t.roomNumber);
                   final matchesFloor =
-                      _selectedFloor == 'all' || t['floor'] == _selectedFloor;
+                      _selectedFloor == 'all' || floor == _selectedFloor;
                   return matchesDay && matchesFloor;
                 }).length;
                 final isSel = _selectedDay == d;
@@ -665,7 +695,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       child: Column(
                         children: [
                           Text(
-                            '${d}th',
+                            _formatDaySuffix(d),
                             style: GoogleFonts.outfit(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
@@ -710,7 +740,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${_selectedDay}th of Month (Salary Cycle)',
+                        '${_formatDaySuffix(_selectedDay)} of Month (Salary Cycle)',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.outfit(
@@ -769,10 +799,14 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   // ===========================================================================
   // 4. TENANT CARD (With Neutral WhatsApp & Verification Actions)
   // ===========================================================================
-  Widget _buildTenantCard(Map<String, dynamic> tenant) {
-    final isPaid = tenant['status'] == 'paid';
-    final isOverdue = tenant['status'] == 'overdue';
-    final String approvedBy = tenant['approvedBy'] ?? _selectedStaffActor;
+  Widget _buildTenantCard(RentLedgerModel tenant) {
+    final isPaid = tenant.isPaid;
+    final isOverdue = tenant.isOverdue;
+    final String approvedBy = _selectedStaffActor;
+    final tenantName =
+        tenant.tenantName.isNotEmpty ? tenant.tenantName : 'Resident';
+    final initials = _getInitials(tenantName);
+    final phone = tenant.phone ?? '';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -818,7 +852,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          tenant['initials'] ?? 'TN',
+                          initials,
                           style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
@@ -834,7 +868,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            tenant['name'] ?? 'Resident',
+                            tenantName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(
@@ -862,7 +896,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               ),
               const SizedBox(width: 10),
               Text(
-                '₹${tenant['amount']}',
+                '₹${tenant.rentAmount.toInt()}',
                 style: GoogleFonts.outfit(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
@@ -894,9 +928,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 Expanded(
                   child: Text(
                     isPaid
-                        ? 'Verified by $approvedBy • Paid on ${tenant['paidDate'] ?? '1 Aug'}'
+                        ? 'Verified by $approvedBy • Paid on ${tenant.paidDate != null ? "${tenant.paidDate!.day} Aug" : "1 Aug"}'
                         : isOverdue
-                            ? 'Agreed Date: ${_selectedDay}th • Overdue (${tenant['overdueDays'] ?? 'Pending'})'
+                            ? 'Agreed Date: ${_selectedDay}th • Overdue'
                             : 'Agreed Salary Date: ${_selectedDay}th • Due Today (No Late Fine)',
                     style: GoogleFonts.outfit(
                       fontSize: 11,
@@ -915,8 +949,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () =>
-                      _showToast('Calling +91 ${tenant['phone']}...'),
+                  onTap: () => _showToast('Calling +91 $phone...'),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     height: 38,
@@ -924,8 +957,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: AppColors.green.withOpacity(0.3)),
+                      border:
+                          Border.all(color: AppColors.green.withOpacity(0.3)),
                     ),
                     child: SvgPicture.asset(
                       'assets/images/phone.svg',
@@ -939,7 +972,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast(
-                      'WhatsApp Chat opened with ${tenant['name']} (+91 ${tenant['phone']}) ✓'),
+                      'WhatsApp Chat opened with $tenantName (+91 $phone) ✓'),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     height: 38,
@@ -947,8 +980,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.greenLight,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color: AppColors.green.withOpacity(0.3)),
+                      border:
+                          Border.all(color: AppColors.green.withOpacity(0.3)),
                     ),
                     child: SvgPicture.asset(
                       'assets/images/whatsapp.svg',
@@ -963,7 +996,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           const SizedBox(height: 8),
 
           // Extension Request Bar with Yellow Decline and Approve Buttons
-          if (tenant['status'] == 'extension_requested') ...[
+          if (tenant.status.toLowerCase() == 'extension_requested') ...[
             Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -979,7 +1012,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Requested to pay on ${tenant['requestedDate'] ?? '15 Aug 2026'}',
+                      'Requested to pay on 15 ${tenant.cycleMonth.isNotEmpty ? tenant.cycleMonth : "Aug 2026"}',
                       style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -1009,7 +1042,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                             ),
                           ),
                           content: Text(
-                            'Are you sure you want to decline the payment extension for ${tenant['name']}?',
+                            'Are you sure you want to decline the payment extension for $tenantName?',
                             style: GoogleFonts.outfit(
                               fontSize: 13,
                               color: AppColors.muted,
@@ -1027,13 +1060,27 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                               ),
                             ),
                             ElevatedButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 Navigator.pop(dCtx);
-                                setState(() {
-                                  tenant['status'] = 'overdue';
-                                  tenant['dueLabel'] = 'Extension Declined • Due Immediately';
-                                });
-                                _showToast('Extension Declined for ${tenant['name']}');
+                                final propId = (widget.propertyId != null &&
+                                        widget.propertyId!.isNotEmpty)
+                                    ? widget.propertyId!
+                                    : (tenant.propertyId.isNotEmpty
+                                        ? tenant.propertyId
+                                        : (SupabaseService
+                                                .instance.activePropertyId ??
+                                            ''));
+                                if (propId != null && propId.isNotEmpty) {
+                                  await SupabaseService.instance
+                                      .declineRentExtension(
+                                    propertyId: propId,
+                                    tenantName: tenantName,
+                                    roomNumber: tenant.roomNumber,
+                                    ledgerId: tenant.id,
+                                  );
+                                }
+                                _showToast(
+                                    'Extension Declined for $tenantName');
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFDC2626),
@@ -1078,7 +1125,6 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   flex: 2,
                   child: InkWell(
                     onTap: () {
-                      final extDate = tenant['requestedDate'] ?? '15 Aug 2026';
                       showDialog(
                         context: context,
                         builder: (dCtx) => AlertDialog(
@@ -1094,7 +1140,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                             ),
                           ),
                           content: Text(
-                            'Approve rent payment extension for ${tenant['name']} till $extDate?',
+                            'Approve rent payment extension for $tenantName till 15 Aug 2026?',
                             style: GoogleFonts.outfit(
                               fontSize: 13,
                               color: AppColors.muted,
@@ -1112,14 +1158,28 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                               ),
                             ),
                             ElevatedButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 Navigator.pop(dCtx);
-                                setState(() {
-                                  tenant['status'] = 'extension_approved';
-                                  tenant['extensionDate'] = extDate;
-                                  tenant['dueLabel'] = 'Extension Approved • Due $extDate';
-                                });
-                                _showToast('Extension Approved for ${tenant['name']} till $extDate ✓');
+                                final propId = (widget.propertyId != null &&
+                                        widget.propertyId!.isNotEmpty)
+                                    ? widget.propertyId!
+                                    : (tenant.propertyId.isNotEmpty
+                                        ? tenant.propertyId
+                                        : (SupabaseService
+                                                .instance.activePropertyId ??
+                                            ''));
+                                if (propId != null && propId.isNotEmpty) {
+                                  await SupabaseService.instance
+                                      .approveRentExtension(
+                                    propertyId: propId,
+                                    tenantName: tenantName,
+                                    roomNumber: tenant.roomNumber,
+                                    ledgerId: tenant.id,
+                                    newDueDay: 15,
+                                  );
+                                }
+                                _showToast(
+                                    'Extension Approved for $tenantName till 15 Aug ✓');
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFF59E0B),
@@ -1149,7 +1209,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       ),
                       child: Center(
                         child: Text(
-                          '✓ Approve (${tenant['requestedDate'] ?? '15 Aug'})',
+                          '✓ Approve (15 Aug)',
                           style: GoogleFonts.outfit(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w800,
@@ -1162,7 +1222,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               ],
             ),
             const SizedBox(height: 8),
-          ] else if (tenant['status'] == 'extension_approved') ...[
+          ] else if (tenant.status.toLowerCase() == 'extension_approved') ...[
             Container(
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -1178,7 +1238,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Extension Approved • Due ${tenant['extensionDate'] ?? '15 Aug 2026'}',
+                      'Extension Approved • Due 15 Aug 2026',
                       style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -1217,7 +1277,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Paid on ${tenant['paidDate'] ?? '1 Aug 2026'}',
+                      'Paid on ${tenant.paidDate != null ? "${tenant.paidDate!.day} Aug 2026" : "1 Aug 2026"}',
                       style: GoogleFonts.outfit(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -1228,16 +1288,80 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 ),
               ),
             )
-          else if (tenant['status'] != 'extension_requested') ...[
-            // Verification Bar: View Proof, Reject, and Accept
+          else if (tenant.status.toLowerCase() == 'under_review') ...[
+            // Tenant uploaded payment proof -> View Proof, Reject, Accept
             Row(
               children: [
                 Expanded(
-                  flex: 3,
                   child: OutlinedButton.icon(
-                    onPressed: () => _openViewProofModal(tenant),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                          title: Text('Payment Proof',
+                              style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.ink)),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Tenant: $tenantName',
+                                  style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 6),
+                              Text(
+                                  'Room: ${tenant.roomNumber} (${tenant.bedNumber ?? ""})',
+                                  style: GoogleFonts.outfit(
+                                      color: AppColors.muted)),
+                              const SizedBox(height: 6),
+                              Text('Amount: ₹${tenant.rentAmount.toInt()}',
+                                  style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.greenDark)),
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                height: 160,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F4F6),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: const Color(0xFFE5E7EB)),
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.receipt_long_rounded,
+                                          size: 40, color: AppColors.muted),
+                                      const SizedBox(height: 8),
+                                      Text('UPI Screenshot Attached',
+                                          style: GoogleFonts.outfit(
+                                              fontSize: 12,
+                                              color: AppColors.muted)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: Text('Close',
+                                  style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.ink)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                     icon: const Icon(Icons.remove_red_eye_outlined,
-                        size: 13, color: AppColors.ink),
+                        size: 14, color: AppColors.ink),
                     label: Text(
                       'View Proof',
                       style: GoogleFonts.outfit(
@@ -1246,9 +1370,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                           color: AppColors.ink),
                     ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.ink,
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
@@ -1256,121 +1379,113 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  flex: 3,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openRejectPaymentModal(tenant),
-                    icon: const Icon(Icons.close_rounded,
-                        size: 13, color: Color(0xFFDC2626)),
-                    label: Text(
-                      'Reject',
-                      style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFFDC2626)),
-                    ),
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      final success = await SupabaseService.instance
+                          .updatePaymentApprovalStatus(
+                        ledgerId: tenant.id,
+                        status: 'rejected',
+                      );
+                      if (success) {
+                        await _loadDayCollectionData();
+                        _showToast('Payment Proof Rejected');
+                      }
+                    },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFDC2626),
                       side: const BorderSide(color: Color(0xFFFCA5A5)),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: Text(
+                      'Reject',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626)),
                     ),
                   ),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  flex: 4,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        tenant['status'] = 'paid';
-                        tenant['paidLabel'] =
-                            'Paid on ${_selectedDay} Aug (Verified by $_selectedStaffActor)';
-                        tenant['ref'] =
-                            'UTR-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
-                        tenant['paidDate'] = '${_selectedDay} Aug 2026';
-                        tenant['approvedBy'] = _selectedStaffActor;
-
-                        _historyLogs.insert(0, {
-                          'id': 'h_${DateTime.now().millisecondsSinceEpoch}',
-                          'type': 'payment_verified',
-                          'title': '₹${tenant['amount']} Direct UPI Verified',
-                          'tenant': '${tenant['name']} (${tenant['bed']})',
-                          'actor': _selectedStaffActor,
-                          'time': 'Just now',
-                          'ref': tenant['ref'],
-                          'badge': 'Paid on Time',
-                        });
-                      });
-                      _showToast(
-                          'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final success = await SupabaseService.instance
+                          .updatePaymentApprovalStatus(
+                        ledgerId: tenant.id,
+                        status: 'approved',
+                      );
+                      if (success) {
+                        await _loadDayCollectionData();
+                        _showToast('Payment Approved for $tenantName ✓');
+                      } else {
+                        _showToast('Failed to approve payment');
+                      }
                     },
-                    icon: const Icon(Icons.check_rounded,
-                        size: 14, color: Colors.white),
-                    label: Text(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.green,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: Text(
                       'Accept',
                       style: GoogleFonts.outfit(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                           color: Colors.white),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.green,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            // Real Unpaid Actions: Record Cash & Change Pay Date
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openRecordCashModal(tenant),
+                    icon: const Icon(Icons.payments_outlined,
+                        size: 14, color: AppColors.greenDark),
+                    label: Text(
+                      'Record Cash',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.greenDark),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.greenDark,
+                      side: BorderSide(
+                          color: AppColors.green.withValues(alpha: 0.3)),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Secondary: Record Cash / Re-Schedule Date
-            Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => _openRecordCashModal(tenant),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFEEF0F2)),
-                      ),
-                      child: Text(
-                        'Record Cash Instead',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.muted),
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: InkWell(
-                    onTap: () => _openChangePayDateModal(tenant),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFEEF0F2)),
-                      ),
-                      child: Text(
-                        'Change Pay Date',
-                        style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.muted),
-                      ),
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openChangePayDateModal(tenant),
+                    icon: const Icon(Icons.calendar_today_outlined,
+                        size: 13, color: AppColors.muted),
+                    label: Text(
+                      'Change Pay Date',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.muted),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.muted,
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
                 ),
@@ -1397,8 +1512,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    tenant['overdueDays'] ??
-                        (isOverdue ? 'Overdue' : 'Due Today'),
+                    isOverdue ? 'Overdue' : 'Due Today',
                     style: GoogleFonts.outfit(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1419,10 +1533,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   // ===========================================================================
   Widget _buildHistoryContent() {
     final filtered = _historyLogs.where((log) {
-      if (_historyFilter == 'payments')
-        return log['type'] == 'payment_verified';
-      if (_historyFilter == 'rescheduled') return log['type'] == 'rescheduled';
-      if (_historyFilter == 'rejected') return log['type'] == 'rejected';
+      if (_historyFilter == 'payments') return log.isDeposited;
+      if (_historyFilter == 'rescheduled') return log.isWithWarden;
       return true;
     }).toList();
 
@@ -1445,9 +1557,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               children: [
                 _buildHistoryFilterChip(
                     'all', 'All Audit Logs (${_historyLogs.length})'),
-                _buildHistoryFilterChip('payments', 'Payments Verified'),
-                _buildHistoryFilterChip('rescheduled', 'Date Changes'),
-                _buildHistoryFilterChip('rejected', 'Rejected'),
+                _buildHistoryFilterChip('payments', 'Deposited to Bank'),
+                _buildHistoryFilterChip('rescheduled', 'With Warden'),
               ],
             ),
           ),
@@ -1501,10 +1612,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
     );
   }
 
-  Widget _buildHistoryCard(Map<String, dynamic> log) {
-    final isPayment = log['type'] == 'payment_verified';
-    final isRescheduled = log['type'] == 'rescheduled';
-    final isRejected = log['type'] == 'rejected';
+  Widget _buildHistoryCard(WardenCashModel log) {
+    final isDeposited = log.isDeposited;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1535,31 +1644,25 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: isPayment
+                        color: isDeposited
                             ? AppColors.greenLight
-                            : isRescheduled
-                                ? const Color(0xFFFEF3C7)
-                                : const Color(0xFFFEE2E2),
+                            : const Color(0xFFFEF3C7),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        isPayment
+                        isDeposited
                             ? Icons.check_circle_outline_rounded
-                            : isRescheduled
-                                ? Icons.calendar_today_outlined
-                                : Icons.cancel_outlined,
+                            : Icons.schedule_rounded,
                         size: 15,
-                        color: isPayment
+                        color: isDeposited
                             ? AppColors.greenDark
-                            : isRescheduled
-                                ? const Color(0xFFB45309)
-                                : const Color(0xFFDC2626),
+                            : const Color(0xFFB45309),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        log['title'],
+                        '₹${log.amount.toInt()} Cash Collection Recorded',
                         style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
@@ -1573,23 +1676,19 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isPayment
+                  color: isDeposited
                       ? AppColors.greenLight
-                      : isRescheduled
-                          ? const Color(0xFFFEF3C7)
-                          : const Color(0xFFFEE2E2),
+                      : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  log['badge'],
+                  isDeposited ? 'Cash Settled' : 'With Warden',
                   style: GoogleFonts.outfit(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
-                    color: isPayment
+                    color: isDeposited
                         ? AppColors.greenDark
-                        : isRescheduled
-                            ? const Color(0xFFB45309)
-                            : const Color(0xFFDC2626),
+                        : const Color(0xFFB45309),
                   ),
                 ),
               ),
@@ -1597,24 +1696,23 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            log['tenant'],
+            '${log.tenantName} (${log.roomNumber})',
             style: GoogleFonts.outfit(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: AppColors.ink),
           ),
           const SizedBox(height: 2),
-          if (log['ref'] != null)
+          Text(
+            'Status: ${isDeposited ? "Deposited to Owner" : "Held by Warden"}',
+            style: GoogleFonts.outfit(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.muted),
+          ),
+          if (log.notes != null && log.notes!.isNotEmpty)
             Text(
-              'Reference: ${log['ref']}',
-              style: GoogleFonts.outfit(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.muted),
-            ),
-          if (log['reason'] != null)
-            Text(
-              'Note: ${log['reason']}',
+              'Note: ${log.notes}',
               style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted),
             ),
           const SizedBox(height: 8),
@@ -1628,14 +1726,16 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Action By: ${log['actor']}',
+                  'Action By: ${log.collectedBy}',
                   style: GoogleFonts.outfit(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w600,
                       color: AppColors.ink),
                 ),
                 Text(
-                  log['time'],
+                  log.createdAt != null
+                      ? log.createdAt.toString().split('T').first
+                      : 'Recent',
                   style: GoogleFonts.outfit(
                       fontSize: 10.5, color: AppColors.muted),
                 ),
@@ -1650,8 +1750,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    final phone = log['phone'] ?? '9876543210';
-                    _showToast('Calling +91 $phone...');
+                    _showToast('Calling resident for ${log.tenantName}...');
                   },
                   icon: const Icon(Icons.phone_outlined,
                       size: 13, color: AppColors.ink),
@@ -1675,8 +1774,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    final phone = log['phone'] ?? '9876543210';
-                    _showToast('WhatsApp Chat opened (+91 $phone) ✓');
+                    _showToast('WhatsApp Chat opened with ${log.tenantName} ✓');
                   },
                   icon: const Icon(Icons.chat_bubble_outline_rounded,
                       size: 13, color: AppColors.ink),
@@ -1708,7 +1806,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   // ===========================================================================
 
   // Modal: View Proof
-  void _openViewProofModal(Map<String, dynamic> tenant) {
+  void _openViewProofModal(RentLedgerModel tenant) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1716,7 +1814,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return _buildBottomSheetWrapper(
-          title: 'Payment Proof: ${tenant['name']}',
+          title: 'Payment Proof: ${tenant.tenantName}',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1729,20 +1827,24 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildRow(
-                        'Resident:', '${tenant['name']} (${tenant['bed']})',
+                    _buildRow('Resident:',
+                        '${tenant.tenantName} (${tenant.roomNumber})',
                         isBold: true),
                     const SizedBox(height: 8),
-                    _buildRow('Amount Claimed:', '₹${tenant['amount']}',
+                    _buildRow(
+                        'Amount Claimed:', '₹${tenant.rentAmount.toInt()}',
                         isBold: true, valueColor: AppColors.greenDark),
                     const SizedBox(height: 8),
                     _buildRow('Payment Mode:', 'Direct UPI / PhonePe'),
                     const SizedBox(height: 8),
-                    _buildRow('Submitted UTR / Ref:',
-                        tenant['ref'] ?? 'Pending UTR',
+                    _buildRow('Submitted UTR / Ref:', tenant.paymentMode,
                         isMonospace: true),
                     const SizedBox(height: 8),
-                    _buildRow('Submission Time:', tenant['time'] ?? 'Today'),
+                    _buildRow(
+                        'Submission Time:',
+                        tenant.createdAt != null
+                            ? '${tenant.createdAt!.day}/${tenant.createdAt!.month}'
+                            : 'Today'),
                   ],
                 ),
               ),
@@ -1761,7 +1863,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Please verify that ₹${tenant['amount']} was credited to your HDFC/SBI bank account before accepting.',
+                        'Please verify that ₹${tenant.rentAmount.toInt()} was credited to your HDFC/SBI bank account before accepting.',
                         style: GoogleFonts.outfit(
                             fontSize: 11.5,
                             color: const Color(0xFF92400E),
@@ -1799,37 +1901,20 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.of(ctx).pop();
-                        final now = DateTime.now();
-                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                        final monthStr = months[now.month - 1];
-                        final dateStr = '${now.day} $monthStr ${now.year}';
-                        final hourStr = now.hour.toString().padLeft(2, '0');
-                        final minStr = now.minute.toString().padLeft(2, '0');
-                        final generatedRef = tenant['ref'] ?? 'UTR-${now.millisecondsSinceEpoch}';
-
-                        setState(() {
-                          tenant['status'] = 'paid';
-                          tenant['paidLabel'] =
-                              'Paid on ${now.day} $monthStr (Verified by $_selectedStaffActor)';
-                          tenant['ref'] = generatedRef;
-                          tenant['paidDate'] = dateStr;
-                          tenant['approvedBy'] = _selectedStaffActor;
-
-                          _historyLogs.insert(0, {
-                            'id': 'h_${now.millisecondsSinceEpoch}',
-                            'type': 'payment_verified',
-                            'title': '₹${tenant['amount']} Direct UPI Verified',
-                            'tenant': '${tenant['name']} (${tenant['bed']})',
-                            'actor': _selectedStaffActor,
-                            'time': 'Today at $hourStr:$minStr',
-                            'ref': generatedRef,
-                            'badge': 'Paid on Time',
-                          });
-                        });
-                        _showToast(
-                            'Payment of ₹${tenant['amount']} Accepted by $_selectedStaffActor for ${tenant['name']} ✓');
+                        final success = await SupabaseService.instance
+                            .updatePaymentApprovalStatus(
+                          ledgerId: tenant.id,
+                          status: 'approved',
+                        );
+                        if (success) {
+                          await _loadDayCollectionData();
+                          _showToast(
+                              'Payment of ₹${tenant.rentAmount.toInt()} Accepted by $_selectedStaffActor for ${tenant.tenantName} ✓');
+                        } else {
+                          _showToast('Failed to approve payment');
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.green,
@@ -1859,7 +1944,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   }
 
   // Modal: Structured Payment Rejection
-  void _openRejectPaymentModal(Map<String, dynamic> tenant) {
+  void _openRejectPaymentModal(RentLedgerModel tenant) {
     String selectedReason = 'Money Not Credited in Bank Account';
     final customNoteCtrl = TextEditingController();
     final List<String> reasons = [
@@ -1878,7 +1963,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
             return _buildBottomSheetWrapper(
-              title: 'Reject Payment: ${tenant['name']}',
+              title: 'Reject Payment: ${tenant.tenantName}',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1896,14 +1981,14 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${tenant['name']} (${tenant['bed']})',
+                              '${tenant.tenantName} (${tenant.roomNumber})',
                               style: GoogleFonts.outfit(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
                                   color: const Color(0xFF991B1B)),
                             ),
                             Text(
-                              'Claimed Amount: ₹${tenant['amount']} • ${tenant['ref'] ?? 'UTR-Pending'}',
+                              'Claimed Amount: ₹${tenant.rentAmount.toInt()} • ${tenant.paymentMode}',
                               style: GoogleFonts.outfit(
                                   fontSize: 11, color: const Color(0xFFB91C1C)),
                             ),
@@ -2020,26 +2105,20 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   ),
                   const SizedBox(height: 18),
                   ElevatedButton(
-                    onPressed: () {
-                      final finalReason = customNoteCtrl.text.trim().isNotEmpty
-                          ? '$selectedReason - ${customNoteCtrl.text.trim()}'
-                          : selectedReason;
-
-                      setState(() {
-                        _historyLogs.insert(0, {
-                          'id': 'h_${DateTime.now().millisecondsSinceEpoch}',
-                          'type': 'rejected',
-                          'title': 'Payment Rejected ($selectedReason)',
-                          'tenant': '${tenant['name']} (${tenant['bed']})',
-                          'actor': _selectedStaffActor,
-                          'time': 'Just now',
-                          'reason': finalReason,
-                          'badge': 'Declined',
-                        });
-                      });
+                    onPressed: () async {
                       Navigator.of(ctx).pop();
-                      _showToast(
-                          'Payment rejected: Alert sent to ${tenant['name']} on WhatsApp ✓');
+                      final success = await SupabaseService.instance
+                          .updatePaymentApprovalStatus(
+                        ledgerId: tenant.id,
+                        status: 'rejected',
+                      );
+                      if (success) {
+                        await _loadDayCollectionData();
+                        _showToast(
+                            'Payment rejected: Alert sent to ${tenant.tenantName} on WhatsApp ✓');
+                      } else {
+                        _showToast('Failed to reject payment');
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFDC2626),
@@ -2066,8 +2145,8 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   }
 
   // Modal: Re-Assign Monthly Pay Date (Dynamic Date Movement)
-  void _openChangePayDateModal(Map<String, dynamic> tenant) {
-    int currentDay = (tenant['payDay'] as int?) ?? 1;
+  void _openChangePayDateModal(RentLedgerModel tenant) {
+    int currentDay = tenant.dueDate.day;
     int selectedDay = currentDay;
     final reasonCtrl =
         TextEditingController(text: 'Salary credited on ${selectedDay}th');
@@ -2082,12 +2161,12 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
             return _buildBottomSheetWrapper(
-              title: 'Re-Schedule Pay Date: ${tenant['name']}',
+              title: 'Re-Schedule Pay Date: ${tenant.tenantName}',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '${tenant['bed']} • Current Agreed Pay Date: ${currentDay}th of month',
+                    '${tenant.roomNumber} • Current Agreed Pay Date: ${currentDay}th of month',
                     style: GoogleFonts.outfit(
                         fontSize: 12, color: AppColors.muted),
                   ),
@@ -2166,27 +2245,30 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.of(ctx).pop();
-                      setState(() {
-                        tenant['payDay'] = selectedDay;
-                        _selectedDay =
-                            selectedDay; // Automatically move user to new scheduled date view!
+                      final prop =
+                          await SupabaseService.instance.getOwnerProperty();
+                      final propId = prop?['id']?.toString() ??
+                          (tenant.propertyId.isNotEmpty
+                              ? tenant.propertyId
+                              : (SupabaseService.instance.activePropertyId ??
+                                  ''));
 
-                        _historyLogs.insert(0, {
-                          'id': 'h_${DateTime.now().millisecondsSinceEpoch}',
-                          'type': 'rescheduled',
-                          'title':
-                              'Salary Pay Date Changed: ${currentDay}th ➔ ${selectedDay}th',
-                          'tenant': '${tenant['name']} (${tenant['bed']})',
-                          'actor': _selectedStaffActor,
-                          'time': 'Just now',
-                          'reason': reasonCtrl.text.trim(),
-                          'badge': 'Re-Scheduled',
-                        });
+                      await SupabaseService.instance.updateRentDueDate(
+                        propertyId: propId,
+                        roomNumber: tenant.roomNumber,
+                        tenantName: tenant.tenantName,
+                        ledgerId: tenant.id,
+                        newDueDay: selectedDay,
+                      );
+                      await _loadDayCollectionData();
+
+                      setState(() {
+                        _selectedDay = selectedDay;
                       });
                       _showToast(
-                          'Moved ${tenant['name']} to ${selectedDay}th of month (Audit Logged) ✓');
+                          'Moved ${tenant.tenantName} to ${selectedDay}th of month (Saved to DB ✓)');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
@@ -2213,8 +2295,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   }
 
   // Modal: Record Cash Payment
-  void _openRecordCashModal(Map<String, dynamic> tenant) {
-    final amountCtrl = TextEditingController(text: tenant['amount'].toString());
+  void _openRecordCashModal(RentLedgerModel tenant) {
+    final amountCtrl =
+        TextEditingController(text: tenant.rentAmount.toInt().toString());
     final notesCtrl =
         TextEditingController(text: 'Paid cash at reception desk');
 
@@ -2225,7 +2308,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return _buildBottomSheetWrapper(
-          title: 'Record Cash: ${tenant['name']}',
+          title: 'Record Cash: ${tenant.tenantName}',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2282,8 +2365,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         .map((a) => DropdownMenuItem(value: a, child: Text(a)))
                         .toList(),
                     onChanged: (val) {
-                      if (val != null)
+                      if (val != null) {
                         setState(() => _selectedStaffActor = val);
+                      }
                     },
                   ),
                 ),
@@ -2291,43 +2375,63 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
-                  final amt = int.tryParse(amountCtrl.text.trim()) ??
-                      (tenant['amount'] as int);
+                  final amt = double.tryParse(amountCtrl.text.trim()) ??
+                      tenant.rentAmount;
                   Navigator.of(ctx).pop();
 
-                  final prop = await SupabaseService.instance.getOwnerProperty();
-                  if (prop != null) {
-                    await SupabaseService.instance.recordCashCollection(
-                      propertyId: prop['id'].toString(),
-                      tenantName: tenant['name'] ?? 'Resident',
-                      amount: amt.toDouble(),
+                  // Instantly update local state so card turns green immediately
+                  setState(() {
+                    final idx = _tenants.indexWhere((t) =>
+                        t.id == tenant.id ||
+                        (t.roomNumber == tenant.roomNumber &&
+                            t.tenantName == tenant.tenantName));
+                    if (idx != -1) {
+                      final old = _tenants[idx];
+                      _tenants[idx] = RentLedgerModel(
+                        id: old.id,
+                        propertyId: old.propertyId,
+                        propertyName: old.propertyName,
+                        tenantId: old.tenantId,
+                        tenantName: old.tenantName,
+                        roomNumber: old.roomNumber,
+                        bedNumber: old.bedNumber,
+                        phone: old.phone,
+                        cycleMonth: old.cycleMonth,
+                        rentAmount: old.rentAmount,
+                        dueDate: old.dueDate,
+                        paidDate: DateTime.now(),
+                        status: 'PAID',
+                        paymentMode: 'CASH',
+                      );
+                    }
+                  });
+
+                  final prop =
+                      await SupabaseService.instance.getOwnerProperty();
+                  final propId = prop?['id']?.toString() ??
+                      (tenant.propertyId.isNotEmpty
+                          ? tenant.propertyId
+                          : (SupabaseService.instance.activePropertyId ?? ''));
+
+                  if (propId.isNotEmpty) {
+                    await SupabaseService.instance
+                        .recordCashPaymentForRentLedger(
+                      propertyId: propId,
+                      propertyName: _propertyName,
+                      tenantName: tenant.tenantName.isNotEmpty
+                          ? tenant.tenantName
+                          : 'Resident',
+                      roomNumber: tenant.roomNumber,
+                      amount: amt,
                       collectedBy: _selectedStaffActor,
-                      roomNumber: tenant['room']?.toString(),
+                      ledgerId: tenant.id,
+                      notes: notesCtrl.text.trim(),
                     );
+                    await _loadDayCollectionData();
                   }
 
-                  setState(() {
-                    tenant['status'] = 'paid';
-                    tenant['paidLabel'] =
-                        'Paid in Cash (Verified by $_selectedStaffActor)';
-                    tenant['ref'] =
-                        'CSH-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-                    tenant['paidDate'] = '${_selectedDay} Aug 2026';
-                    tenant['approvedBy'] = _selectedStaffActor;
-
-                    _historyLogs.insert(0, {
-                      'id': 'h_${DateTime.now().millisecondsSinceEpoch}',
-                      'type': 'payment_verified',
-                      'title': '₹$amt Cash Payment Verified',
-                      'tenant': '${tenant['name']} (${tenant['bed']})',
-                      'actor': _selectedStaffActor,
-                      'time': 'Just now',
-                      'ref': tenant['ref'],
-                      'badge': 'Cash Settled',
-                    });
-                  });
                   _showToast(
-                      '₹$amt Cash recorded for ${tenant['name']} by $_selectedStaffActor ✓');
+                      '₹${amt.toInt()} Cash recorded for ${tenant.tenantName} by $_selectedStaffActor ✓');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.green,
@@ -2350,7 +2454,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   }
 
   // Modal: View Stamped Receipt
-  void _openReceiptModal(Map<String, dynamic> tenant) {
+  void _openReceiptModal(RentLedgerModel tenant) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2371,26 +2475,26 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                 ),
                 child: Column(
                   children: [
-                    _buildRow('Tenant Name:', tenant['name'], isBold: true),
+                    _buildRow('Tenant Name:', tenant.tenantName, isBold: true),
                     const SizedBox(height: 8),
-                    _buildRow('Room / Bed:', tenant['bed']),
+                    _buildRow('Room / Bed:',
+                        '${tenant.roomNumber} ${tenant.bedNumber != null ? "(${tenant.bedNumber})" : ""}'),
                     const SizedBox(height: 8),
-                    _buildRow(
-                        'Month / Period:',
-                        '${const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][DateTime.now().month - 1]} ${DateTime.now().year}'),
+                    _buildRow('Month / Period:', tenant.cycleMonth),
                     const SizedBox(height: 8),
-                    _buildRow('Amount Paid:', '₹${tenant['amount']}',
+                    _buildRow('Amount Paid:', '₹${tenant.rentAmount.toInt()}',
                         isBold: true, valueColor: AppColors.greenDark),
                     const SizedBox(height: 8),
-                    _buildRow(
-                        'Transaction Ref:', tenant['ref'] ?? 'Pending UTR',
+                    _buildRow('Transaction Ref:', tenant.paymentMode,
                         isMonospace: true),
                     const SizedBox(height: 8),
-                    _buildRow('Date of Payment:',
-                        tenant['paidDate'] ?? '${DateTime.now().day} ${const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][DateTime.now().month - 1]} ${DateTime.now().year}'),
+                    _buildRow(
+                        'Date of Payment:',
+                        tenant.paidDate != null
+                            ? '${tenant.paidDate!.day}/${tenant.paidDate!.month}/${tenant.paidDate!.year}'
+                            : 'Paid'),
                     const SizedBox(height: 8),
-                    _buildRow('Verified By:',
-                        tenant['approvedBy'] ?? _selectedStaffActor),
+                    _buildRow('Verified By:', _selectedStaffActor),
                   ],
                 ),
               ),

@@ -627,6 +627,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   void _openRequestExtension() {
     RequestExtensionSheet.show(
       context,
+      propertyName: widget.pgName,
+      tenantName: widget.tenantName,
+      roomNumber: widget.roomNumber,
       onExtensionRequested: (selectedDay) {
         // Callback if needed for dashboard state updates
       },

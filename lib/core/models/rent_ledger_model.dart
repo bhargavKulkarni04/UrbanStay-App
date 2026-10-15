@@ -52,8 +52,20 @@ class RentLedgerModel {
 
     DateTime parsedDueDate;
     if (json['due_date'] != null) {
-      parsedDueDate =
-          DateTime.tryParse(json['due_date'].toString()) ?? DateTime.now();
+      final str = json['due_date'].toString();
+      final dt = DateTime.tryParse(str);
+      if (dt != null) {
+        parsedDueDate = dt;
+      } else {
+        final match = RegExp(r'\d+').firstMatch(str);
+        if (match != null) {
+          final day = int.tryParse(match.group(0)!) ?? 1;
+          final now = DateTime.now();
+          parsedDueDate = DateTime(now.year, now.month, day.clamp(1, 31));
+        } else {
+          parsedDueDate = DateTime.now();
+        }
+      }
     } else {
       parsedDueDate = DateTime.now();
     }

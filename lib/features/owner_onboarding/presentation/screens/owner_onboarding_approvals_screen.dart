@@ -29,12 +29,34 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   final TextEditingController _searchController = TextEditingController();
 
   // Master Pending Onboarding Requests List
-  final List<Map<String, dynamic>> _pendingList = [];
+  final List<OnboardingRequestModel> _pendingList = [];
 
   // Master Onboarding History List
-  final List<Map<String, dynamic>> _historyList = [];
+  final List<OnboardingRequestModel> _historyList = [];
 
   bool _isLoading = false;
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return 'RV';
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : 'RV';
+  }
+
+  String _formatDate(DateTime? dt) {
+    if (dt == null) return 'Today';
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+  }
+
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '11:15 AM';
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    final minStr = dt.minute.toString().padLeft(2, '0');
+    return '$hour:$minStr $ampm';
+  }
 
   @override
   void initState() {
@@ -50,38 +72,15 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
         final propId = prop['id'].toString();
         final checkins = await SupabaseService.instance.getOnboardingRequestModels(propId);
         if (mounted && checkins.isNotEmpty) {
-          final pending = <Map<String, dynamic>>[];
-          final history = <Map<String, dynamic>>[];
-          for (final c in checkins) {
-            final name = c.name;
-            final nameParts = name.trim().split(' ');
-            final initials = nameParts.length >= 2
-                ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
-                : (name.isNotEmpty ? name[0].toUpperCase() : 'RV');
-            final item = {
-              'id': c.id,
-              'name': name,
-              'initials': initials,
-              'phone': c.phone,
-              'roomNumber': c.roomNumber ?? c.requestedRoom,
-              'sharingType': c.sharingType,
-              'rent': c.monthlyRent.toInt(),
-              'deposit': c.depositAmount.toInt(),
-              'status': c.status.toLowerCase(),
-              'processedDate': c.createdAt != null ? c.createdAt.toString().split('T').first : 'Today',
-              'auditNote': 'QR Standee Check-In',
-            };
-            if (item['status'] == 'pending' || item['status'] == 'pending_approval') {
-              pending.add(item);
-            } else {
-              history.add(item);
-            }
-          }
           setState(() {
             _pendingList.clear();
-            _pendingList.addAll(pending);
+            _pendingList.addAll(checkins.where((c) =>
+                c.status.toLowerCase() == 'pending' ||
+                c.status.toLowerCase() == 'pending_approval'));
             _historyList.clear();
-            _historyList.addAll(history);
+            _historyList.addAll(checkins.where((c) =>
+                c.status.toLowerCase() != 'pending' &&
+                c.status.toLowerCase() != 'pending_approval'));
           });
         }
       }
@@ -118,12 +117,12 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   // ===========================================================================
   // ACCEPT ONBOARDING FLOW WITH INLINE EDIT CAPABILITY
   // ===========================================================================
-  void _acceptOnboarding(Map<String, dynamic> req) {
+  void _acceptOnboarding(OnboardingRequestModel req) {
     // Editable state controllers so owner can modify room, sharing, rent & deposit
-    final roomController = TextEditingController(text: req['roomNumber']);
-    final sharingController = TextEditingController(text: req['sharingType'] ?? '2 Sharing');
-    final rentController = TextEditingController(text: (req['rent'] as int).toString());
-    final depositController = TextEditingController(text: (req['deposit'] as int).toString());
+    final roomController = TextEditingController(text: req.roomNumber ?? req.requestedRoom);
+    final sharingController = TextEditingController(text: req.sharingType);
+    final rentController = TextEditingController(text: req.monthlyRent.toInt().toString());
+    final depositController = TextEditingController(text: req.depositAmount.toInt().toString());
     bool isEditing = false;
 
     showModalBottomSheet(
@@ -157,7 +156,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                           ),
                           child: Center(
                             child: Text(
-                              req['initials'] ?? 'RV',
+                              _getInitials(req.name),
                               style: GoogleFonts.outfit(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
@@ -172,7 +171,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                req['name'],
+                                req.name,
                                 style: GoogleFonts.outfit(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
@@ -182,7 +181,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                'Applied at ${req['appliedTime'] ?? '11:15 AM'}',
+                                'Applied at ${_formatTime(req.createdAt)}',
                                 style: GoogleFonts.outfit(
                                   fontSize: 11.5,
                                   color: AppColors.muted,
@@ -353,31 +352,37 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                     onPressed: () {
                       final assignedRoom = roomController.text.trim();
                       final assignedSharing = sharingController.text.trim();
-                      final finalRent = int.tryParse(rentController.text.replaceAll(',', '').replaceAll('₹', '')) ?? req['rent'];
-                      final finalDeposit = int.tryParse(depositController.text.replaceAll(',', '').replaceAll('₹', '')) ?? req['deposit'];
+                      final finalRent = int.tryParse(rentController.text.replaceAll(',', '').replaceAll('₹', '')) ?? req.monthlyRent.toInt();
+                      final finalDeposit = int.tryParse(depositController.text.replaceAll(',', '').replaceAll('₹', '')) ?? req.depositAmount.toInt();
 
                       Navigator.of(ctx).pop();
                       SupabaseService.instance.updateCheckinStatus(
-                        checkinId: req['id'].toString(),
+                        checkinId: req.id,
                         status: 'APPROVED',
                       );
                       setState(() {
-                        _pendingList.removeWhere((item) => item['id'] == req['id']);
-                        _historyList.insert(0, {
-                          'id': req['id'],
-                          'name': req['name'],
-                          'initials': req['initials'],
-                          'phone': req['phone'],
-                          'roomNumber': assignedRoom,
-                          'sharingType': assignedSharing,
-                          'rent': finalRent,
-                          'deposit': finalDeposit,
-                          'status': 'approved',
-                          'processedDate': 'Today',
-                          'auditNote': 'Approved & Assigned Room $assignedRoom by Bhargav (Owner)',
-                        });
+                        _pendingList.removeWhere((item) => item.id == req.id);
+                        _historyList.insert(0, OnboardingRequestModel(
+                          id: req.id,
+                          propertyId: req.propertyId,
+                          propertyName: req.propertyName,
+                          name: req.name,
+                          phone: req.phone,
+                          email: req.email,
+                          requestedRoom: assignedRoom,
+                          roomNumber: assignedRoom,
+                          requestedBed: req.requestedBed,
+                          sharingType: assignedSharing,
+                          monthlyRent: finalRent.toDouble(),
+                          depositAmount: finalDeposit.toDouble(),
+                          aadhaarMasked: req.aadhaarMasked,
+                          aadhaarFrontUrl: req.aadhaarFrontUrl,
+                          selfieUrl: req.selfieUrl,
+                          status: 'APPROVED',
+                          createdAt: DateTime.now(),
+                        ));
                       });
-                      _showToast('✓ ${req['name']} Onboarded to Room $assignedRoom');
+                      _showToast('✓ ${req.name} Onboarded to Room $assignedRoom');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.green,
@@ -404,7 +409,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   // ===========================================================================
   // REJECT ONBOARDING FLOW
   // ===========================================================================
-  void _rejectOnboarding(Map<String, dynamic> req) {
+  void _rejectOnboarding(OnboardingRequestModel req) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -420,7 +425,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Select a reason for denying ${req['name']}\'s onboarding request. The applicant will be notified politely and blocked from accessing PG data.',
+                    'Select a reason for denying ${req.name}\'s onboarding request. The applicant will be notified politely and blocked from accessing PG data.',
                     style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted, height: 1.4),
                   ),
                   const SizedBox(height: 14),
@@ -434,26 +439,32 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                     onPressed: () {
                       Navigator.of(ctx).pop();
                       SupabaseService.instance.updateCheckinStatus(
-                        checkinId: req['id'].toString(),
+                        checkinId: req.id,
                         status: 'REJECTED',
                       );
                       setState(() {
-                        _pendingList.removeWhere((item) => item['id'] == req['id']);
-                        _historyList.insert(0, {
-                          'id': req['id'],
-                          'name': req['name'],
-                          'initials': req['initials'],
-                          'phone': req['phone'],
-                          'roomNumber': req['roomNumber'],
-                          'sharingType': req['sharingType'],
-                          'rent': req['rent'],
-                          'deposit': req['deposit'],
-                          'status': 'rejected',
-                          'processedDate': 'Today',
-                          'auditNote': 'Rejected: $selectedReason',
-                        });
+                        _pendingList.removeWhere((item) => item.id == req.id);
+                        _historyList.insert(0, OnboardingRequestModel(
+                          id: req.id,
+                          propertyId: req.propertyId,
+                          propertyName: req.propertyName,
+                          name: req.name,
+                          phone: req.phone,
+                          email: req.email,
+                          requestedRoom: req.requestedRoom,
+                          roomNumber: req.roomNumber,
+                          requestedBed: req.requestedBed,
+                          sharingType: req.sharingType,
+                          monthlyRent: req.monthlyRent,
+                          depositAmount: req.depositAmount,
+                          aadhaarMasked: req.aadhaarMasked,
+                          aadhaarFrontUrl: req.aadhaarFrontUrl,
+                          selfieUrl: req.selfieUrl,
+                          status: 'REJECTED',
+                          createdAt: DateTime.now(),
+                        ));
                       });
-                      _showToast('Request Denied for ${req['name']}');
+                      _showToast('Request Denied for ${req.name}');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFDC2626),
@@ -483,15 +494,15 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
 
     final filteredPending = _pendingList.where((item) {
       if (query.isEmpty) return true;
-      final name = (item['name'] as String? ?? '').toLowerCase();
-      final room = (item['roomNumber'] as String? ?? '').toLowerCase();
+      final name = item.name.toLowerCase();
+      final room = (item.roomNumber ?? item.requestedRoom).toLowerCase();
       return name.contains(query) || room.contains(query);
     }).toList();
 
     final filteredHistory = _historyList.where((item) {
       if (query.isEmpty) return true;
-      final name = (item['name'] as String? ?? '').toLowerCase();
-      final room = (item['roomNumber'] as String? ?? '').toLowerCase();
+      final name = item.name.toLowerCase();
+      final room = (item.roomNumber ?? item.requestedRoom).toLowerCase();
       return name.contains(query) || room.contains(query);
     }).toList();
 
@@ -723,7 +734,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   // ===========================================================================
   // 4. PENDING ONBOARDING QUEUE (With Prominent Room Block & Zero Aadhaar)
   // ===========================================================================
-  Widget _buildPendingQueue(List<Map<String, dynamic>> list) {
+  Widget _buildPendingQueue(List<OnboardingRequestModel> list) {
     if (list.isEmpty) {
       return _buildEmptyState('No pending onboarding requests.\nNew requests from residents will appear here.');
     }
@@ -733,7 +744,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
     );
   }
 
-  Widget _buildPendingCard(Map<String, dynamic> req) {
+  Widget _buildPendingCard(OnboardingRequestModel req) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
@@ -764,7 +775,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                 ),
                 child: Center(
                   child: Text(
-                    req['initials'] ?? 'RV',
+                    _getInitials(req.name),
                     style: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -780,7 +791,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      req['name'],
+                      req.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -792,7 +803,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Applied at ${req['appliedTime'] ?? '11:15 AM'}',
+                      'Applied at ${_formatTime(req.createdAt)}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -824,7 +835,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Room - ${req['roomNumber']}',
+                      'Room - ${req.roomNumber ?? req.requestedRoom}',
                       style: GoogleFonts.outfit(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
@@ -834,7 +845,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Sharing - ${req['sharingType']}',
+                      'Sharing - ${req.sharingType}',
                       style: GoogleFonts.outfit(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
@@ -844,7 +855,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                   ],
                 ),
                 Text(
-                  '₹${(req['rent'] as int).toString()}',
+                  '₹${req.monthlyRent.toInt()}',
                   style: GoogleFonts.outfit(
                     fontSize: 17,
                     fontWeight: FontWeight.w900,
@@ -873,7 +884,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                   style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.muted),
                 ),
                 Text(
-                  '₹${(req['deposit'] as int).toString()}',
+                  '₹${req.depositAmount.toInt()}',
                   style: GoogleFonts.outfit(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink),
                 ),
               ],
@@ -886,7 +897,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('Calling ${req['name']}: +91${req['phone']}'),
+                  onTap: () => _showToast('Calling ${req.name}: +91${req.phone}'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 40,
@@ -909,7 +920,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
               const SizedBox(width: 10),
               Expanded(
                 child: InkWell(
-                  onTap: () => _showToast('WhatsApp opened with ${req['name']}'),
+                  onTap: () => _showToast('WhatsApp opened with ${req.name}'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 40,
@@ -992,7 +1003,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
   // ===========================================================================
   // 5. ONBOARDING HISTORY LEDGER
   // ===========================================================================
-  Widget _buildHistoryLedger(List<Map<String, dynamic>> list) {
+  Widget _buildHistoryLedger(List<OnboardingRequestModel> list) {
     if (list.isEmpty) {
       return _buildEmptyState('No onboarding history recorded yet.');
     }
@@ -1002,8 +1013,8 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
     );
   }
 
-  Widget _buildHistoryCard(Map<String, dynamic> item) {
-    final isApproved = item['status'] == 'approved';
+  Widget _buildHistoryCard(OnboardingRequestModel item) {
+    final isApproved = item.status.toLowerCase() == 'approved';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1038,7 +1049,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                     ),
                     child: Center(
                       child: Text(
-                        item['initials'] ?? 'KS',
+                        _getInitials(item.name),
                         style: GoogleFonts.outfit(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
@@ -1052,7 +1063,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item['name'],
+                        item.name,
                         style: GoogleFonts.outfit(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -1061,7 +1072,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                         ),
                       ),
                       Text(
-                        'Room - ${item['roomNumber']} • ${item['sharingType'] ?? '2 Sharing'} • ${item['processedDate']}',
+                        'Room - ${item.roomNumber ?? item.requestedRoom} • ${item.sharingType} • ${_formatDate(item.createdAt)}',
                         style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w500),
                       ),
                     ],
@@ -1095,7 +1106,9 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
           const SizedBox(height: 6),
 
           Text(
-            item['auditNote'] ?? '',
+            isApproved
+                ? 'Approved & Assigned Room ${item.roomNumber ?? item.requestedRoom} by Bhargav (Owner)'
+                : 'Onboarding request rejected by owner',
             style: GoogleFonts.outfit(fontSize: 11, color: AppColors.muted, fontStyle: FontStyle.italic),
           ),
         ],

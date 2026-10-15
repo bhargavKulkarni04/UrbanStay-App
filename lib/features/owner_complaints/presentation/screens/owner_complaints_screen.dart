@@ -32,10 +32,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   String _selectedFloor = 'all';
 
   // Active Complaints List (Populated live from Supabase / State)
-  final List<Map<String, dynamic>> _activeTickets = [];
+  final List<MaintenanceTicketModel> _activeTickets = [];
 
   // Resolution History List (Populated live from Supabase / State)
-  final List<Map<String, dynamic>> _historyTickets = [];
+  final List<MaintenanceTicketModel> _historyTickets = [];
   bool _isLoading = true;
 
   @override
@@ -58,56 +58,11 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       if (propId != null && propId.isNotEmpty) {
         final list = await SupabaseService.instance.getMaintenanceTicketModels(propId);
         if (mounted) {
-          final List<Map<String, dynamic>> loadedActive = [];
-          final List<Map<String, dynamic>> loadedHistory = [];
-
-          for (final model in list) {
-            final isResolved = model.isResolved;
-            final residentName = model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
-            final nameParts = residentName.trim().split(' ');
-            final initials = nameParts.length >= 2
-                ? '${nameParts.first[0]}${nameParts.last[0]}'.toUpperCase()
-                : (residentName.isNotEmpty ? residentName[0].toUpperCase() : 'RS');
-
-            final item = {
-              'id': model.id,
-              'residentName': residentName,
-              'initials': initials,
-              'phone': '',
-              'room': model.roomNumber.isNotEmpty
-                  ? (model.roomNumber.startsWith('Room') ? model.roomNumber : 'Room ${model.roomNumber}')
-                  : '',
-              'sharingType': '2-Sharing',
-              'bed': '',
-              'floor': '1st Floor',
-              'category': model.category.isNotEmpty ? model.category : 'General',
-              'categoryIcon': Icons.build_rounded,
-              'issue': model.issue.isNotEmpty ? model.issue : 'Maintenance Issue',
-              'photoUrl': model.photoUrl,
-              'reportedDate': model.createdAt != null
-                  ? model.createdAt!.toString().split('T').first
-                  : 'Recent',
-              'reportedTime': model.createdAt != null
-                  ? model.createdAt!.toString().split('T').first
-                  : 'Recent',
-              'resolvedDate': 'Resolved',
-              'resolvedBy': model.assignedStaff ?? 'Resolved by Owner',
-              'resolutionNote': model.progressNote ?? 'Issue fixed.',
-              'status': isResolved ? 'resolved' : (model.isInProgress ? 'in_progress' : 'pending'),
-            };
-
-            if (isResolved) {
-              loadedHistory.add(item);
-            } else {
-              loadedActive.add(item);
-            }
-          }
-
           setState(() {
             _activeTickets.clear();
-            _activeTickets.addAll(loadedActive);
+            _activeTickets.addAll(list.where((t) => !t.isResolved));
             _historyTickets.clear();
-            _historyTickets.addAll(loadedHistory);
+            _historyTickets.addAll(list.where((t) => t.isResolved));
           });
         }
       }
@@ -143,9 +98,33 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
     );
   }
 
+  // Helper to extract initials
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : 'RS';
+  }
+
+  // Helper to extract floor from room
+  String _getFloor(String roomNumber) {
+    final clean = roomNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (clean.isNotEmpty) {
+      final first = clean[0];
+      if (first == '1') return '1st Floor';
+      if (first == '2') return '2nd Floor';
+      if (first == '3') return '3rd Floor';
+      if (first == '4') return '4th Floor';
+      if (first == '0') return 'Ground Floor';
+      return '${first}th Floor';
+    }
+    return '1st Floor';
+  }
+
   // 1-Tap Mark In Progress (Async Supabase persistence)
-  Future<void> _markInProgress(Map<String, dynamic> ticket) async {
-    final complaintId = ticket['id']?.toString() ?? '';
+  Future<void> _markInProgress(MaintenanceTicketModel ticket) async {
+    final complaintId = ticket.id;
     if (complaintId.isNotEmpty) {
       final success = await SupabaseService.instance.updateComplaintStatus(
         complaintId: complaintId,
@@ -159,16 +138,32 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
     }
 
     setState(() {
-      ticket['status'] = 'in_progress';
-      ticket['progressNote'] = 'Acknowledged by Owner • Work in progress';
+      final index = _activeTickets.indexOf(ticket);
+      if (index != -1) {
+        _activeTickets[index] = MaintenanceTicketModel(
+          id: ticket.id,
+          propertyId: ticket.propertyId,
+          propertyName: ticket.propertyName,
+          tenantId: ticket.tenantId,
+          tenantName: ticket.tenantName,
+          roomNumber: ticket.roomNumber,
+          category: ticket.category,
+          issue: ticket.issue,
+          photoUrl: ticket.photoUrl,
+          status: 'in_progress',
+          assignedStaff: ticket.assignedStaff,
+          progressNote: 'Acknowledged by Owner • Work in progress',
+          createdAt: ticket.createdAt,
+        );
+      }
     });
     _showToast(
-        'Marked In Progress! ${ticket['residentName']} notified on WhatsApp.');
+        'Marked In Progress! ${ticket.tenantName.isNotEmpty ? ticket.tenantName : "Resident"} notified on WhatsApp.');
   }
 
   // 1-Tap Mark Resolved (Migrates from Active to History)
-  Future<void> _markResolved(Map<String, dynamic> ticket) async {
-    final complaintId = ticket['id']?.toString() ?? '';
+  Future<void> _markResolved(MaintenanceTicketModel ticket) async {
+    final complaintId = ticket.id;
     if (complaintId.isNotEmpty) {
       final success =
           await SupabaseService.instance.resolveComplaint(complaintId);
@@ -179,30 +174,26 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       }
     }
 
-    final now = DateTime.now();
-    final hourStr = now.hour.toString().padLeft(2, '0');
-    final minStr = now.minute.toString().padLeft(2, '0');
     setState(() {
       _activeTickets.remove(ticket);
-      _historyTickets.insert(0, {
-        'id': ticket['id'],
-        'residentName': ticket['residentName'],
-        'initials': ticket['initials'],
-        'phone': ticket['phone'],
-        'room': ticket['room'],
-        'sharingType': ticket['sharingType'] ?? '2-Sharing',
-        'bed': ticket['bed'],
-        'floor': ticket['floor'],
-        'category': ticket['category'],
-        'categoryIcon': ticket['categoryIcon'],
-        'issue': ticket['issue'],
-        'reportedDate': ticket['reportedTime'] ?? 'Today',
-        'resolvedDate': 'Resolved Today at $hourStr:$minStr',
-        'resolvedBy': 'Resolved by Owner',
-        'resolutionNote':
-            'Issue inspected and fixed. Tenant notified on WhatsApp.',
-        'status': 'resolved',
-      });
+      _historyTickets.insert(
+        0,
+        MaintenanceTicketModel(
+          id: ticket.id,
+          propertyId: ticket.propertyId,
+          propertyName: ticket.propertyName,
+          tenantId: ticket.tenantId,
+          tenantName: ticket.tenantName,
+          roomNumber: ticket.roomNumber,
+          category: ticket.category,
+          issue: ticket.issue,
+          photoUrl: ticket.photoUrl,
+          status: 'resolved',
+          assignedStaff: 'Resolved by Owner',
+          progressNote: 'Issue inspected and fixed. Tenant notified on WhatsApp.',
+          createdAt: ticket.createdAt,
+        ),
+      );
     });
     _showToast('Complaint resolved! Moved to History & WhatsApp alert sent.');
   }
@@ -210,7 +201,8 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   // ===========================================================================
   // PHOTO PROOF VIEWER MODAL
   // ===========================================================================
-  void _openPhotoModal(Map<String, dynamic> ticket) {
+  void _openPhotoModal(MaintenanceTicketModel ticket) {
+    final residentName = ticket.tenantName.isNotEmpty ? ticket.tenantName : 'Resident';
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -218,7 +210,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return _buildNativeBottomSheetWrapper(
-          title: 'Photo Proof: ${ticket['residentName']}',
+          title: 'Photo Proof: $residentName',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -232,11 +224,11 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(ticket['categoryIcon'] ?? Icons.image_outlined,
+                    const Icon(Icons.build_rounded,
                         size: 48, color: AppColors.muted),
                     const SizedBox(height: 10),
                     Text(
-                      ticket['photoName'] ?? 'damage_proof.jpg',
+                      'damage_proof.jpg',
                       style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
@@ -261,7 +253,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                ticket['issue'],
+                ticket.issue,
                 style: GoogleFonts.outfit(
                     fontSize: 13, color: AppColors.ink, height: 1.4),
               ),
@@ -302,9 +294,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
     }
 
     final pendingCount =
-        _activeTickets.where((t) => t['status'] == 'pending').length;
+        _activeTickets.where((t) => t.isPending).length;
     final inProgressCount =
-        _activeTickets.where((t) => t['status'] == 'in_progress').length;
+        _activeTickets.where((t) => t.isInProgress).length;
     final totalActive = pendingCount + inProgressCount;
     final resolvedCount = _historyTickets.length;
 
@@ -563,11 +555,13 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   Widget _buildActiveTicketsTab(int pendingCount, int inProgressCount) {
     final filtered = _activeTickets.where((t) {
       if (_selectedFloor != 'all' &&
-          !(t['floor'] as String).toLowerCase().contains(_selectedFloor))
+          !_getFloor(t.roomNumber).toLowerCase().contains(_selectedFloor)) {
         return false;
+      }
       if (_selectedCategory != 'all' &&
-          (t['category'] as String).toLowerCase() != _selectedCategory)
+          t.category.toLowerCase() != _selectedCategory) {
         return false;
+      }
       return true;
     }).toList();
 
@@ -607,11 +601,13 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   Widget _buildHistoryTab(int resolvedCount) {
     final filtered = _historyTickets.where((t) {
       if (_selectedFloor != 'all' &&
-          !(t['floor'] as String).toLowerCase().contains(_selectedFloor))
+          !_getFloor(t.roomNumber).toLowerCase().contains(_selectedFloor)) {
         return false;
+      }
       if (_selectedCategory != 'all' &&
-          (t['category'] as String).toLowerCase() != _selectedCategory)
+          t.category.toLowerCase() != _selectedCategory) {
         return false;
+      }
       return true;
     }).toList();
 
@@ -837,8 +833,22 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   // ===========================================================================
   // 6. ACTIVE TICKET CARD (Clean White Elevated Card, Proper Spacing & 3-Tier Context)
   // ===========================================================================
-  Widget _buildActiveTicketCard(Map<String, dynamic> ticket) {
-    final isPending = ticket['status'] == 'pending';
+  Widget _buildActiveTicketCard(MaintenanceTicketModel ticket) {
+    final isPending = ticket.isPending;
+    final residentName =
+        ticket.tenantName.isNotEmpty ? ticket.tenantName : 'Resident';
+    final initials = _getInitials(residentName);
+    final roomDisplay = ticket.roomNumber.isNotEmpty
+        ? (ticket.roomNumber.startsWith('Room')
+            ? ticket.roomNumber
+            : 'Room ${ticket.roomNumber}')
+        : 'Room --';
+    final floor = _getFloor(ticket.roomNumber);
+    final categoryText =
+        ticket.category.isNotEmpty ? ticket.category : 'General';
+    final reportedTime = ticket.createdAt != null
+        ? ticket.createdAt!.toString().split('T').first
+        : 'Recent';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -874,7 +884,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    ticket['initials'] ?? 'AV',
+                    initials,
                     style: GoogleFonts.outfit(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w800,
@@ -894,7 +904,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                       children: [
                         Flexible(
                           child: Text(
-                            ticket['residentName'],
+                            residentName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(
@@ -914,7 +924,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            ticket['category'],
+                            categoryText,
                             style: GoogleFonts.outfit(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
@@ -925,9 +935,9 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                       ],
                     ),
                     const SizedBox(height: 3),
-                    // Room • Sharing • Floor • Time (bed removed)
+                    // Room • Sharing • Floor • Time
                     Text(
-                      '${ticket['room']} • ${ticket['sharingType'] ?? '2-Sharing'} • ${ticket['floor']} • ${ticket['reportedTime']}',
+                      '$roomDisplay • 2-Sharing • $floor • $reportedTime',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -978,7 +988,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               border: Border.all(color: const Color(0xFFEEF0F2)),
             ),
             child: Text(
-              ticket['issue'],
+              ticket.issue,
               style: GoogleFonts.outfit(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
@@ -989,7 +999,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
           ),
 
           // Progress Note Strip (If In Progress)
-          if (!isPending && ticket['progressNote'] != null) ...[
+          if (!isPending && ticket.progressNote != null && ticket.progressNote!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -1005,7 +1015,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      ticket['progressNote'],
+                      ticket.progressNote!,
                       style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -1018,7 +1028,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
           ],
 
           // Photo Proof Row (If attached)
-          if (ticket['hasPhoto'] == true) ...[
+          if (ticket.photoUrl != null && ticket.photoUrl!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -1036,7 +1046,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                           size: 15, color: AppColors.muted),
                       const SizedBox(width: 6),
                       Text(
-                        ticket['photoName'],
+                        'damage_proof.jpg',
                         style: GoogleFonts.outfit(
                             fontSize: 11.5,
                             color: AppColors.ink,
@@ -1067,7 +1077,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast(
-                      'Calling ${ticket['residentName']}: +91${ticket['phone']}'),
+                      'Calling $residentName'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 44,
@@ -1105,7 +1115,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast(
-                      'WhatsApp opened with ${ticket['residentName']} regarding ${ticket['category']}'),
+                      'WhatsApp opened with $residentName regarding $categoryText'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 44,
@@ -1205,7 +1215,24 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
   // ===========================================================================
   // 7. HISTORY TICKET CARD (Zero Overflow, Clean Layout & Spacing)
   // ===========================================================================
-  Widget _buildHistoryTicketCard(Map<String, dynamic> ticket) {
+  Widget _buildHistoryTicketCard(MaintenanceTicketModel ticket) {
+    final residentName =
+        ticket.tenantName.isNotEmpty ? ticket.tenantName : 'Resident';
+    final initials = _getInitials(residentName);
+    final roomDisplay = ticket.roomNumber.isNotEmpty
+        ? (ticket.roomNumber.startsWith('Room')
+            ? ticket.roomNumber
+            : 'Room ${ticket.roomNumber}')
+        : 'Room --';
+    final categoryText =
+        ticket.category.isNotEmpty ? ticket.category : 'General';
+    final resolvedDate = ticket.createdAt != null
+        ? ticket.createdAt!.toString().split('T').first
+        : 'Resolved';
+    final resolvedBy = ticket.assignedStaff?.isNotEmpty == true
+        ? ticket.assignedStaff!
+        : 'Resolved by Owner';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
@@ -1233,7 +1260,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    ticket['initials'] ?? 'RS',
+                    initials,
                     style: GoogleFonts.outfit(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,
@@ -1252,7 +1279,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                       children: [
                         Flexible(
                           child: Text(
-                            ticket['residentName'],
+                            residentName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(
@@ -1272,7 +1299,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            ticket['category'],
+                            categoryText,
                             style: GoogleFonts.outfit(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.w700,
@@ -1284,7 +1311,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                     const SizedBox(height: 2),
                     // Room & Timing Subtitle
                     Text(
-                      '${ticket['room']} • ${ticket['sharingType'] ?? '2-Sharing'} (${ticket['bed']}) • ${ticket['resolvedDate']}',
+                      '$roomDisplay • 2-Sharing • $resolvedDate',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.outfit(
@@ -1316,7 +1343,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
 
           // Issue Text
           Text(
-            ticket['issue'],
+            ticket.issue,
             style: GoogleFonts.outfit(
                 fontSize: 12.5, color: AppColors.inkSecondary, height: 1.35),
           ),
@@ -1337,7 +1364,7 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      ticket['resolvedBy'],
+                      resolvedBy,
                       style: GoogleFonts.outfit(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
@@ -1352,10 +1379,10 @@ class _OwnerComplaintsScreenState extends State<OwnerComplaintsScreen> {
                     ),
                   ],
                 ),
-                if (ticket['resolutionNote'] != null) ...[
+                if (ticket.progressNote != null && ticket.progressNote!.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    ticket['resolutionNote'],
+                    ticket.progressNote!,
                     style: GoogleFonts.outfit(
                         fontSize: 11,
                         color: AppColors.inkSecondary,

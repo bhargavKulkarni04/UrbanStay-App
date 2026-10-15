@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// Clean, Dedicated Bottom Sheet for Tenant Rent Due Extension Request.
 /// Features:
@@ -10,15 +11,33 @@ import '../../../../core/theme/app_colors.dart';
 /// - Non-editable pre-fixed preview: "Requested to pay on {day}th of this month"
 /// - Green CTA button with double-verification confirmation popup
 class RequestExtensionSheet extends StatefulWidget {
+  final String? propertyId;
+  final String? propertyName;
+  final String? tenantName;
+  final String? tenantId;
+  final String? roomNumber;
+  final String? ledgerId;
   final Function(int selectedDay)? onExtensionRequested;
 
   const RequestExtensionSheet({
     super.key,
+    this.propertyId,
+    this.propertyName,
+    this.tenantName,
+    this.tenantId,
+    this.roomNumber,
+    this.ledgerId,
     this.onExtensionRequested,
   });
 
   static Future<void> show(
     BuildContext context, {
+    String? propertyId,
+    String? propertyName,
+    String? tenantName,
+    String? tenantId,
+    String? roomNumber,
+    String? ledgerId,
     Function(int selectedDay)? onExtensionRequested,
   }) {
     HapticFeedback.lightImpact();
@@ -27,6 +46,12 @@ class RequestExtensionSheet extends StatefulWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => RequestExtensionSheet(
+        propertyId: propertyId,
+        propertyName: propertyName,
+        tenantName: tenantName,
+        tenantId: tenantId,
+        roomNumber: roomNumber,
+        ledgerId: ledgerId,
         onExtensionRequested: onExtensionRequested,
       ),
     );
@@ -86,20 +111,44 @@ class _RequestExtensionSheetState extends State<RequestExtensionSheet> {
             ),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(confirmCtx); // Close confirm
               Navigator.pop(context); // Close sheet
               widget.onExtensionRequested?.call(_selectedDay);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'Extension requested till ${_selectedDay}th. Owner notified ✓',
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+
+              final pId = widget.propertyId ??
+                  SupabaseService.instance.activePropertyId;
+              String? propId = pId;
+              if (propId == null || propId.isEmpty) {
+                final prop = await SupabaseService.instance.getOwnerProperty();
+                propId = prop?['id']?.toString();
+              }
+
+              if (propId != null && propId.isNotEmpty) {
+                await SupabaseService.instance.requestRentExtension(
+                  propertyId: propId,
+                  propertyName: widget.propertyName,
+                  tenantName: widget.tenantName ?? 'Resident',
+                  tenantId: widget.tenantId,
+                  roomNumber: widget.roomNumber,
+                  ledgerId: widget.ledgerId,
+                  requestedDueDay: _selectedDay,
+                  reason: 'Requested to pay on ${_selectedDay}th of this month',
+                );
+              }
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Extension requested till ${_selectedDay}th. Owner notified ✓',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                    ),
+                    backgroundColor: AppColors.green,
+                    behavior: SnackBarBehavior.floating,
                   ),
-                  backgroundColor: AppColors.green,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.green,

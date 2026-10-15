@@ -26,6 +26,11 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   String _selectedFloor = 'all'; // 'all', '1st', '2nd', '3rd', 'ground'
   bool _isLoading = true;
 
+  String _destinationAccountName = '';
+  String _destinationBankName = '';
+  String _destinationUpiId = '';
+  String _destinationMaskedAccount = '';
+
   @override
   void initState() {
     super.initState();
@@ -34,59 +39,83 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
 
   Future<void> _loadApprovalsFromSupabase() async {
     try {
-      final targetPropId = widget.propertyId ??
-          SupabaseService.instance.activePropertyId;
+      final targetPropId =
+          widget.propertyId ?? SupabaseService.instance.activePropertyId;
       String? propId = targetPropId;
       if (propId == null || propId.isEmpty) {
         final prop = await SupabaseService.instance.getOwnerProperty();
         propId = prop?['id']?.toString();
       }
 
+      // Load destination account dynamically from property & authenticated owner
+      PropertyModel? propModel;
       if (propId != null && propId.isNotEmpty) {
-        final approvals = await SupabaseService.instance.getPaymentApprovalModels(propId);
+        propModel =
+            await SupabaseService.instance.getPropertyModel(propertyId: propId);
+      }
+      if (propModel == null) {
+        final propMap =
+            await SupabaseService.instance.getOwnerProperty(propertyId: propId);
+        if (propMap != null) {
+          propModel =
+              PropertyModel.fromJson(Map<String, dynamic>.from(propMap));
+        }
+      }
+
+      final authUser = SupabaseService.instance.currentUser;
+      final authName = authUser?.userMetadata?['full_name']?.toString() ??
+          authUser?.userMetadata?['name']?.toString();
+      final authPhone = authUser?.phone;
+
+      final ownerName = (propModel?.ownerLegalName != null &&
+              propModel!.ownerLegalName!.isNotEmpty)
+          ? propModel.ownerLegalName!
+          : (propModel?.bankHolderName != null &&
+                  propModel!.bankHolderName!.isNotEmpty)
+              ? propModel.bankHolderName!
+              : (authName != null && authName.isNotEmpty)
+                  ? authName
+                  : (authUser?.email != null && authUser!.email!.isNotEmpty)
+                      ? authUser.email!.split('@').first
+                      : (authPhone != null && authPhone.isNotEmpty)
+                          ? authPhone
+                          : '';
+
+      final bankName =
+          (propModel?.bankName != null && propModel!.bankName!.isNotEmpty)
+              ? propModel.bankName!
+              : '';
+
+      final upiId = (propModel?.upiVpa != null && propModel!.upiVpa!.isNotEmpty)
+          ? propModel.upiVpa!
+          : '';
+
+      final maskedAcc = (propModel?.creditingPhone != null &&
+              propModel!.creditingPhone!.length >= 4)
+          ? '******${propModel.creditingPhone!.substring(propModel.creditingPhone!.length - 4)}'
+          : (authPhone != null && authPhone.length >= 4
+              ? '******${authPhone.substring(authPhone.length - 4)}'
+              : '');
+
+      if (mounted) {
+        setState(() {
+          _destinationAccountName = ownerName;
+          _destinationBankName = bankName;
+          _destinationUpiId = upiId;
+          _destinationMaskedAccount = maskedAcc;
+        });
+      }
+
+      if (propId != null && propId.isNotEmpty) {
+        final approvals =
+            await SupabaseService.instance.getPaymentApprovalModels(propId);
 
         if (approvals.isNotEmpty && mounted) {
-          final List<Map<String, dynamic>> loadedPending = [];
-          final List<Map<String, dynamic>> loadedHistory = [];
-
-          for (final model in approvals) {
-            final name = model.tenantName.isNotEmpty ? model.tenantName : 'Resident';
-            final initials = name
-                .split(' ')
-                .map((p) => p.isNotEmpty ? p[0] : '')
-                .take(2)
-                .join('')
-                .toUpperCase();
-
-            final mappedItem = {
-              'id': model.id,
-              'name': name,
-              'initials': initials.isNotEmpty ? initials : 'TN',
-              'room': model.roomNumber.isNotEmpty ? model.roomNumber : 'Room',
-              'floor': '1st',
-              'amount': model.amount.toInt(),
-              'phone': model.phone ?? '',
-              'utr': model.utrNumber,
-              'time': model.createdAt != null
-                  ? model.createdAt!.toString().split('T').first
-                  : 'Recent',
-              'app': model.paymentApp.isNotEmpty ? model.paymentApp : 'Direct UPI Transfer',
-              'proofFile': model.proofImageUrl ?? '',
-              'status': model.status.toLowerCase(),
-            };
-
-            if (model.isPending) {
-              loadedPending.add(mappedItem);
-            } else {
-              loadedHistory.add(mappedItem);
-            }
-          }
-
           setState(() {
             _pendingApprovals.clear();
-            _pendingApprovals.addAll(loadedPending);
+            _pendingApprovals.addAll(approvals.where((m) => m.isPending));
             _approvalHistory.clear();
-            _approvalHistory.addAll(loadedHistory);
+            _approvalHistory.addAll(approvals.where((m) => !m.isPending));
           });
         }
       }
@@ -98,10 +127,40 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   }
 
   // Active Pending Approvals (Populated live from Supabase)
-  final List<Map<String, dynamic>> _pendingApprovals = [];
+  final List<PaymentApprovalModel> _pendingApprovals = [];
 
   // Settled & Rejected Approval History (Populated live from Supabase)
-  final List<Map<String, dynamic>> _approvalHistory = [];
+  final List<PaymentApprovalModel> _approvalHistory = [];
+
+  String _getInitials(String name) {
+    if (name.isEmpty) return 'TN';
+    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    return name.isNotEmpty ? name[0].toUpperCase() : 'TN';
+  }
+
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return 'Recent';
+    final now = DateTime.now();
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      final hourStr = dt.hour.toString().padLeft(2, '0');
+      final minStr = dt.minute.toString().padLeft(2, '0');
+      return 'Today at $hourStr:$minStr';
+    }
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+  }
+
+  String _getFloor(String roomNumber) {
+    if (roomNumber.isEmpty) return '1st';
+    final firstChar = roomNumber.trim()[0].toUpperCase();
+    if (firstChar == 'G') return 'ground';
+    if (firstChar == '1') return '1st';
+    if (firstChar == '2') return '2nd';
+    if (firstChar == '3') return '3rd';
+    return '1st';
+  }
 
   void _showToast(String msg) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -124,44 +183,50 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ===========================================================================
   // ACTIONS: APPROVE & REJECT WITH AUDIT HISTORY MIGRATION
   // ===========================================================================
-  Future<void> _approvePayment(Map<String, dynamic> item) async {
-    final submissionId = item['id']?.toString() ?? '';
+  Future<void> _approvePayment(PaymentApprovalModel item) async {
+    final submissionId = item.id;
     if (submissionId.isNotEmpty) {
-      final success = await SupabaseService.instance.updatePaymentApprovalStatus(
+      final success =
+          await SupabaseService.instance.updatePaymentApprovalStatus(
         submissionId: submissionId,
         status: 'APPROVED',
       );
       if (!success) {
-        _showToast('Failed to update status in database. Please check connection.');
+        _showToast(
+            'Failed to update status in database. Please check connection.');
         return;
       }
     }
 
     final now = DateTime.now();
-    final hourStr = now.hour.toString().padLeft(2, '0');
-    final minStr = now.minute.toString().padLeft(2, '0');
     setState(() {
-      _pendingApprovals.removeWhere((p) => p['id'] == item['id']);
-      _approvalHistory.insert(0, {
-        'id': 'hist_${now.millisecondsSinceEpoch}',
-        'name': item['name'],
-        'initials': item['initials'],
-        'room': item['room'],
-        'floor': item['floor'],
-        'amount': item['amount'],
-        'phone': item['phone'],
-        'utr': item['utr'],
-        'settledTime': 'Today at $hourStr:$minStr',
-        'status': 'approved',
-        'receiptNo':
-            'REC-${now.millisecondsSinceEpoch.toString().substring(7)}',
-      });
+      _pendingApprovals.removeWhere((p) => p.id == item.id);
+      _approvalHistory.insert(
+        0,
+        PaymentApprovalModel(
+          id: item.id,
+          propertyId: item.propertyId,
+          propertyName: item.propertyName,
+          tenantId: item.tenantId,
+          tenantName: item.tenantName,
+          roomNumber: item.roomNumber,
+          phone: item.phone,
+          ledgerId: item.ledgerId,
+          amount: item.amount,
+          utrNumber: item.utrNumber,
+          paymentApp: item.paymentApp,
+          proofImageUrl: item.proofImageUrl,
+          status: 'approved',
+          approvedBy: item.approvedBy,
+          createdAt: now,
+        ),
+      );
     });
     _showToast(
-        '₹${item['amount']} Approved for ${item['name']}. Logged to History & Receipt sent via WhatsApp.');
+        '₹${item.amount.toInt()} Approved for ${item.tenantName}. Logged to History & Receipt sent via WhatsApp.');
   }
 
-  void _showApproveConfirmationDialog(Map<String, dynamic> item) {
+  void _showApproveConfirmationDialog(PaymentApprovalModel item) {
     showDialog(
       context: context,
       builder: (dialogCtx) {
@@ -200,7 +265,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Approve ₹${item['amount']} from ${item['name']} for ${item['room']}?\nUTR: ${item['utr']}',
+                'Approve ₹${item.amount.toInt()} from ${item.tenantName} for ${item.roomNumber}?\nUTR: ${item.utrNumber}',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 12.5,
@@ -271,7 +336,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
     );
   }
 
-  void _showRejectConfirmationDialog(Map<String, dynamic> item) {
+  void _showRejectConfirmationDialog(PaymentApprovalModel item) {
     showDialog(
       context: context,
       builder: (dialogCtx) {
@@ -310,7 +375,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Are you sure you want to reject ₹${item['amount']} from ${item['name']} for ${item['room']}?\nUTR: ${item['utr']}',
+                'Are you sure you want to reject ₹${item.amount.toInt()} from ${item.tenantName} for ${item.roomNumber}?\nUTR: ${item.utrNumber}',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.outfit(
                   fontSize: 12.5,
@@ -381,46 +446,53 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
     );
   }
 
-  Future<void> _rejectPayment(Map<String, dynamic> item) async {
-    final submissionId = item['id']?.toString() ?? '';
+  Future<void> _rejectPayment(PaymentApprovalModel item) async {
+    final submissionId = item.id;
     if (submissionId.isNotEmpty) {
-      final success = await SupabaseService.instance.updatePaymentApprovalStatus(
+      final success =
+          await SupabaseService.instance.updatePaymentApprovalStatus(
         submissionId: submissionId,
         status: 'REJECTED',
       );
       if (!success) {
-        _showToast('Failed to reject payment in database. Please check connection.');
+        _showToast(
+            'Failed to reject payment in database. Please check connection.');
         return;
       }
     }
 
     final now = DateTime.now();
-    final hourStr = now.hour.toString().padLeft(2, '0');
-    final minStr = now.minute.toString().padLeft(2, '0');
     setState(() {
-      _pendingApprovals.removeWhere((p) => p['id'] == item['id']);
-      _approvalHistory.insert(0, {
-        'id': 'hist_${now.millisecondsSinceEpoch}',
-        'name': item['name'],
-        'initials': item['initials'],
-        'room': item['room'],
-        'floor': item['floor'],
-        'amount': item['amount'],
-        'phone': item['phone'],
-        'utr': item['utr'],
-        'settledTime': 'Today at $hourStr:$minStr',
-        'status': 'rejected',
-        'rejectReason': 'Declined by owner',
-      });
+      _pendingApprovals.removeWhere((p) => p.id == item.id);
+      _approvalHistory.insert(
+        0,
+        PaymentApprovalModel(
+          id: item.id,
+          propertyId: item.propertyId,
+          propertyName: item.propertyName,
+          tenantId: item.tenantId,
+          tenantName: item.tenantName,
+          roomNumber: item.roomNumber,
+          phone: item.phone,
+          ledgerId: item.ledgerId,
+          amount: item.amount,
+          utrNumber: item.utrNumber,
+          paymentApp: item.paymentApp,
+          proofImageUrl: item.proofImageUrl,
+          status: 'rejected',
+          approvedBy: item.approvedBy,
+          createdAt: now,
+        ),
+      );
     });
     _showToast(
-        'Payment rejected for ${item['name']}. Logged to History & Alert sent to resident.');
+        'Payment rejected for ${item.tenantName}. Logged to History & Alert sent to resident.');
   }
 
   // ===========================================================================
   // MODAL: PROOF SCREENSHOT VIEWER (Native Bottom Sheet)
   // ===========================================================================
-  void _openProofModal(Map<String, dynamic> item) {
+  void _openProofModal(PaymentApprovalModel item) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -458,7 +530,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${item['name']} — ₹${item['amount']}',
+                        '${item.tenantName} — ₹${item.amount.toInt()}',
                         style: GoogleFonts.outfit(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -467,7 +539,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         ),
                       ),
                       Text(
-                        'UTR Reference: ${item['utr']}',
+                        'UTR Reference: ${item.utrNumber}',
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 11.5,
@@ -524,21 +596,29 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Paid to Arun Kumar',
+                      _destinationAccountName.isNotEmpty
+                          ? 'Paid to $_destinationAccountName'
+                          : 'Payment Received',
                       style: GoogleFonts.outfit(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: AppColors.ink),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'HDFC Bank Account ending in 8902',
-                      style: GoogleFonts.outfit(
-                          fontSize: 12, color: AppColors.muted),
-                    ),
+                    if (_destinationBankName.isNotEmpty || _destinationMaskedAccount.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (_destinationBankName.isNotEmpty) _destinationBankName,
+                          if (_destinationMaskedAccount.isNotEmpty)
+                            'Account ending in ${_destinationMaskedAccount.replaceAll('*', '')}',
+                        ].join(' '),
+                        style: GoogleFonts.outfit(
+                            fontSize: 12, color: AppColors.muted),
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Text(
-                      '₹${item['amount']}',
+                      '₹${item.amount.toInt()}',
                       style: GoogleFonts.outfit(
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
@@ -556,7 +636,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
                       child: Text(
-                        'UPI Ref / UTR: ${item['utr']}',
+                        'UPI Ref / UTR: ${item.utrNumber}',
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 11,
@@ -808,7 +888,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ===========================================================================
   Widget _buildPendingApprovalsView() {
     final filtered = _pendingApprovals.where((p) {
-      if (_selectedFloor != 'all' && p['floor'] != _selectedFloor) return false;
+      if (_selectedFloor != 'all' && _getFloor(p.roomNumber) != _selectedFloor) return false;
       return true;
     }).toList();
 
@@ -991,22 +1071,35 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  'Arun Kumar • HDFC Bank',
+                  [
+                    if (_destinationAccountName.isNotEmpty) _destinationAccountName,
+                    if (_destinationBankName.isNotEmpty) _destinationBankName,
+                  ].isNotEmpty
+                      ? [
+                          if (_destinationAccountName.isNotEmpty) _destinationAccountName,
+                          if (_destinationBankName.isNotEmpty) _destinationBankName,
+                        ].join(' • ')
+                      : 'Destination Account',
                   style: GoogleFonts.outfit(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.ink,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'UPI ID: arunkumar@hdfcbank  •  A/C: ******8902',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.muted,
+                if (_destinationUpiId.isNotEmpty || _destinationMaskedAccount.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (_destinationUpiId.isNotEmpty) 'UPI ID: $_destinationUpiId',
+                      if (_destinationMaskedAccount.isNotEmpty) 'A/C: $_destinationMaskedAccount',
+                    ].join('  •  '),
+                    style: GoogleFonts.outfit(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.muted,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -1018,7 +1111,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ===========================================================================
   // PENDING APPROVAL CARD
   // ===========================================================================
-  Widget _buildApprovalCard(Map<String, dynamic> item) {
+  Widget _buildApprovalCard(PaymentApprovalModel item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
@@ -1051,7 +1144,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                 ),
                 child: Center(
                   child: Text(
-                    item['initials'] ?? 'RS',
+                    _getInitials(item.tenantName),
                     style: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -1067,7 +1160,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item['name'],
+                    item.tenantName.isNotEmpty ? item.tenantName : 'Resident',
                     style: GoogleFonts.outfit(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -1077,7 +1170,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${item['room']} • ${item['floor']} Floor',
+                    '${item.roomNumber.isNotEmpty ? item.roomNumber : 'Room'} • ${_getFloor(item.roomNumber)} Floor',
                     style: GoogleFonts.outfit(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -1119,7 +1212,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         ),
                         const SizedBox(height: 1),
                         Text(
-                          '₹${item['amount']}',
+                          '₹${item.amount.toInt()}',
                           style: GoogleFonts.outfit(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
@@ -1138,7 +1231,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
                       child: Text(
-                        item['time'],
+                        _formatTime(item.createdAt),
                         style: GoogleFonts.outfit(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w500,
@@ -1161,7 +1254,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                           fontSize: 12, color: AppColors.muted),
                     ),
                     Text(
-                      item['utr'],
+                      item.utrNumber,
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12.5,
@@ -1194,7 +1287,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                item['proofFile'],
+                                (item.proofImageUrl != null && item.proofImageUrl!.isNotEmpty)
+                                    ? item.proofImageUrl!
+                                    : 'Screenshot_UPI_Payment.png',
                                 style: GoogleFonts.outfit(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
@@ -1239,7 +1334,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () => _showToast(
-                      'Calling ${item['name']}: +91${item['phone']}'),
+                      'Calling ${item.tenantName}: +91${item.phone ?? ''}'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 38,
@@ -1276,7 +1371,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () =>
-                      _showToast('WhatsApp opened with ${item['name']}'),
+                      _showToast('WhatsApp opened with ${item.tenantName}'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     height: 38,
@@ -1378,8 +1473,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ===========================================================================
   // AUDIT HISTORY CARD
   // ===========================================================================
-  Widget _buildHistoryCard(Map<String, dynamic> item) {
-    final isApproved = item['status'] == 'approved';
+  Widget _buildHistoryCard(PaymentApprovalModel item) {
+    final isApproved = item.isApproved;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1420,7 +1515,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     ),
                     child: Center(
                       child: Text(
-                        item['initials'] ?? 'KR',
+                        _getInitials(item.tenantName),
                         style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w800,
@@ -1436,7 +1531,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item['name'],
+                        item.tenantName.isNotEmpty ? item.tenantName : 'Resident',
                         style: GoogleFonts.outfit(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
@@ -1444,7 +1539,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         ),
                       ),
                       Text(
-                        '${item['room']} • ${item['settledTime']}',
+                        '${item.roomNumber.isNotEmpty ? item.roomNumber : 'Room'} • ${_formatTime(item.createdAt)}',
                         style: GoogleFonts.outfit(
                           fontSize: 11.5,
                           color: AppColors.muted,
@@ -1455,7 +1550,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                 ],
               ),
               Text(
-                '₹${item['amount']}',
+                '₹${item.amount.toInt()}',
                 style: GoogleFonts.outfit(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
@@ -1499,7 +1594,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   ],
                 ),
                 Text(
-                  'UTR: ${item['utr']}',
+                  'UTR: ${item.utrNumber}',
                   style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11,
