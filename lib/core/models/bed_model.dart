@@ -15,6 +15,7 @@ class BedModel {
   final String? bedCode;
   final bool isOccupied;
   final String status;
+  final String? tenantId;
   final String? tenantName;
   final String? tenantPhone;
   final double? rent;
@@ -31,6 +32,7 @@ class BedModel {
     this.bedCode,
     this.isOccupied = false,
     this.status = 'Vacant',
+    this.tenantId,
     this.tenantName,
     this.tenantPhone,
     this.rent,
@@ -81,6 +83,7 @@ class BedModel {
       bedCode: json['bed_code']?.toString(),
       isOccupied: json['is_occupied'] == true,
       status: json['status']?.toString() ?? (json['is_occupied'] == true ? 'Active' : 'Vacant'),
+      tenantId: json['tenant_id']?.toString(),
       tenantName: json['tenant_name']?.toString(),
       tenantPhone: json['tenant_phone']?.toString(),
       rent: rent,
@@ -103,6 +106,7 @@ class BedModel {
       if (bedCode != null) 'bed_code': bedCode,
       'is_occupied': isOccupied,
       'status': status,
+      if (tenantId != null && tenantId!.isNotEmpty) 'tenant_id': tenantId,
       if (tenantName != null) 'tenant_name': tenantName,
       if (tenantPhone != null) 'tenant_phone': tenantPhone,
       if (rent != null) 'rent': rent,
@@ -121,6 +125,7 @@ class BedModel {
     String? bedCode,
     bool? isOccupied,
     String? status,
+    String? tenantId,
     String? tenantName,
     String? tenantPhone,
     double? rent,
@@ -137,6 +142,7 @@ class BedModel {
       bedCode: bedCode ?? this.bedCode,
       isOccupied: isOccupied ?? this.isOccupied,
       status: status ?? this.status,
+      tenantId: tenantId ?? this.tenantId,
       tenantName: tenantName ?? this.tenantName,
       tenantPhone: tenantPhone ?? this.tenantPhone,
       rent: rent ?? this.rent,

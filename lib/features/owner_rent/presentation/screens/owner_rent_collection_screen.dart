@@ -144,6 +144,20 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
           cycleMonth: _selectedCycle,
         );
 
+        final roomData =
+            await SupabaseService.instance.getRoomsWithBeds(propId);
+        final Map<String, String> roomSharingMap = {};
+        for (final r in roomData) {
+          final rNum = r['room_number']?.toString() ?? '';
+          final st = r['sharing_type']?.toString();
+          final tb = (r['total_beds'] as num?)?.toInt() ??
+              ((r['beds'] as List?)?.length ?? 2);
+          if (rNum.isNotEmpty) {
+            roomSharingMap[rNum] =
+                (st != null && st.isNotEmpty) ? st : '$tb-Sharing';
+          }
+        }
+
         final ledgerModels =
             await SupabaseService.instance.getRentLedgerModels(propId);
         final Map<String, Map<String, List<Map<String, dynamic>>>> floorMap =
@@ -255,14 +269,17 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
             final List<Map<String, dynamic>> roomsList = [];
             roomsMap.forEach((rNum, beds) {
               final bedCount = beds.length;
-              final dynamicSharing = bedCount == 1
-                  ? '1-Sharing'
-                  : (bedCount == 2
-                      ? '2-Sharing'
-                      : (bedCount == 3 ? '3-Sharing' : '$bedCount-Sharing'));
+              final accurateSharing = roomSharingMap[rNum] ??
+                  (bedCount == 1
+                      ? '1-Sharing'
+                      : (bedCount == 2
+                          ? '2-Sharing'
+                          : (bedCount == 3
+                              ? '3-Sharing'
+                              : '$bedCount-Sharing')));
               roomsList.add({
                 'room': rNum,
-                'type': dynamicSharing,
+                'type': accurateSharing,
                 'monthlyExpected':
                     beds.fold<int>(0, (acc, b) => acc + (b['amount'] as int)),
                 'beds': beds,
