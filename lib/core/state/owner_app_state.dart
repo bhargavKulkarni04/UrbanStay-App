@@ -20,6 +20,12 @@ class OwnerAppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> get properties => List.unmodifiable(_properties);
   int get activePropertyIndex => _activePropertyIndex;
+  void setActivePropertyIndex(int index) {
+    if (index >= 0) {
+      _activePropertyIndex = index;
+      notifyListeners();
+    }
+  }
   bool get isLoading => _isLoading;
 
   Map<String, dynamic>? get activeProperty {

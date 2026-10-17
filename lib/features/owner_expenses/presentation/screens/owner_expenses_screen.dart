@@ -19,8 +19,10 @@ import '../../../../core/models/models.dart';
 class OwnerExpensesScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final String? propertyId;
+  final String? propertyName;
 
-  const OwnerExpensesScreen({super.key, this.onBack, this.propertyId});
+  const OwnerExpensesScreen(
+      {super.key, this.onBack, this.propertyId, this.propertyName});
 
   @override
   State<OwnerExpensesScreen> createState() => _OwnerExpensesScreenState();
@@ -308,7 +310,12 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
 
                       final prop = await SupabaseService.instance.getOwnerProperty();
                       final pId = widget.propertyId ?? prop?['id']?.toString() ?? SupabaseService.instance.activePropertyId ?? '';
-                      final pName = prop?['property_name']?.toString() ?? SupabaseService.instance.activePropertyName ?? '';
+                      final pName = (widget.propertyName != null &&
+                              widget.propertyName!.isNotEmpty)
+                          ? widget.propertyName!
+                          : (prop?['property_name']?.toString() ??
+                              SupabaseService.instance.activePropertyName ??
+                              '');
 
                       final expenseModel = ExpenseModel(
                         id: (isEditing && expenseToEdit != null) ? expenseToEdit.id : '',

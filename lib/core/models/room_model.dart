@@ -30,8 +30,8 @@ class RoomModel {
     required this.roomNumber,
     this.sharingType = '2-Sharing',
     this.totalBeds = 2,
-    this.rentPerBed = 8500.0,
-    this.depositPerBed = 15000.0,
+    this.rentPerBed = 0.0,
+    this.depositPerBed = 0.0,
     this.beds = const [],
     this.createdAt,
   });
@@ -46,12 +46,12 @@ class RoomModel {
     final rawRent = json['rent_per_bed'];
     final double rent = rawRent is num
         ? rawRent.toDouble()
-        : (double.tryParse(rawRent?.toString() ?? '8500.0') ?? 8500.0);
+        : (double.tryParse(rawRent?.toString() ?? '0.0') ?? 0.0);
 
     final rawDeposit = json['deposit_per_bed'];
     final double deposit = rawDeposit is num
         ? rawDeposit.toDouble()
-        : (double.tryParse(rawDeposit?.toString() ?? '15000.0') ?? 15000.0);
+        : (double.tryParse(rawDeposit?.toString() ?? '0.0') ?? 0.0);
 
     List<BedModel> parsedBeds = [];
     if (json['beds'] != null && json['beds'] is List) {

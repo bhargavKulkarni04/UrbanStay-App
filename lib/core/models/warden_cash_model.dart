@@ -81,8 +81,6 @@ class WardenCashModel {
       if (roomNumber.isNotEmpty) 'room_number': roomNumber,
       'amount': amount,
       'warden_name': collectedBy,
-      'collected_by': collectedBy,
-      'status': status,
       'is_deposited_to_owner': isDepositedToOwner,
       if (notes != null) 'notes': notes,
       if (depositDate != null)

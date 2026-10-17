@@ -35,8 +35,8 @@ class OnboardingRequestModel {
     this.roomNumber,
     required this.requestedBed,
     this.sharingType = '2-Sharing',
-    this.monthlyRent = 8500.0,
-    this.depositAmount = 17000.0,
+    this.monthlyRent = 0.0,
+    this.depositAmount = 0.0,
     this.aadhaarMasked,
     this.aadhaarFrontUrl,
     this.selfieUrl,
@@ -51,12 +51,12 @@ class OnboardingRequestModel {
     final rawRent = json['monthly_rent'];
     final double rent = rawRent is num
         ? rawRent.toDouble()
-        : (double.tryParse(rawRent?.toString() ?? '8500.0') ?? 8500.0);
+        : (double.tryParse(rawRent?.toString() ?? '0.0') ?? 0.0);
 
     final rawDeposit = json['deposit_amount'];
     final double deposit = rawDeposit is num
         ? rawDeposit.toDouble()
-        : (double.tryParse(rawDeposit?.toString() ?? '17000.0') ?? 17000.0);
+        : (double.tryParse(rawDeposit?.toString() ?? '0.0') ?? 0.0);
 
     return OnboardingRequestModel(
       id: json['id']?.toString() ?? '',

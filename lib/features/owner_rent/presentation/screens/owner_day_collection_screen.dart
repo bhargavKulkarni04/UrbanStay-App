@@ -2298,8 +2298,12 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   void _openRecordCashModal(RentLedgerModel tenant) {
     final amountCtrl =
         TextEditingController(text: tenant.rentAmount.toInt().toString());
+    final loggedInName = SupabaseService.instance.client.auth.currentUser?.userMetadata?['name'] ?? 'Owner';
+    if (_selectedStaffActor.isEmpty) {
+      _selectedStaffActor = '$loggedInName (Owner)';
+    }
     final notesCtrl =
-        TextEditingController(text: 'Paid cash at reception desk');
+        TextEditingController(text: 'Cash received by $_selectedStaffActor');
 
     showModalBottomSheet(
       context: context,
@@ -2366,7 +2370,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                         .toList(),
                     onChanged: (val) {
                       if (val != null) {
-                        setState(() => _selectedStaffActor = val);
+                        setState(() {
+                          _selectedStaffActor = val;
+                          notesCtrl.text = 'Cash received by $val';
+                        });
                       }
                     },
                   ),

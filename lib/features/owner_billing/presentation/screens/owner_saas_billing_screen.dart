@@ -48,34 +48,36 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
 
   Future<void> _loadBillingData() async {
     try {
-      if (widget.propertyId != null && widget.propertyId!.isNotEmpty) {
-        final metrics = await SupabaseService.instance.getBedMetrics(widget.propertyId!);
+      String? targetPropId =
+          widget.propertyId ?? SupabaseService.instance.activePropertyId;
+      if (targetPropId == null || targetPropId.isEmpty) {
+        final prop = await SupabaseService.instance.getPropertyModel();
+        targetPropId = prop?.id;
+        if (prop != null && widget.propertyName == null) {
+          _activePropertyName = prop.propertyName;
+        }
+      }
+
+      if (targetPropId != null && targetPropId.isNotEmpty) {
+        final metrics =
+            await SupabaseService.instance.getBedMetrics(targetPropId);
         final int beds = metrics['total'] ?? 0;
         if (beds > 0 && mounted) {
           setState(() {
             _totalBeds = beds;
           });
         }
-      } else {
-        final prop = await SupabaseService.instance.getPropertyModel();
-        if (prop != null) {
-          final propId = prop.id;
-          final metrics = await SupabaseService.instance.getBedMetrics(propId);
-          final int beds = metrics['total'] ?? 0;
-          if (mounted) {
-            setState(() {
-              if (widget.propertyName == null) {
-                _activePropertyName = prop.propertyName.isNotEmpty ? prop.propertyName : _activePropertyName;
-              }
-              if (widget.totalBeds == null && beds > 0) {
-                _totalBeds = beds;
-              }
-            });
-          }
-        }
+
+        // Auto-create / verify saas_subscriptions and inaugural invoice in Supabase
+        await SupabaseService.instance.ensureSaasSubscription(
+          propertyId: targetPropId,
+          propertyName: _activePropertyName,
+          totalBeds: _totalBeds > 0 ? _totalBeds : null,
+        );
       }
 
-      final invoicesList = await SupabaseService.instance.getSaasInvoiceModels();
+      final invoicesList = await SupabaseService.instance
+          .getSaasInvoiceModels(propertyId: targetPropId);
       if (mounted) {
         setState(() {
           _invoices = invoicesList;
@@ -89,21 +91,64 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
   int get _bedLicenseCost => _totalBeds * _pricePerBed;
   int get _totalDue => _bedLicenseCost + _platformFee;
 
+  DateTime get _nextBillingDate {
+    final now = DateTime.now();
+    return (now.day == 1)
+        ? DateTime(now.year, now.month + 1, 1)
+        : DateTime(now.year, now.month + 2, 1);
+  }
+
+  int get _daysRemainingInTrial {
+    final diff = _nextBillingDate.difference(DateTime.now()).inDays;
+    return diff > 0 ? diff : 0;
+  }
+
+  String get _firstInvoiceDateStr {
+    final date = _nextBillingDate;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '1 ${months[date.month - 1]} ${date.year}';
+  }
+
+  String get _fullMonthName {
+    final date = _nextBillingDate;
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[date.month - 1];
+  }
+
+  String get _billingPeriodStr {
+    final date = _nextBillingDate;
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final lastDay = DateTime(date.year, date.month + 1, 0).day;
+    final mStr = months[date.month - 1];
+    return '1 $mStr ${date.year} – $lastDay $mStr ${date.year}';
+  }
+
   Future<void> _activateMandate() async {
     setState(() => _isLoading = true);
 
     try {
       // Calls Cloudflare Pages backend function which securely talks to Cashfree
-      final res = await http.post(
-        Uri.parse('https://urbanstay.living/api/cashfree-order'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'amount': _totalDue,
-          'customer_id': 'owner_bhargav',
-          'phone': '9876543210',
-          'name': 'Bhargav Kulkarni',
-        }),
-      ).timeout(const Duration(seconds: 10));
+      final res = await http
+          .post(
+            Uri.parse('https://urbanstay.living/api/cashfree-order'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'amount': _totalDue,
+              'customer_id': 'owner_bhargav',
+              'phone': '9876543210',
+              'name': 'Bhargav Kulkarni',
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -112,11 +157,26 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
         final data = jsonDecode(res.body);
         final sessionId = data['payment_session_id'];
         if (sessionId != null && sessionId.toString().isNotEmpty) {
+          final propId =
+              widget.propertyId ?? SupabaseService.instance.activePropertyId;
+          if (propId != null && propId.isNotEmpty) {
+            await SupabaseService.instance.recordSaasInvoice(
+              propertyId: propId,
+              propertyName: _activePropertyName,
+              amount: _totalDue.toDouble(),
+              utrNumber: 'CF-$sessionId',
+              paymentMode: 'Cashfree Mandate',
+            );
+            _loadBillingData();
+          }
+
           // Launch OFFICIAL Cashfree Checkout Web SDK
           final mode = data['environment'] ?? 'production';
-          launchCashfreeWebCheckout(sessionId.toString(), mode: mode.toString());
+          launchCashfreeWebCheckout(sessionId.toString(),
+              mode: mode.toString());
         } else {
-          _showError('Order created but payment_session_id missing: ${res.body}');
+          _showError(
+              'Order created but payment_session_id missing: ${res.body}');
         }
       } else {
         String msg = 'Cashfree Order Failed (${res.statusCode})';
@@ -131,7 +191,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        _showError('Cashfree API error: $e\nEnsure functions/api/cashfree-order.js is deployed on Cloudflare Pages with CF_APP_ID & CF_SECRET_KEY.');
+        _showError(
+            'Cashfree API error: $e\nEnsure functions/api/cashfree-order.js is deployed on Cloudflare Pages with CF_APP_ID & CF_SECRET_KEY.');
       }
     }
   }
@@ -141,16 +202,14 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
       SnackBar(
         content: Text(
           message,
-          style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
+          style: GoogleFonts.outfit(
+              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13),
         ),
         backgroundColor: const Color(0xFFDC2626),
         duration: const Duration(seconds: 6),
       ),
     );
   }
-
-
-
 
   void _navigateToSettings() {
     Navigator.of(context).push(
@@ -170,7 +229,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
         scrolledUnderElevation: 0,
         leading: widget.onBack != null
             ? IconButton(
-                icon: const Icon(Icons.arrow_back, color: Color(0xFF111111), size: 20),
+                icon: const Icon(Icons.arrow_back,
+                    color: Color(0xFF111111), size: 20),
                 onPressed: widget.onBack,
               )
             : null,
@@ -248,7 +308,7 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    '12 Days Remaining in Free Trial',
+                    '$_daysRemainingInTrial Days Remaining in Free Trial',
                     style: GoogleFonts.outfit(
                       fontSize: 16.5,
                       fontWeight: FontWeight.w700,
@@ -258,7 +318,7 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Free access until 1 September 2026',
+                    'Free access & reminders until $_firstInvoiceDateStr',
                     style: GoogleFonts.outfit(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w500,
@@ -272,7 +332,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
                       value: 0.62,
                       minHeight: 4,
                       backgroundColor: Color(0xFFE5E7EB),
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.green),
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(AppColors.green),
                     ),
                   ),
                 ],
@@ -303,13 +364,14 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildSummaryRow('First Invoice Date', '1 Sep 2026'),
+                  _buildSummaryRow('First Invoice Date', _firstInvoiceDateStr),
                   const SizedBox(height: 10),
-                  _buildSummaryRow('Billing Period', '1 Sep 2026 – 30 Sep 2026'),
+                  _buildSummaryRow('Billing Period', _billingPeriodStr),
                   const SizedBox(height: 10),
                   _buildSummaryRow('Total Beds', '$_totalBeds Beds'),
                   const SizedBox(height: 14),
-                  const Divider(color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+                  const Divider(
+                      color: Color(0xFFE5E7EB), height: 1, thickness: 1),
                   const SizedBox(height: 14),
                   Text(
                     'ITEM BREAKDOWN',
@@ -328,7 +390,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
                   const SizedBox(height: 10),
                   _buildSummaryRow('Platform Fee', '₹$_platformFee.00'),
                   const SizedBox(height: 14),
-                  const Divider(color: Color(0xFFE5E7EB), height: 1, thickness: 1),
+                  const Divider(
+                      color: Color(0xFFE5E7EB), height: 1, thickness: 1),
                   const SizedBox(height: 14),
                   _buildSummaryRow(
                     'Total Due on 1st of Month',
@@ -390,7 +453,7 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
             const SizedBox(height: 16),
 
             // Button 1: ACTIVATE SUBSCRIPTION & PAY ₹604 (Solid Green Bar, White Text)
-             SizedBox(
+            SizedBox(
               height: 48,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _activateMandate,
@@ -509,7 +572,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
             if (_invoices.isEmpty)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
@@ -517,7 +581,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
                 ),
                 child: Column(
                   children: [
-                    const Icon(Icons.receipt_long_outlined, size: 28, color: Color(0xFF9CA3AF)),
+                    const Icon(Icons.receipt_long_outlined,
+                        size: 28, color: Color(0xFF9CA3AF)),
                     const SizedBox(height: 8),
                     Text(
                       'No Past Invoices Yet',
@@ -542,7 +607,9 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
               )
             else
               ..._invoices.map((inv) {
-                final invNum = inv.invoiceNumber.isNotEmpty ? inv.invoiceNumber : 'US-INV-001';
+                final invNum = inv.invoiceNumber.isNotEmpty
+                    ? inv.invoiceNumber
+                    : 'US-INV-001';
                 final dateStr = inv.createdAt != null
                     ? inv.createdAt!.toString().split('T').first
                     : 'Recent';
@@ -570,10 +637,12 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
                       },
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                          border: Border.all(
+                              color: const Color(0xFFE5E7EB), width: 1),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -646,7 +715,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {double fontSize = 13, bool isTotal = false}) {
+  Widget _buildSummaryRow(String label, String value,
+      {double fontSize = 13, bool isTotal = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -656,7 +726,8 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
             style: GoogleFonts.outfit(
               fontSize: fontSize,
               fontWeight: isTotal ? FontWeight.w700 : FontWeight.w500,
-              color: isTotal ? const Color(0xFF111111) : const Color(0xFF4B5563),
+              color:
+                  isTotal ? const Color(0xFF111111) : const Color(0xFF4B5563),
             ),
           ),
         ),
@@ -704,7 +775,8 @@ class OwnerInvoiceDetailScreen extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF111111), size: 20),
+          icon:
+              const Icon(Icons.arrow_back, color: Color(0xFF111111), size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
@@ -780,7 +852,8 @@ class OwnerInvoiceDetailScreen extends StatelessWidget {
                         ],
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEBF8EE),
                           borderRadius: BorderRadius.circular(6),
@@ -810,9 +883,11 @@ class OwnerInvoiceDetailScreen extends StatelessWidget {
                   const SizedBox(height: 10),
                   _buildDetailRow('Billing Period', '1 Aug 2026 – 31 Aug 2026'),
                   const SizedBox(height: 10),
-                  _buildDetailRow('Billed To', '$propertyName • Bhargav Kulkarni'),
+                  _buildDetailRow(
+                      'Billed To', '$propertyName • Bhargav Kulkarni'),
                   const SizedBox(height: 10),
-                  _buildDetailRow('Payment Mode', 'Direct UPI AutoPay (Cashfree Verified)'),
+                  _buildDetailRow(
+                      'Payment Mode', 'Direct UPI AutoPay (Cashfree Verified)'),
                   const SizedBox(height: 10),
                   _buildDetailRow('Transaction Ref / UTR', 'CF-984210385912'),
 
@@ -821,11 +896,13 @@ class OwnerInvoiceDetailScreen extends StatelessWidget {
                   const SizedBox(height: 14),
 
                   // Itemized Breakdown
-                  _buildDetailRow('Bed Licensing ($totalBeds Bed × ₹10)', '₹10.00'),
+                  _buildDetailRow(
+                      'Bed Licensing ($totalBeds Bed × ₹10)', '₹10.00'),
                   const SizedBox(height: 10),
                   _buildDetailRow('Platform & WhatsApp Alerts', '₹1.00'),
                   const SizedBox(height: 10),
-                  _buildDetailRow('GST (SAC 998315 @ 0% Micro-exempt)', '₹0.00'),
+                  _buildDetailRow(
+                      'GST (SAC 998315 @ 0% Micro-exempt)', '₹0.00'),
 
                   const SizedBox(height: 16),
                   const Divider(color: Color(0xFFE5E7EB), height: 1),
@@ -879,7 +956,8 @@ class OwnerInvoiceDetailScreen extends StatelessWidget {
                     ),
                   );
                 },
-                icon: const Icon(Icons.download_rounded, color: Colors.white, size: 18),
+                icon: const Icon(Icons.download_rounded,
+                    color: Colors.white, size: 18),
                 label: Text(
                   'DOWNLOAD TAX INVOICE (PDF)',
                   style: GoogleFonts.outfit(
@@ -950,4 +1028,3 @@ class OwnerInvoiceDetailScreen extends StatelessWidget {
     );
   }
 }
-

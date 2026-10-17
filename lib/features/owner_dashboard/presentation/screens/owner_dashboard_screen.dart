@@ -52,8 +52,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       0; // 0: Dashboard, 1: Rooms, 2: Approvals, 3: Plan / Pay
   String _activeSubScreen = 'dashboard'; // 'dashboard', 'rooms', 'rent'
 
-  // Multi-PG Properties State (Populated dynamically from Supabase / Setup)
-  int _activePropertyIndex = 0;
+  // Multi-PG Properties State (Bound globally to OwnerAppState so it stays locked)
+  int get _activePropertyIndex => OwnerAppState.instance.activePropertyIndex;
+  set _activePropertyIndex(int val) {
+    OwnerAppState.instance.setActivePropertyIndex(val);
+  }
   final List<Map<String, dynamic>> _properties = [];
 
   String? get _currentPropertyId {
@@ -235,10 +238,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         setState(() {
           _properties.clear();
           _properties.addAll(loaded);
-          _activePropertyIndex = 0;
+          final savedIdx = OwnerAppState.instance.activePropertyIndex;
+          final validIdx = (savedIdx >= 0 && savedIdx < _properties.length) ? savedIdx : 0;
+          _activePropertyIndex = validIdx;
           if (_properties.isNotEmpty) {
             SupabaseService.instance.activePropertyId =
-                _properties[0]['id']?.toString();
+                _properties[validIdx]['id']?.toString();
+            SupabaseService.instance.activePropertyName =
+                _properties[validIdx]['name']?.toString() ??
+                _properties[validIdx]['property_name']?.toString();
           }
         });
       } else if (mounted && widget.initialProperty != null) {
@@ -448,6 +456,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             else if (_activeSubScreen == 'expenses')
               OwnerExpensesScreen(
                 propertyId: _currentPropertyId,
+                propertyName: _currentPropertyName,
                 onBack: () {
                   setState(() => _activeSubScreen = 'dashboard');
                   _loadPropertiesFromSupabase();
@@ -1434,31 +1443,62 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
             // Load live team members from Supabase once on open
-            if (currentPropId.isNotEmpty && _teamMembers.isEmpty) {
-              SupabaseService.instance
-                  .getPropertyTeamMembers(currentPropId)
-                  .then((team) {
-                if (team.isNotEmpty && mounted) {
-                  final loaded = team.map((m) {
-                    final assigned = m.assignedPropertyIds.isNotEmpty
-                        ? m.assignedPropertyIds
-                        : [currentPropId];
-                    return {
-                      'id': m.id,
-                      'name': m.name,
-                      'phone': m.phone,
-                      'role': m.role,
-                      'assignedPropertyIds': assigned,
-                      'status': m.status,
-                    };
-                  }).toList();
-                  setModalState(() {
-                    _teamMembers.clear();
-                    _teamMembers.addAll(loaded);
-                  });
-                  setState(() {});
-                }
-              });
+            if (_teamMembers.isEmpty) {
+              final allPropIds = _properties
+                  .map((p) => p['id']?.toString() ?? '')
+                  .where((id) => id.isNotEmpty)
+                  .toList();
+              if (allPropIds.isEmpty && currentPropId.isNotEmpty) {
+                allPropIds.add(currentPropId);
+              }
+              if (allPropIds.isNotEmpty) {
+                Future.wait(allPropIds.map(
+                        (pId) => SupabaseService.instance.getPropertyTeamMembers(pId)))
+                    .then((results) {
+                  final List<Map<String, dynamic>> allLoaded = [];
+                  for (int i = 0; i < allPropIds.length; i++) {
+                    final pId = allPropIds[i];
+                    final teamList =
+                        i < results.length ? results[i] : <PropertyTeamModel>[];
+                    for (final m in teamList) {
+                      allLoaded.add({
+                        'id': m.id,
+                        'name': m.name,
+                        'phone': m.phone,
+                        'role': m.role,
+                        'assignedPropertyIds': m.assignedPropertyIds.isNotEmpty
+                            ? m.assignedPropertyIds
+                            : [pId],
+                        'status': m.status,
+                      });
+                    }
+                  }
+                  if (allLoaded.isNotEmpty && mounted) {
+                    final Map<String, Map<String, dynamic>> deduped = {};
+                    for (final item in allLoaded) {
+                      final key = '${item['name']}_${item['phone']}';
+                      if (!deduped.containsKey(key)) {
+                        deduped[key] = Map<String, dynamic>.from(item);
+                      } else {
+                        final existingAssigned = (deduped[key]!['assignedPropertyIds']
+                                as List)
+                            .cast<String>()
+                            .toSet();
+                        final newAssigned =
+                            (item['assignedPropertyIds'] as List).cast<String>();
+                        existingAssigned.addAll(newAssigned);
+                        deduped[key]!['assignedPropertyIds'] =
+                            existingAssigned.toList();
+                      }
+                    }
+                    setModalState(() {
+                      _teamMembers.clear();
+                      _teamMembers.addAll(deduped.values);
+                    });
+                    setState(() {});
+                  }
+                });
+              }
             }
             return Container(
               decoration: const BoxDecoration(
@@ -2018,45 +2058,64 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                           }
                         }
 
-                        // Save to Supabase property_team table immediately
-                        final primaryPropId = selectedPropertyIds.isNotEmpty
-                            ? selectedPropertyIds.first
+                        // Save to Supabase property_team table immediately for ALL selected properties!
+                        final List<String> targetPropIds = selectedPropertyIds.isNotEmpty
+                            ? selectedPropertyIds.toList()
                             : (currentPropId.isNotEmpty
-                                ? currentPropId
+                                ? [currentPropId]
                                 : (_properties.isNotEmpty
-                                    ? _properties.first['id'].toString()
-                                    : ''));
-                        if (primaryPropId.isNotEmpty) {
-                          SupabaseService.instance.inviteTeamMember(
-                            propertyId: primaryPropId,
-                            name: name,
-                            phone: phone,
-                            role: selectedRole,
-                          ).then((success) {
-                            if (success && mounted) {
-                              SupabaseService.instance
-                                  .getPropertyTeamMembers(primaryPropId)
-                                  .then((team) {
-                                if (team.isNotEmpty && mounted) {
-                                  final loaded = team
-                                      .map((m) => {
-                                            'id': m.id,
-                                            'name': m.name,
-                                            'phone': m.phone,
-                                            'role': m.role,
-                                            'assignedPropertyIds': [
-                                              primaryPropId
-                                            ],
-                                            'status': m.status,
-                                          })
-                                      .toList();
-                                  setModalState(() {
-                                    _teamMembers.clear();
-                                    _teamMembers.addAll(loaded);
+                                    ? [_properties.first['id'].toString()]
+                                    : []));
+
+                        if (targetPropIds.isNotEmpty) {
+                          Future.wait(targetPropIds.map((pId) {
+                            String targetPName = '';
+                            try {
+                              final matched = _properties.firstWhere(
+                                  (p) => p['id']?.toString() == pId.toString());
+                              targetPName = matched['name']?.toString() ??
+                                  matched['property_name']?.toString() ??
+                                  '';
+                            } catch (_) {}
+                            return SupabaseService.instance.inviteTeamMember(
+                              propertyId: pId,
+                              propertyName: targetPName,
+                              name: name,
+                              phone: phone,
+                              role: selectedRole,
+                            );
+                          })).then((_) async {
+                            final List<Map<String, dynamic>> allLoaded = [];
+                            for (final pId in targetPropIds) {
+                              try {
+                                final team = await SupabaseService.instance.getPropertyTeamMembers(pId);
+                                for (final m in team) {
+                                  allLoaded.add({
+                                    'id': m.id,
+                                    'name': m.name,
+                                    'phone': m.phone,
+                                    'role': m.role,
+                                    'assignedPropertyIds': targetPropIds,
+                                    'status': m.status,
                                   });
-                                  setState(() {});
                                 }
+                              } catch (_) {}
+                            }
+                            if (allLoaded.isNotEmpty && mounted) {
+                              setModalState(() {
+                                final seen = <String>{};
+                                final deduped = <Map<String, dynamic>>[];
+                                for (final m in allLoaded) {
+                                  final k = '${m['name']}_${m['phone']}';
+                                  if (!seen.contains(k)) {
+                                    seen.add(k);
+                                    deduped.add(m);
+                                  }
+                                }
+                                _teamMembers.clear();
+                                _teamMembers.addAll(deduped);
                               });
+                              setState(() {});
                             }
                           });
                         }

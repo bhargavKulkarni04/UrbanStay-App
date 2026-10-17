@@ -19,6 +19,7 @@ class TenantModel {
   final String? workplace;
   final double monthlyRent;
   final double securityDeposit;
+  final int rentDueDay;
   final bool isAadhaarVerified;
   final String? refundUpiId;
   final String? emergencyContact;
@@ -37,8 +38,9 @@ class TenantModel {
     required this.phone,
     this.email,
     this.workplace,
-    this.monthlyRent = 8500.0,
-    this.securityDeposit = 15000.0,
+    this.monthlyRent = 0.0,
+    this.securityDeposit = 0.0,
+    this.rentDueDay = 5,
     this.isAadhaarVerified = false,
     this.refundUpiId,
     this.emergencyContact,
@@ -63,12 +65,14 @@ class TenantModel {
     final rawRent = json['monthly_rent'] ?? json['rent'];
     final double rent = rawRent is num
         ? rawRent.toDouble()
-        : (double.tryParse(rawRent?.toString() ?? '8500.0') ?? 8500.0);
+        : (double.tryParse(rawRent?.toString() ?? '0.0') ?? 0.0);
 
     final rawDeposit = json['security_deposit'] ?? json['deposit'];
     final double deposit = rawDeposit is num
         ? rawDeposit.toDouble()
-        : (double.tryParse(rawDeposit?.toString() ?? '15000.0') ?? 15000.0);
+        : (double.tryParse(rawDeposit?.toString() ?? '0.0') ?? 0.0);
+
+    final dueDay = (json['rent_due_day'] as num?)?.toInt() ?? 5;
 
     return TenantModel(
       id: json['id']?.toString() ?? '',
@@ -84,6 +88,7 @@ class TenantModel {
       workplace: json['workplace']?.toString(),
       monthlyRent: rent,
       securityDeposit: deposit,
+      rentDueDay: dueDay,
       isAadhaarVerified: json['is_aadhaar_verified'] == true,
       refundUpiId: json['refund_upi_id']?.toString(),
       emergencyContact: json['emergency_contact']?.toString(),
@@ -110,6 +115,7 @@ class TenantModel {
       if (workplace != null) 'workplace': workplace,
       'monthly_rent': monthlyRent,
       'security_deposit': securityDeposit,
+      'rent_due_day': rentDueDay,
       'is_aadhaar_verified': isAadhaarVerified,
       if (refundUpiId != null) 'refund_upi_id': refundUpiId,
       if (emergencyContact != null) 'emergency_contact': emergencyContact,

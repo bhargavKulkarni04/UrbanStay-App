@@ -51,9 +51,11 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
 
   // Controllers for Swap Tab (both residents editable)
   final TextEditingController _swapRes1RentController = TextEditingController();
-  final TextEditingController _swapRes1DepositController = TextEditingController();
+  final TextEditingController _swapRes1DepositController =
+      TextEditingController();
   final TextEditingController _swapRes2RentController = TextEditingController();
-  final TextEditingController _swapRes2DepositController = TextEditingController();
+  final TextEditingController _swapRes2DepositController =
+      TextEditingController();
 
   @override
   void dispose() {
@@ -86,8 +88,11 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
             'roomType': room['type'],
             'bed': bed['bed'],
             'title': bed['title'] ?? '${room['room']} - ${bed['bed']}',
-            'rent': int.tryParse(bed['rent']?.toString() ?? '8500') ?? 8500,
-            'deposit': bed['deposit']?.toString() ?? '15000',
+            'rent': int.tryParse(bed['rent']?.toString() ?? '') ??
+                (int.tryParse(room['rent']?.toString() ?? '') ?? 0),
+            'deposit': bed['deposit']?.toString() ??
+                room['deposit']?.toString() ??
+                '0',
             'rawBed': bed,
             'rawRoom': room,
           });
@@ -104,8 +109,7 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
     final currentPhone = widget.resident['phone']?.toString() ?? '';
 
     for (final room in widget.rooms) {
-      if (_swapFloorFilter != 'all' &&
-          room['floor'] != _swapFloorFilter) {
+      if (_swapFloorFilter != 'all' && room['floor'] != _swapFloorFilter) {
         continue;
       }
       final beds = room['beds'] as List<dynamic>;
@@ -166,7 +170,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
         if (r['room'] == widget.roomName) {
           final beds = r['beds'] as List<dynamic>;
           for (final b in beds) {
-            if (b['bed'] == widget.resident['bed'] || b['label'] == widget.resident['bed']) {
+            if (b['bed'] == widget.resident['bed'] ||
+                b['label'] == widget.resident['bed']) {
               oldBedId = b['id']?.toString() ?? '';
               break;
             }
@@ -184,8 +189,12 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
             b['isOccupied'] = false;
             b['title'] = 'Vacant ${b['bed']} — Available';
             final rentVal = widget.resident['rent'];
-            final hasRent = rentVal != null && rentVal.toString().isNotEmpty && rentVal.toString() != '0';
-            b['sub'] = hasRent ? '₹$rentVal/mo • Ready for Walk-In' : 'Ready for Walk-In';
+            final hasRent = rentVal != null &&
+                rentVal.toString().isNotEmpty &&
+                rentVal.toString() != '0';
+            b['sub'] = hasRent
+                ? '₹$rentVal/mo • Ready for Walk-In'
+                : 'Ready for Walk-In';
             b['name'] = null;
             b['phone'] = '';
             b['work'] = '';
@@ -214,8 +223,12 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
             b['phone'] = widget.resident['phone'];
             b['work'] = widget.resident['work'];
             b['status'] = widget.resident['status'] ?? 'Active';
-            b['rent'] = _newRentController.text.isNotEmpty ? _newRentController.text : (_selectedEmptyRent?.toString() ?? widget.resident['rent']);
-            b['deposit'] = _newDepositController.text.isNotEmpty ? _newDepositController.text : widget.resident['deposit'];
+            b['rent'] = _newRentController.text.isNotEmpty
+                ? _newRentController.text
+                : (_selectedEmptyRent?.toString() ?? widget.resident['rent']);
+            b['deposit'] = _newDepositController.text.isNotEmpty
+                ? _newDepositController.text
+                : widget.resident['deposit'];
             b['docs'] = widget.resident['docs'] ?? 'KYC Verified ✓';
             b['docsVerified'] = widget.resident['docsVerified'] ?? true;
             b.remove('title');
@@ -237,16 +250,19 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
         phone: widget.resident['phone'] ?? '',
         rent: double.tryParse(_newRentController.text.isNotEmpty
             ? _newRentController.text
-            : (_selectedEmptyRent?.toString() ?? widget.resident['rent']?.toString() ?? '8500')),
+            : (_selectedEmptyRent?.toString() ??
+                widget.resident['rent']?.toString() ??
+                '0')),
         deposit: double.tryParse(_newDepositController.text.isNotEmpty
             ? _newDepositController.text
-            : (widget.resident['deposit']?.toString() ?? '15000')),
+            : (widget.resident['deposit']?.toString() ?? '0')),
       );
       if (!success) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to shift bed in database. Please check connection.'),
+              content: Text(
+                  'Failed to shift bed in database. Please check connection.'),
               backgroundColor: AppColors.danger,
             ),
           );
@@ -260,7 +276,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$residentName successfully shifted to $_selectedEmptyRoom ✓'),
+          content: Text(
+              '$residentName successfully shifted to $_selectedEmptyRoom ✓'),
           backgroundColor: AppColors.green,
         ),
       );
@@ -280,7 +297,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
     }
 
     final currentResName = widget.resident['name'] ?? 'Resident 1';
-    final targetResData = _selectedTargetResident!['resident'] as Map<String, dynamic>;
+    final targetResData =
+        _selectedTargetResident!['resident'] as Map<String, dynamic>;
     final targetResName = targetResData['name'] ?? 'Resident 2';
 
     // Store snapshots
@@ -307,7 +325,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
         if (r['room'] == widget.roomName) {
           final beds = r['beds'] as List<dynamic>;
           for (final b in beds) {
-            if (b['bed'] == widget.resident['bed'] || b['label'] == widget.resident['bed']) {
+            if (b['bed'] == widget.resident['bed'] ||
+                b['label'] == widget.resident['bed']) {
               bed1Id = b['id']?.toString() ?? '';
               break;
             }
@@ -323,7 +342,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
         if (r['room'] == _selectedTargetRoom) {
           final beds = r['beds'] as List<dynamic>;
           for (final b in beds) {
-            if (b['bed'] == _selectedTargetResident!['bed'] || b['label'] == _selectedTargetResident!['bed']) {
+            if (b['bed'] == _selectedTargetResident!['bed'] ||
+                b['label'] == _selectedTargetResident!['bed']) {
               bed2Id = b['id']?.toString() ?? '';
               break;
             }
@@ -341,25 +361,26 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
         res1Phone: res1Phone,
         res1Rent: double.tryParse(_swapRes1RentController.text.isNotEmpty
             ? _swapRes1RentController.text
-            : (widget.resident['rent']?.toString() ?? '8500')),
+            : (widget.resident['rent']?.toString() ?? '0')),
         res1Deposit: double.tryParse(_swapRes1DepositController.text.isNotEmpty
             ? _swapRes1DepositController.text
-            : (widget.resident['deposit']?.toString() ?? '15000')),
+            : (widget.resident['deposit']?.toString() ?? '0')),
         res2Name: res2Name,
         res2Phone: res2Phone,
         res2Rent: double.tryParse(_swapRes2RentController.text.isNotEmpty
             ? _swapRes2RentController.text
-            : (targetResData['rent']?.toString() ?? '8500')),
+            : (targetResData['rent']?.toString() ?? '0')),
         res2Deposit: double.tryParse(_swapRes2DepositController.text.isNotEmpty
             ? _swapRes2DepositController.text
-            : (targetResData['deposit']?.toString() ?? '15000')),
+            : (targetResData['deposit']?.toString() ?? '0')),
       );
 
       if (!success) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to swap beds in database. Please check connection.'),
+              content: Text(
+                  'Failed to swap beds in database. Please check connection.'),
               backgroundColor: AppColors.danger,
             ),
           );
@@ -381,10 +402,10 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
             b['status'] = res2Status;
             b['rent'] = _swapRes2RentController.text.isNotEmpty
                 ? _swapRes2RentController.text
-                : (b['rent'] ?? '8500');
+                : (b['rent'] ?? '0');
             b['deposit'] = _swapRes2DepositController.text.isNotEmpty
                 ? _swapRes2DepositController.text
-                : (b['deposit'] ?? '15000');
+                : (b['deposit'] ?? '0');
             b['docs'] = res2Docs;
             b['docsVerified'] = res2DocsVerified;
             break;
@@ -407,10 +428,10 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
             b['status'] = res1Status;
             b['rent'] = _swapRes1RentController.text.isNotEmpty
                 ? _swapRes1RentController.text
-                : (b['rent'] ?? '8500');
+                : (b['rent'] ?? '0');
             b['deposit'] = _swapRes1DepositController.text.isNotEmpty
                 ? _swapRes1DepositController.text
-                : (b['deposit'] ?? '15000');
+                : (b['deposit'] ?? '0');
             b['docs'] = res1Docs;
             b['docsVerified'] = res1DocsVerified;
             break;
@@ -425,7 +446,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Swapped $currentResName and $targetResName between ${widget.roomName} and $_selectedTargetRoom successfully ✓'),
+          content: Text(
+              'Swapped $currentResName and $targetResName between ${widget.roomName} and $_selectedTargetRoom successfully ✓'),
           backgroundColor: AppColors.green,
         ),
       );
@@ -437,8 +459,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
     final resName = widget.resident['name']?.toString() ?? 'Resident';
     final resInitials = widget.resident['initials']?.toString() ?? 'UR';
     final resBed = widget.resident['bed']?.toString() ?? 'Bed';
-    final resRent = widget.resident['rent']?.toString() ?? '8500';
-    final resDeposit = widget.resident['deposit']?.toString() ?? '15000';
+    final resRent = widget.resident['rent']?.toString() ?? '';
+    final resDeposit = widget.resident['deposit']?.toString() ?? '';
 
     final vacantBeds = _getVacantBeds();
     final eligibleResidents = _getEligibleSwapResidents();
@@ -498,7 +520,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                        border: Border.all(
+                            color: const Color(0xFFE5E7EB), width: 1),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -516,7 +539,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
                                   color: AppColors.greenLight,
                                   borderRadius: BorderRadius.circular(6),
@@ -605,14 +629,18 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                               },
                               borderRadius: BorderRadius.circular(9),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: _selectedTab == 0 ? Colors.white : Colors.transparent,
+                                  color: _selectedTab == 0
+                                      ? Colors.white
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(9),
                                   boxShadow: _selectedTab == 0
                                       ? [
                                           BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.06),
+                                            color: Colors.black
+                                                .withValues(alpha: 0.06),
                                             blurRadius: 4,
                                             offset: const Offset(0, 1),
                                           )
@@ -625,7 +653,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                     style: GoogleFonts.outfit(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
-                                      color: _selectedTab == 0 ? AppColors.ink : AppColors.muted,
+                                      color: _selectedTab == 0
+                                          ? AppColors.ink
+                                          : AppColors.muted,
                                     ),
                                   ),
                                 ),
@@ -641,14 +671,18 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                               },
                               borderRadius: BorderRadius.circular(9),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: _selectedTab == 1 ? Colors.white : Colors.transparent,
+                                  color: _selectedTab == 1
+                                      ? Colors.white
+                                      : Colors.transparent,
                                   borderRadius: BorderRadius.circular(9),
                                   boxShadow: _selectedTab == 1
                                       ? [
                                           BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.06),
+                                            color: Colors.black
+                                                .withValues(alpha: 0.06),
                                             blurRadius: 4,
                                             offset: const Offset(0, 1),
                                           )
@@ -661,7 +695,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                     style: GoogleFonts.outfit(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
-                                      color: _selectedTab == 1 ? AppColors.ink : AppColors.muted,
+                                      color: _selectedTab == 1
+                                          ? AppColors.ink
+                                          : AppColors.muted,
                                     ),
                                   ),
                                 ),
@@ -725,7 +761,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                         )
                       else
                         ...vacantBeds.map((bedItem) {
-                          final isSelected = _selectedEmptyBedKey == bedItem['key'];
+                          final isSelected =
+                              _selectedEmptyBedKey == bedItem['key'];
                           final newRent = bedItem['rent'] as int;
 
                           return Padding(
@@ -738,7 +775,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                   _selectedEmptyBed = bedItem['bed'];
                                   _selectedEmptyRent = newRent;
                                   _newRentController.text = newRent.toString();
-                                  _newDepositController.text = bedItem['deposit']?.toString() ?? '15000';
+                                  _newDepositController.text =
+                                      bedItem['deposit']?.toString() ?? '0';
                                 });
                               },
                               borderRadius: BorderRadius.circular(12),
@@ -748,7 +786,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                                    color: isSelected
+                                        ? AppColors.green
+                                        : const Color(0xFFE5E7EB),
                                     width: isSelected ? 2 : 1,
                                   ),
                                 ),
@@ -758,16 +798,20 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                       isSelected
                                           ? Icons.radio_button_checked
                                           : Icons.radio_button_off,
-                                      color: isSelected ? AppColors.green : AppColors.muted,
+                                      color: isSelected
+                                          ? AppColors.green
+                                          : AppColors.muted,
                                       size: 20,
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
                                             children: [
                                               Expanded(
                                                 child: Text(
@@ -829,7 +873,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                             const SizedBox(width: 8),
                             _buildFloorChip('3rd', '3rd Floor', isSwap: true),
                             const SizedBox(width: 8),
-                            _buildFloorChip('ground', 'Ground Floor', isSwap: true),
+                            _buildFloorChip('ground', 'Ground Floor',
+                                isSwap: true),
                           ],
                         ),
                       ),
@@ -855,9 +900,11 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                               fontSize: 13,
                               color: AppColors.muted,
                             ),
-                            prefixIcon: const Icon(Icons.search, color: AppColors.muted, size: 20),
+                            prefixIcon: const Icon(Icons.search,
+                                color: AppColors.muted, size: 20),
                             border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                            contentPadding:
+                                const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       ),
@@ -894,10 +941,13 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                         )
                       else
                         ...eligibleResidents.map((item) {
-                          final targetRes = item['resident'] as Map<String, dynamic>;
-                          final tName = targetRes['name']?.toString() ?? 'Resident';
-                          final tInitials = targetRes['initials']?.toString() ?? 'TR';
-                          final tRent = targetRes['rent']?.toString() ?? '8500';
+                          final targetRes =
+                              item['resident'] as Map<String, dynamic>;
+                          final tName =
+                              targetRes['name']?.toString() ?? 'Resident';
+                          final tInitials =
+                              targetRes['initials']?.toString() ?? 'TR';
+                          final tRent = targetRes['rent']?.toString() ?? '0';
                           final isSelected = _selectedSwapKey == item['key'];
 
                           return Padding(
@@ -908,10 +958,16 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                   _selectedSwapKey = item['key'];
                                   _selectedTargetResident = item;
                                   _selectedTargetRoom = item['room'];
-                                  _swapRes1RentController.text = targetRes['rent']?.toString() ?? '8500';
-                                  _swapRes1DepositController.text = targetRes['deposit']?.toString() ?? '15000';
-                                  _swapRes2RentController.text = widget.resident['rent']?.toString() ?? '8500';
-                                  _swapRes2DepositController.text = widget.resident['deposit']?.toString() ?? '15000';
+                                  _swapRes1RentController.text =
+                                      targetRes['rent']?.toString() ?? '0';
+                                  _swapRes1DepositController.text =
+                                      targetRes['deposit']?.toString() ?? '0';
+                                  _swapRes2RentController.text =
+                                      widget.resident['rent']?.toString() ??
+                                          '0';
+                                  _swapRes2DepositController.text =
+                                      widget.resident['deposit']?.toString() ??
+                                          '0';
                                 });
                               },
                               borderRadius: BorderRadius.circular(12),
@@ -921,7 +977,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),
+                                    color: isSelected
+                                        ? AppColors.green
+                                        : const Color(0xFFE5E7EB),
                                     width: isSelected ? 2 : 1,
                                   ),
                                 ),
@@ -931,7 +989,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                       isSelected
                                           ? Icons.radio_button_checked
                                           : Icons.radio_button_off,
-                                      color: isSelected ? AppColors.green : AppColors.muted,
+                                      color: isSelected
+                                          ? AppColors.green
+                                          : AppColors.muted,
                                       size: 20,
                                     ),
                                     const SizedBox(width: 10),
@@ -954,7 +1014,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             tName,
@@ -1003,7 +1064,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: const Color(0xFFE5E7EB), width: 1),
+                            border: Border.all(
+                                color: const Color(0xFFE5E7EB), width: 1),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withValues(alpha: 0.02),
@@ -1035,13 +1097,16 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                                     ),
                                   ),
                                   const Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 8),
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 8),
                                     child: Icon(Icons.swap_horiz_rounded,
                                         color: AppColors.greenDark, size: 26),
                                   ),
                                   Expanded(
                                     child: _buildSwapColumn(
-                                      name: _selectedTargetResident!['resident']['name'] ?? 'Target',
+                                      name: _selectedTargetResident!['resident']
+                                              ['name'] ??
+                                          'Target',
                                       from: '$_selectedTargetRoom',
                                       to: widget.roomName,
                                     ),
@@ -1056,7 +1121,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                         // Editable Rent & Deposit for BOTH Residents
                         _buildSwapEditableAmounts(
                           resName,
-                          _selectedTargetResident!['resident']['name'] ?? 'Resident 2',
+                          _selectedTargetResident!['resident']['name'] ??
+                              'Resident 2',
                         ),
                         const SizedBox(height: 16),
 
@@ -1077,7 +1143,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                               child: _buildRadioOption(
                                 label: 'Immediate Today',
                                 isSelected: _effectiveDate == 'immediate',
-                                onTap: () => setState(() => _effectiveDate = 'immediate'),
+                                onTap: () => setState(
+                                    () => _effectiveDate = 'immediate'),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1085,7 +1152,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                               child: _buildRadioOption(
                                 label: '1st of Next Month',
                                 isSelected: _effectiveDate == 'next_cycle',
-                                onTap: () => setState(() => _effectiveDate = 'next_cycle'),
+                                onTap: () => setState(
+                                    () => _effectiveDate = 'next_cycle'),
                               ),
                             ),
                           ],
@@ -1109,7 +1177,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                               child: _buildRadioOption(
                                 label: 'Keep as-is',
                                 isSelected: _depositHandling == 'keep',
-                                onTap: () => setState(() => _depositHandling = 'keep'),
+                                onTap: () =>
+                                    setState(() => _depositHandling = 'keep'),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -1117,7 +1186,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                               child: _buildRadioOption(
                                 label: 'Adjust Difference',
                                 isSelected: _depositHandling == 'adjust',
-                                onTap: () => setState(() => _depositHandling = 'adjust'),
+                                onTap: () =>
+                                    setState(() => _depositHandling = 'adjust'),
                               ),
                             ),
                           ],
@@ -1152,7 +1222,9 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                     elevation: 0,
                   ),
                   child: Text(
-                    _selectedTab == 0 ? 'Review & Shift Room' : 'Review & Swap Rooms',
+                    _selectedTab == 0
+                        ? 'Review & Shift Room'
+                        : 'Review & Swap Rooms',
                     style: GoogleFonts.outfit(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w800,
@@ -1181,7 +1253,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
       );
       return;
     }
-    if (!isShift && (_selectedTargetResident == null || _selectedTargetRoom == null)) {
+    if (!isShift &&
+        (_selectedTargetResident == null || _selectedTargetRoom == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a resident to swap with'),
@@ -1201,7 +1274,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 12, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+        padding: EdgeInsets.fromLTRB(
+            20, 12, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1250,39 +1324,60 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                         const SizedBox(height: 8),
                         _confirmDetailRow('To Room', '$_selectedEmptyRoom'),
                         const SizedBox(height: 8),
-                        _confirmDetailRow('New Rent', '₹${_newRentController.text}', isGreen: true),
+                        _confirmDetailRow(
+                            'New Rent', '₹${_newRentController.text}',
+                            isGreen: true),
                         const SizedBox(height: 8),
-                        _confirmDetailRow('New Deposit', '₹${_newDepositController.text}', isGreen: true),
+                        _confirmDetailRow(
+                            'New Deposit', '₹${_newDepositController.text}',
+                            isGreen: true),
                       ]
                     : [
                         _confirmDetailRow('Resident 1', resName, isGreen: true),
                         const SizedBox(height: 4),
                         _confirmDetailRow('Moves to', '$_selectedTargetRoom'),
                         const SizedBox(height: 4),
-                        _confirmDetailRow('New Rent', '₹${_swapRes1RentController.text}', isGreen: true),
+                        _confirmDetailRow(
+                            'New Rent', '₹${_swapRes1RentController.text}',
+                            isGreen: true),
                         const SizedBox(height: 4),
-                        _confirmDetailRow('New Deposit', '₹${_swapRes1DepositController.text}', isGreen: true),
+                        _confirmDetailRow('New Deposit',
+                            '₹${_swapRes1DepositController.text}',
+                            isGreen: true),
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 8),
                           child: Divider(color: Color(0xFFE5E7EB), height: 1),
                         ),
-                        _confirmDetailRow('Resident 2',
-                            _selectedTargetResident!['resident']['name'] ?? 'Resident', isGreen: true),
+                        _confirmDetailRow(
+                            'Resident 2',
+                            _selectedTargetResident!['resident']['name'] ??
+                                'Resident',
+                            isGreen: true),
                         const SizedBox(height: 4),
                         _confirmDetailRow('Moves to', widget.roomName),
                         const SizedBox(height: 4),
-                        _confirmDetailRow('New Rent', '₹${_swapRes2RentController.text}', isGreen: true),
+                        _confirmDetailRow(
+                            'New Rent', '₹${_swapRes2RentController.text}',
+                            isGreen: true),
                         const SizedBox(height: 4),
-                        _confirmDetailRow('New Deposit', '₹${_swapRes2DepositController.text}', isGreen: true),
+                        _confirmDetailRow('New Deposit',
+                            '₹${_swapRes2DepositController.text}',
+                            isGreen: true),
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 8),
                           child: Divider(color: Color(0xFFE5E7EB), height: 1),
                         ),
-                        _confirmDetailRow('Effective Date',
-                            _effectiveDate == 'immediate' ? 'Immediately Today' : '1st of Next Month'),
+                        _confirmDetailRow(
+                            'Effective Date',
+                            _effectiveDate == 'immediate'
+                                ? 'Immediately Today'
+                                : '1st of Next Month'),
                         const SizedBox(height: 6),
-                        _confirmDetailRow('Deposit Handling',
-                            _depositHandling == 'keep' ? 'Keep as-is' : 'Adjust Difference'),
+                        _confirmDetailRow(
+                            'Deposit Handling',
+                            _depositHandling == 'keep'
+                                ? 'Keep as-is'
+                                : 'Adjust Difference'),
                       ],
               ),
             ),
@@ -1441,7 +1536,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                       fontWeight: FontWeight.w700,
                       color: AppColors.greenDark,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -1452,7 +1548,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -1483,7 +1580,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                       fontWeight: FontWeight.w700,
                       color: AppColors.greenDark,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -1494,7 +1592,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -1535,7 +1634,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                   color: AppColors.greenLight,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Icon(Icons.currency_rupee, color: AppColors.greenDark, size: 15),
+                child: const Icon(Icons.currency_rupee,
+                    color: AppColors.greenDark, size: 15),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -1589,14 +1689,16 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                   ),
                   decoration: InputDecoration(
                     labelText: 'Monthly Rent',
-                    labelStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                    labelStyle: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted),
                     prefixText: '₹ ',
                     prefixStyle: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.greenDark,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -1607,7 +1709,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -1627,14 +1730,16 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                   ),
                   decoration: InputDecoration(
                     labelText: 'Deposit',
-                    labelStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                    labelStyle: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted),
                     prefixText: '₹ ',
                     prefixStyle: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.greenDark,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -1645,7 +1750,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -1684,14 +1790,16 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                   ),
                   decoration: InputDecoration(
                     labelText: 'Monthly Rent',
-                    labelStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                    labelStyle: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted),
                     prefixText: '₹ ',
                     prefixStyle: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.greenDark,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -1702,7 +1810,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -1722,14 +1831,16 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                   ),
                   decoration: InputDecoration(
                     labelText: 'Deposit',
-                    labelStyle: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted),
+                    labelStyle: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted),
                     prefixText: '₹ ',
                     prefixStyle: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.greenDark,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -1740,7 +1851,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.green, width: 1.5),
+                      borderSide:
+                          const BorderSide(color: AppColors.green, width: 1.5),
                     ),
                     filled: true,
                     fillColor: Colors.white,
@@ -1756,7 +1868,8 @@ class _ShiftBedScreenState extends State<ShiftBedScreen> {
 
   // ── Floor Chip Builder ─────────────────────────────────────────────
   Widget _buildFloorChip(String id, String label, {bool isSwap = false}) {
-    final isSelected = isSwap ? _swapFloorFilter == id : _selectedFloorFilter == id;
+    final isSelected =
+        isSwap ? _swapFloorFilter == id : _selectedFloorFilter == id;
     return InkWell(
       onTap: () {
         setState(() {

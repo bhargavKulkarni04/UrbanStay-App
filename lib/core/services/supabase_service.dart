@@ -102,7 +102,7 @@ class SupabaseService {
     final uid = ownerId ?? currentUserId;
     var query = client.from('properties').select('*');
     if (uid != null) {
-      query = query.eq('owner_id', uid);
+      query = query.or('owner_id.eq.$uid,owner_id.is.null');
     }
 
     final response = await query
@@ -232,6 +232,8 @@ class SupabaseService {
       'grace_period': gracePeriod ?? '3 Days',
       'late_fee': numLateFee,
       'notice_period': noticePeriod ?? '30 Days',
+      if (ownerId != null && ownerId.isNotEmpty) 'owner_id': ownerId,
+      if (ownerId == null && currentUserId != null) 'owner_id': currentUserId,
     };
 
     final property =
@@ -248,7 +250,7 @@ class SupabaseService {
         'floor_number': r['floor_number'] ?? 1,
         'floor_label': r['floor_label'] ?? '1st Floor',
         'room_number': roomNum,
-        'sharing_type': r['sharing_type'] ?? '2-Sharing',
+        'sharing_type': r['sharing_type'] ?? '',
         'total_beds': r['total_beds'] ?? 2,
         'rent_per_bed': r['rent_per_bed'] ?? 8000,
         'deposit_per_bed': r['deposit_per_bed'] ?? 15000,
@@ -269,20 +271,42 @@ class SupabaseService {
         final bedLabel = (customBedLabels != null && b < customBedLabels.length)
             ? customBedLabels[b]
             : defaultLabel;
+        final sharingType = r['sharing_type']?.toString() ?? '';
         bedsPayload.add({
           'property_id': propertyId,
           'property_name': brandName,
           'room_id': roomId,
           'room_number': roomNum,
           'bed_label': bedLabel,
+          'sharing_type': sharingType,
           'is_occupied': false,
           'status': 'Vacant',
         });
       }
 
       if (bedsPayload.isNotEmpty) {
-        await client.from('beds').insert(bedsPayload);
+        try {
+          await client.from('beds').insert(bedsPayload);
+        } catch (e) {
+          debugPrint('Notice inserting beds with sharing_type: $e');
+          for (final b in bedsPayload) {
+            b.remove('sharing_type');
+          }
+          await client.from('beds').insert(bedsPayload);
+        }
       }
+    }
+
+    try {
+      final totalBeds = roomsData.fold<int>(
+          0, (sum, r) => sum + ((r['total_beds'] as int?) ?? 2));
+      await ensureSaasSubscription(
+        propertyId: propertyId,
+        propertyName: brandName,
+        totalBeds: totalBeds,
+      );
+    } catch (e) {
+      debugPrint('Notice creating initial SaaS subscription: $e');
     }
 
     return property;
@@ -368,16 +392,13 @@ class SupabaseService {
     }
   }
 
-  /// Fetch SaaS subscription billing invoices for the owner / property
+  /// Fetch SaaS subscription billing invoices for the property
   Future<List<Map<String, dynamic>>> getSaasInvoices(
-      {String? propertyId, String? ownerId}) async {
+      {String? propertyId}) async {
     var query = client.from('saas_invoices').select('*');
-    if (propertyId != null && propertyId.isNotEmpty) {
-      query = query.eq('property_id', propertyId);
-    }
-    final uid = ownerId ?? currentUserId;
-    if (uid != null) {
-      query = query.eq('owner_id', uid);
+    final propId = propertyId ?? activePropertyId;
+    if (propId != null && propId.isNotEmpty) {
+      query = query.eq('property_id', propId);
     }
 
     final response = await query.order('created_at', ascending: false);
@@ -386,14 +407,184 @@ class SupabaseService {
 
   /// Fetch strongly-typed SaasInvoiceModels
   Future<List<SaasInvoiceModel>> getSaasInvoiceModels(
-      {String? propertyId, String? ownerId}) async {
+      {String? propertyId}) async {
     try {
-      final response =
-          await getSaasInvoices(propertyId: propertyId, ownerId: ownerId);
+      final response = await getSaasInvoices(propertyId: propertyId);
       return response.map((e) => SaasInvoiceModel.fromJson(e)).toList();
     } catch (e) {
       debugPrint('Error fetching SaaS invoice models: $e');
       return [];
+    }
+  }
+
+  /// Ensure a row exists in saas_subscriptions for the property, auto-creating if missing
+  Future<Map<String, dynamic>?> ensureSaasSubscription({
+    required String propertyId,
+    String? propertyName,
+    int? totalBeds,
+  }) async {
+    try {
+      final existing = await client
+          .from('saas_subscriptions')
+          .select()
+          .eq('property_id', propertyId)
+          .maybeSingle();
+
+      final pName = (propertyName != null && propertyName.isNotEmpty)
+          ? propertyName
+          : (activePropertyName ?? '');
+      final beds = (totalBeds != null && totalBeds > 0) ? totalBeds : 35;
+      final bedCost = beds * 15.0;
+      const platformFee = 79.0;
+      final totalDue = bedCost + platformFee;
+
+      if (existing != null) {
+        // If property name or beds changed, update it
+        await client.from('saas_subscriptions').update({
+          if (pName.isNotEmpty) 'property_name': pName,
+          'total_beds': beds,
+          'total_due': totalDue,
+        }).eq('id', existing['id']);
+        return existing;
+      }
+
+      // Create new subscription row
+      final now = DateTime.now();
+      // Cycle logic: Remainder of current month + 1 full calendar month cycle free
+      final nextBillingDate = (now.day == 1)
+          ? DateTime(now.year, now.month + 1, 1)
+          : DateTime(now.year, now.month + 2, 1);
+      final trialEnds = nextBillingDate.toIso8601String();
+      final nextBilling = nextBillingDate.toIso8601String();
+
+      final payload = {
+        'property_id': propertyId,
+        'property_name': pName,
+        'sac_code': '998315',
+        'status': 'trial',
+        'valid_until': trialEnds,
+        'total_beds': beds,
+        'price_per_bed': 15.0,
+        'platform_fee': platformFee,
+        'total_due': totalDue,
+        'trial_ends_at': trialEnds,
+        'next_billing_date': nextBilling,
+      };
+
+      final inserted = await client
+          .from('saas_subscriptions')
+          .insert(payload)
+          .select()
+          .maybeSingle();
+
+      // Also ensure at least one inaugural/trial tax invoice exists
+      await ensureInauguralSaasInvoice(
+        propertyId: propertyId,
+        propertyName: pName,
+        amount: totalDue,
+        nextBillingDate: nextBillingDate,
+      );
+
+      return inserted;
+    } catch (e) {
+      debugPrint('Notice ensuring SaaS subscription: $e');
+      return null;
+    }
+  }
+
+  /// Ensure an inaugural / trial tax invoice exists in saas_invoices
+  Future<void> ensureInauguralSaasInvoice({
+    required String propertyId,
+    String? propertyName,
+    required double amount,
+    DateTime? nextBillingDate,
+  }) async {
+    try {
+      final existing = await client
+          .from('saas_invoices')
+          .select('id')
+          .eq('property_id', propertyId)
+          .limit(1);
+
+      if (existing.isNotEmpty) return;
+
+      final now = DateTime.now();
+      final invNumber =
+          'US-${now.year}-${now.millisecondsSinceEpoch.toString().substring(7)}';
+      final pName = (propertyName != null && propertyName.isNotEmpty)
+          ? propertyName
+          : (activePropertyName ?? '');
+
+      final targetDate = nextBillingDate ??
+          ((now.day == 1)
+              ? DateTime(now.year, now.month + 1, 1)
+              : DateTime(now.year, now.month + 2, 1));
+
+      const monthNames = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      final monthStr = monthNames[targetDate.month - 1];
+
+      await client.from('saas_invoices').insert({
+        'invoice_number': invNumber,
+        'property_id': propertyId,
+        'property_name': pName,
+        'amount': amount,
+        'status': 'paid',
+        'payment_mode': 'Cashfree AutoPay (Trial)',
+        'utr_number':
+            'CF-TRIAL-${now.millisecondsSinceEpoch.toString().substring(7)}',
+        'billing_period': 'Trial Period (Free until 1 $monthStr ${targetDate.year})',
+      });
+    } catch (e) {
+      debugPrint('Notice creating inaugural SaaS invoice: $e');
+    }
+  }
+
+  /// Record a new paid SaaS invoice after Cashfree payment
+  Future<bool> recordSaasInvoice({
+    required String propertyId,
+    String? propertyName,
+    required double amount,
+    required String utrNumber,
+    String paymentMode = 'Cashfree AutoPay',
+    String? billingPeriod,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final invNumber =
+          'US-${now.year}-${now.millisecondsSinceEpoch.toString().substring(7)}';
+      final pName = (propertyName != null && propertyName.isNotEmpty)
+          ? propertyName
+          : (activePropertyName ?? '');
+
+      await client.from('saas_invoices').insert({
+        'invoice_number': invNumber,
+        'property_id': propertyId,
+        'property_name': pName,
+        'amount': amount,
+        'status': 'paid',
+        'payment_mode': paymentMode,
+        'utr_number': utrNumber,
+        'billing_period':
+            billingPeriod ?? '${now.day}/${now.month}/${now.year}',
+      });
+
+      // Update saas_subscriptions status to 'active'
+      try {
+        await client.from('saas_subscriptions').update({
+          'status': 'active',
+          'valid_until': now.add(const Duration(days: 30)).toIso8601String(),
+          'next_billing_date':
+              now.add(const Duration(days: 30)).toIso8601String(),
+        }).eq('property_id', propertyId);
+      } catch (_) {}
+
+      return true;
+    } catch (e) {
+      debugPrint('Error recording SaaS invoice: $e');
+      return false;
     }
   }
 
@@ -620,27 +811,38 @@ class SupabaseService {
         debugPrint('Fallback tenant insert: $e');
         final minInsert = {
           if (pId.isNotEmpty) 'property_id': pId,
+          if (pName.isNotEmpty) 'property_name': pName,
+          if (roomNumber != null && roomNumber.isNotEmpty)
+            'room_number': roomNumber,
+          if (bedLabel != null && bedLabel.isNotEmpty) 'bed_label': bedLabel,
           'name': cleanName.isNotEmpty ? cleanName : 'Resident',
+          'tenant_name': cleanName.isNotEmpty ? cleanName : 'Resident',
           'phone': newPhone,
+          if (rent != null) 'monthly_rent': rent,
+          if (deposit != null) 'security_deposit': deposit,
+          'rent_due_day': dueDay,
+          'status': 'Active',
         };
         final minRes = await client
             .from('tenants')
             .insert(minInsert)
             .select('id')
             .maybeSingle();
-        final minId = minRes?['id']?.toString();
-        if (minId != null &&
-            minId.isNotEmpty &&
+        final fallbackId = minRes?['id']?.toString();
+        if (fallbackId != null &&
+            fallbackId.isNotEmpty &&
             bedId != null &&
             bedId.isNotEmpty) {
           try {
             await client.from('beds').update({
-              'tenant_id': minId,
+              'tenant_id': fallbackId,
+              if (cleanName.isNotEmpty) 'tenant_name': cleanName,
+              'tenant_phone': newPhone,
               'is_occupied': true,
             }).eq('id', bedId);
           } catch (_) {}
-          return minId;
         }
+        return fallbackId;
       }
     } catch (e) {
       debugPrint('Error in ensureTenantExists: $e');
@@ -712,6 +914,44 @@ class SupabaseService {
           if (deposit != null) 'deposit': deposit,
         }).eq('id', bedId);
 
+        // 3b. GUARANTEED TENANT SYNC: Update tenants table with exact rent, deposit, due day, room, and bed
+        if (realTenantId != null && realTenantId.isNotEmpty) {
+          try {
+            await client.from('tenants').update({
+              if (propId.isNotEmpty) 'property_id': propId,
+              if (pName.isNotEmpty) 'property_name': pName,
+              if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
+              if (finalRoomNumber.isNotEmpty) 'room_number': finalRoomNumber,
+              'bed_id': bedId,
+              if (bedLabel.isNotEmpty) 'bed_label': bedLabel,
+              'name': name,
+              'tenant_name': name,
+              'phone': phone,
+              if (rent != null) 'monthly_rent': rent,
+              if (deposit != null) 'security_deposit': deposit,
+              'rent_due_day': chosenDueDay,
+              'status': 'Active',
+            }).eq('id', realTenantId);
+          } catch (e) {
+            debugPrint('Notice updating full tenant metadata: $e');
+            // If foreign key constraint failed on room_id or bed_id, still update the financial & text fields!
+            try {
+              await client.from('tenants').update({
+                if (propId.isNotEmpty) 'property_id': propId,
+                if (pName.isNotEmpty) 'property_name': pName,
+                if (finalRoomNumber.isNotEmpty) 'room_number': finalRoomNumber,
+                if (bedLabel.isNotEmpty) 'bed_label': bedLabel,
+                'name': name,
+                'phone': phone,
+                if (rent != null) 'monthly_rent': rent,
+                if (deposit != null) 'security_deposit': deposit,
+                'rent_due_day': chosenDueDay,
+                'status': 'Active',
+              }).eq('id', realTenantId);
+            } catch (_) {}
+          }
+        }
+
         // 4. Create or update active monthly rent ledger with exact due day
         if (propId.isNotEmpty) {
           try {
@@ -762,8 +1002,8 @@ class SupabaseService {
                 'tenant_name': name,
                 if (finalRoomNumber.isNotEmpty) 'room_number': finalRoomNumber,
                 'billing_month': cycleMonth,
-                'rent_amount': rent ?? 8500.0,
-                'due_amount': rent ?? 8500.0,
+                'rent_amount': rent ?? 0.0,
+                'due_amount': rent ?? 0.0,
                 'status': 'PENDING',
                 'due_date': formattedDueDate,
                 'rent_due_day': chosenDueDay,
@@ -919,26 +1159,29 @@ class SupabaseService {
           }
         }
 
-        // 7. Update pending rent ledgers to point to new room
+        // 7. Update rent ledgers to point to new room for this resident (BOTH Paid and Pending)
         if (newRoomNumber.isNotEmpty) {
           try {
+            final cleanRoom =
+                newRoomNumber.replaceAll(RegExp(r'[^0-9]'), '').trim();
+            final roomToSet = cleanRoom.isNotEmpty ? cleanRoom : newRoomNumber;
             if (resolvedTenantId != null && resolvedTenantId.isNotEmpty) {
               await client
                   .from('rent_ledgers')
                   .update({
-                    'room_number': newRoomNumber,
+                    'room_number': roomToSet,
                   })
                   .eq('tenant_id', resolvedTenantId)
-                  .neq('status', 'PAID');
-            } else if (targetPropId.isNotEmpty) {
+                  .eq('property_id', targetPropId);
+            }
+            if (name.isNotEmpty && name != 'Resident') {
               await client
                   .from('rent_ledgers')
                   .update({
-                    'room_number': newRoomNumber,
+                    'room_number': roomToSet,
                   })
                   .eq('property_id', targetPropId)
-                  .eq('tenant_name', name)
-                  .neq('status', 'PAID');
+                  .ilike('tenant_name', name);
             }
           } catch (e) {
             debugPrint('Notice updating rent_ledgers on bed shift: $e');
@@ -1166,7 +1409,7 @@ class SupabaseService {
                   'room_number': bed2RoomNumber,
                 })
                 .eq('tenant_id', res1TenantId)
-                .neq('status', 'PAID');
+                .eq('property_id', targetPropId);
           } else if (bed2RoomNumber.isNotEmpty) {
             await client
                 .from('rent_ledgers')
@@ -1174,8 +1417,7 @@ class SupabaseService {
                   'room_number': bed2RoomNumber,
                 })
                 .eq('property_id', targetPropId)
-                .eq('tenant_name', res1Name)
-                .neq('status', 'PAID');
+                .eq('tenant_name', res1Name);
           }
 
           if (res2TenantId != null && res2TenantId.isNotEmpty) {
@@ -1185,7 +1427,7 @@ class SupabaseService {
                   'room_number': bed1RoomNumber,
                 })
                 .eq('tenant_id', res2TenantId)
-                .neq('status', 'PAID');
+                .eq('property_id', targetPropId);
           } else if (bed1RoomNumber.isNotEmpty) {
             await client
                 .from('rent_ledgers')
@@ -1193,8 +1435,7 @@ class SupabaseService {
                   'room_number': bed1RoomNumber,
                 })
                 .eq('property_id', targetPropId)
-                .eq('tenant_name', res2Name)
-                .neq('status', 'PAID');
+                .eq('tenant_name', res2Name);
           }
         } catch (e) {
           debugPrint('Notice updating rent_ledgers on swap: $e');
@@ -1216,6 +1457,17 @@ class SupabaseService {
   }) async {
     return await _withLoading('Vacating Bed...', () async {
       try {
+        // 1. Fetch occupant metadata before clearing bed
+        Map<String, dynamic>? bedRow;
+        try {
+          bedRow = await client
+              .from('beds')
+              .select('property_id, tenant_id, tenant_name, room_number')
+              .eq('id', bedId)
+              .maybeSingle();
+        } catch (_) {}
+
+        // 2. Clear bed
         await client.from('beds').update({
           'is_occupied': false,
           'status': 'Vacant',
@@ -1225,6 +1477,35 @@ class SupabaseService {
           'rent': null,
           'deposit': null,
         }).eq('id', bedId);
+
+        // 3. Purge orphaned PENDING rent ledgers for this vacated tenant
+        if (bedRow != null) {
+          try {
+            final tId = bedRow['tenant_id']?.toString();
+            final pId =
+                bedRow['property_id']?.toString() ?? activePropertyId ?? '';
+            final tName = bedRow['tenant_name']?.toString();
+            if (tId != null && tId.isNotEmpty) {
+              await client
+                  .from('rent_ledgers')
+                  .delete()
+                  .eq('tenant_id', tId)
+                  .eq('status', 'PENDING');
+            } else if (pId.isNotEmpty &&
+                tName != null &&
+                tName.isNotEmpty &&
+                tName != 'Resident') {
+              await client
+                  .from('rent_ledgers')
+                  .delete()
+                  .eq('property_id', pId)
+                  .eq('tenant_name', tName)
+                  .eq('status', 'PENDING');
+            }
+          } catch (e) {
+            debugPrint('Notice purging pending ledgers on vacate: $e');
+          }
+        }
         return true;
       } catch (e) {
         debugPrint('Error vacating bed: $e');
@@ -1931,19 +2212,48 @@ class SupabaseService {
           }
         }
 
-        // 2. Safely log to warden_cash_collections (non-blocking)
+        // 2. Safely log to warden_cash_collections (matches exact table schema)
         try {
+          String? resolvedTenantId;
+          if (ledgerId != null &&
+              ledgerId.isNotEmpty &&
+              !ledgerId.startsWith('bed_')) {
+            try {
+              final lRes = await client
+                  .from('rent_ledgers')
+                  .select('tenant_id')
+                  .eq('id', ledgerId)
+                  .maybeSingle();
+              resolvedTenantId = lRes?['tenant_id']?.toString();
+            } catch (_) {}
+          }
+          if (resolvedTenantId == null || resolvedTenantId.isEmpty) {
+            try {
+              final tRes = await client
+                  .from('tenants')
+                  .select('id')
+                  .eq('property_id', propertyId)
+                  .ilike('name', tenantName)
+                  .maybeSingle();
+              resolvedTenantId = tRes?['id']?.toString();
+            } catch (_) {}
+          }
+
+          final cashNote = (notes != null && notes.trim().isNotEmpty)
+              ? notes.trim()
+              : 'Cash received by $collectedBy';
+
           await client.from('warden_cash_collections').insert({
             'property_id': propertyId,
             if (pName.isNotEmpty) 'property_name': pName,
+            if (resolvedTenantId != null && resolvedTenantId.isNotEmpty)
+              'tenant_id': resolvedTenantId,
             'tenant_name': tenantName,
             'room_number': roomNumber,
-            'amount': amount,
-            'collected_by': collectedBy,
             'warden_name': collectedBy,
-            'status': 'with_warden',
+            'amount': amount,
             'is_deposited_to_owner': false,
-            if (notes != null && notes.isNotEmpty) 'notes': notes,
+            'notes': cashNote,
           });
         } catch (e) {
           debugPrint('Notice logging to warden_cash_collections: $e');
@@ -2012,19 +2322,62 @@ class SupabaseService {
           } catch (_) {}
         }
 
-        // 3. Persist new due day to tenants table
-        if (propertyId != null && propertyId.isNotEmpty) {
-          try {
-            var tQuery = client.from('tenants').update({
-              'rent_due_day': clampedDay,
-            }).eq('property_id', propertyId);
-            if (tenantName != null && tenantName.isNotEmpty) {
-              tQuery = tQuery.eq('name', tenantName);
-            } else if (roomNumber != null && roomNumber.isNotEmpty) {
-              tQuery = tQuery.eq('room_number', roomNumber);
+        // 4. Log to rent_extensions table so it is permanently tracked
+        try {
+          final pId = propertyId ?? activePropertyId ?? '';
+          if (pId.isNotEmpty) {
+            String pName = activePropertyName ?? '';
+            String? resolvedTenantId;
+            if (ledgerId != null &&
+                ledgerId.isNotEmpty &&
+                !ledgerId.startsWith('bed_')) {
+              try {
+                final l = await client
+                    .from('rent_ledgers')
+                    .select('tenant_id, property_name')
+                    .eq('id', ledgerId)
+                    .maybeSingle();
+                resolvedTenantId = l?['tenant_id']?.toString();
+                if (pName.isEmpty) {
+                  pName = l?['property_name']?.toString() ?? '';
+                }
+              } catch (_) {}
             }
-            await tQuery;
-          } catch (_) {}
+            if (resolvedTenantId == null &&
+                tenantName != null &&
+                tenantName.isNotEmpty) {
+              try {
+                final t = await client
+                    .from('tenants')
+                    .select('id, property_name')
+                    .eq('property_id', pId)
+                    .ilike('name', tenantName)
+                    .maybeSingle();
+                resolvedTenantId = t?['id']?.toString();
+                if (pName.isEmpty) {
+                  pName = t?['property_name']?.toString() ?? '';
+                }
+              } catch (_) {}
+            }
+
+            await client.from('rent_extensions').insert({
+              'property_id': pId,
+              if (pName.isNotEmpty) 'property_name': pName,
+              if (resolvedTenantId != null && resolvedTenantId.isNotEmpty)
+                'tenant_id': resolvedTenantId,
+              'tenant_name': tenantName ?? 'Resident',
+              if (roomNumber != null && roomNumber.isNotEmpty)
+                'room_number': roomNumber,
+              if (ledgerId != null && ledgerId.isNotEmpty)
+                'ledger_id': ledgerId,
+              'requested_date': dateStr,
+              'reason':
+                  reason ?? 'Owner updated rent due day to ${clampedDay}th',
+              'status': 'approved',
+            });
+          }
+        } catch (e) {
+          debugPrint('Notice logging rent_extension on due date update: $e');
         }
 
         return true;
@@ -2043,14 +2396,75 @@ class SupabaseService {
     try {
       final existing = await client
           .from('rent_ledgers')
-          .select('id, room_number')
+          .select(
+              'id, room_number, tenant_id, tenant_name, status, rent_amount, due_amount')
           .eq('property_id', propertyId)
           .eq('billing_month', cycleMonth);
 
       final List existingList = (existing as List?) ?? [];
-      final Set<String> existingRooms = existingList
-          .map((e) => e['room_number']?.toString() ?? '')
+
+      // 1. AUTO-CLEANUP DUPLICATES:
+      // Group ledgers by tenant to detect duplicate bills for the same resident in the same cycleMonth
+      final Map<String, List<Map<String, dynamic>>> tenantLedgerMap = {};
+      for (final raw in existingList) {
+        final row = Map<String, dynamic>.from(raw);
+        final tId = row['tenant_id']?.toString() ?? '';
+        final tName = row['tenant_name']?.toString().trim().toLowerCase() ?? '';
+        final key = tId.isNotEmpty
+            ? 'id_$tId'
+            : (tName.isNotEmpty ? 'name_$tName' : 'id_${row['id']}');
+        tenantLedgerMap.putIfAbsent(key, () => []).add(row);
+      }
+
+      // If any resident has multiple ledgers for the same month, purge zero-rupee/duplicate pending ones!
+      for (final entries in tenantLedgerMap.values) {
+        if (entries.length > 1) {
+          // Check if there is an active PAID ledger
+          final hasPaid = entries.any((e) => e['status'] == 'PAID');
+          for (final row in entries) {
+            final double rAmt = (row['rent_amount'] as num?)?.toDouble() ?? 0.0;
+            final double dAmt = (row['due_amount'] as num?)?.toDouble() ?? 0.0;
+            final String status = row['status']?.toString() ?? 'PENDING';
+            final String rowId = row['id']?.toString() ?? '';
+            // If another row is PAID and this one is PENDING with 0 dues, or zero rent: DELETE IT!
+            if (rowId.isNotEmpty &&
+                ((hasPaid && status == 'PENDING') ||
+                    (rAmt == 0.0 && dAmt == 0.0 && status == 'PENDING'))) {
+              try {
+                await client.from('rent_ledgers').delete().eq('id', rowId);
+                debugPrint(
+                    'Purged duplicate ghost rent ledger $rowId for month $cycleMonth.');
+              } catch (e) {
+                debugPrint('Notice deleting duplicate ledger: $e');
+              }
+            }
+          }
+        }
+      }
+
+      // Re-fetch remaining clean ledgers after deduplication
+      final remaining = await client
+          .from('rent_ledgers')
+          .select('id, room_number, tenant_id, tenant_name')
+          .eq('property_id', propertyId)
+          .eq('billing_month', cycleMonth);
+
+      final List remainingList = (remaining as List?) ?? [];
+      final Set<String> existingRooms = remainingList
+          .map((e) =>
+              e['room_number']?.toString().replaceAll(RegExp(r'[^0-9]'), '') ??
+              '')
           .where((r) => r.isNotEmpty)
+          .toSet();
+
+      final Set<String> existingTenantIds = remainingList
+          .map((e) => e['tenant_id']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toSet();
+
+      final Set<String> existingTenantNames = remainingList
+          .map((e) => e['tenant_name']?.toString().trim().toLowerCase() ?? '')
+          .where((n) => n.isNotEmpty && n != 'resident')
           .toSet();
 
       // Fetch occupied beds
@@ -2060,15 +2474,17 @@ class SupabaseService {
 
       for (final r in roomsWithBeds) {
         final rNum = r['room_number']?.toString() ?? '';
-        final roomRent = (r['rent_per_bed'] as num?)?.toDouble() ?? 8500.0;
+        final cleanRoom = rNum.replaceAll(RegExp(r'[^0-9]'), '').trim();
+        final roomRent = (r['rent_per_bed'] as num?)?.toDouble() ?? 0.0;
         final beds = (r['beds'] as List?) ?? [];
 
         for (final b in beds) {
           if (b['is_occupied'] == true) {
             final tName = b['tenant_name']?.toString() ?? 'Resident';
+            final cleanTName = tName.trim().toLowerCase();
             final bedRent = (b['rent'] as num?)?.toDouble() ?? roomRent;
             final rawTId = b['tenant_id']?.toString();
-            // Only use real UUID from tenants table; never use bed UUID which fails foreign key
+            // Only use real UUID from tenants table
             final String? validTenantId = (rawTId != null &&
                     rawTId.isNotEmpty &&
                     !rawTId.startsWith('bed_'))
@@ -2080,14 +2496,24 @@ class SupabaseService {
             final formattedDueDate =
                 '${now.year}-${now.month.toString().padLeft(2, '0')}-$dayPadded';
 
-            // If this room is not yet in this month's ledger, generate it!
-            if (!existingRooms.contains(rNum)) {
+            // GLOBAL CHECK: Do NOT insert if this tenant ALREADY has a ledger this month!
+            final bool tenantAlreadyBilled = (validTenantId != null &&
+                    existingTenantIds.contains(validTenantId)) ||
+                (cleanTName.isNotEmpty &&
+                    cleanTName != 'resident' &&
+                    existingTenantNames.contains(cleanTName));
+
+            // Also check room
+            final bool roomAlreadyBilled =
+                cleanRoom.isNotEmpty && existingRooms.contains(cleanRoom);
+
+            if (!tenantAlreadyBilled && !roomAlreadyBilled) {
               toInsert.add({
                 'property_id': propertyId,
                 'property_name': activePropertyName ?? '',
                 if (validTenantId != null) 'tenant_id': validTenantId,
                 'tenant_name': tName,
-                'room_number': rNum,
+                'room_number': cleanRoom.isNotEmpty ? cleanRoom : rNum,
                 'billing_month': cycleMonth,
                 'rent_amount': bedRent,
                 'due_amount': bedRent,
@@ -2096,6 +2522,10 @@ class SupabaseService {
                 'rent_due_day': clampedDay,
                 'payment_mode': 'UPI',
               });
+              // Mark as existing so subsequent beds in same loop don't duplicate
+              if (validTenantId != null) existingTenantIds.add(validTenantId);
+              if (cleanTName.isNotEmpty) existingTenantNames.add(cleanTName);
+              if (cleanRoom.isNotEmpty) existingRooms.add(cleanRoom);
             }
           }
         }
@@ -2550,6 +2980,7 @@ class SupabaseService {
   /// 24. Update property settings (Comprehensive: all house rules, business, banking & toggles)
   Future<bool> updatePropertySettings({
     required String propertyId,
+    String? propertyName,
     Map<String, dynamic>? settings,
     String? upiId,
     String? upiName,
@@ -2573,7 +3004,13 @@ class SupabaseService {
         }
 
         // 2. Comprehensive settings update to property_settings table
-        final settingsUpdates = <String, dynamic>{'property_id': propertyId};
+        String pName = (propertyName != null && propertyName.isNotEmpty)
+            ? propertyName
+            : (activePropertyName ?? '');
+        final settingsUpdates = <String, dynamic>{
+          'property_id': propertyId,
+          if (pName.isNotEmpty) 'property_name': pName,
+        };
         if (gateClosingTime != null) {
           settingsUpdates['gate_closing_time'] = gateClosingTime;
         }
@@ -2601,6 +3038,12 @@ class SupabaseService {
     return await _withLoading('Saving Settings...', () async {
       try {
         final payload = model.toJson();
+        if ((payload['property_name'] == null ||
+                payload['property_name'].toString().isEmpty) &&
+            activePropertyName != null &&
+            activePropertyName!.isNotEmpty) {
+          payload['property_name'] = activePropertyName!;
+        }
         await client
             .from('property_settings')
             .upsert(payload, onConflict: 'property_id');
@@ -2662,7 +3105,7 @@ class SupabaseService {
       final uid = ownerId ?? currentUserId;
       var query = client.from('properties').select('*');
       if (uid != null) {
-        query = query.eq('owner_id', uid);
+        query = query.or('owner_id.eq.$uid,owner_id.is.null');
       }
       final res = await query.order('created_at', ascending: false).limit(10);
       return (res as List)

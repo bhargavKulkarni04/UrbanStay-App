@@ -422,8 +422,9 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
       'outstanding': tenant['amount'],
     };
     _cashAmountController.text = tenant['amount'].toString();
-    _cashNotesController.clear();
-    String currentStaff = _selectedStaffActor;
+    final loggedInName = SupabaseService.instance.client.auth.currentUser?.userMetadata?['name'] ?? 'Owner';
+    String currentStaff = _selectedStaffActor.isNotEmpty ? _selectedStaffActor : '$loggedInName (Owner)';
+    _cashNotesController.text = 'Cash received by $currentStaff';
     String paymentMode = 'cash'; // 'cash' or 'online'
     final utrController = TextEditingController();
 
@@ -474,7 +475,10 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                         }).toList(),
                         onChanged: (val) {
                           if (val != null) {
-                            setModalState(() => currentStaff = val);
+                            setModalState(() {
+                              currentStaff = val;
+                              _cashNotesController.text = 'Cash received by $currentStaff';
+                            });
                           }
                         },
                       ),
@@ -2984,7 +2988,7 @@ class _OwnerRentCollectionScreenState extends State<OwnerRentCollectionScreen> {
                           tenantName: tenant['name'] ?? 'Resident',
                           roomNumber: tenant['room']?.toString() ?? '',
                           amount: ((tenant['amount'] as num?)?.toDouble() ??
-                              8500.0),
+                              0.0),
                           collectedBy: _selectedStaffActor,
                           ledgerId: tenant['id']?.toString(),
                           notes: 'Verified direct UPI payment',
