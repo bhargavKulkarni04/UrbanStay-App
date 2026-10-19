@@ -106,8 +106,18 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
   String get _firstInvoiceDateStr {
     final date = _nextBillingDate;
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     return '1 ${months[date.month - 1]} ${date.year}';
   }
@@ -115,8 +125,18 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
   String get _fullMonthName {
     final date = _nextBillingDate;
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return months[date.month - 1];
   }
@@ -124,8 +144,18 @@ class _OwnerSaaSBillingScreenState extends State<OwnerSaaSBillingScreen> {
   String get _billingPeriodStr {
     final date = _nextBillingDate;
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     final lastDay = DateTime(date.year, date.month + 1, 0).day;
     final mStr = months[date.month - 1];

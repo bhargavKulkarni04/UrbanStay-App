@@ -36,6 +36,7 @@ class PropertyModel {
   final String? ownerAadhaarNumber;
   final int totalFloors;
   final int totalRooms;
+  final bool groundFloorHasRooms;
   final String? ownerId;
   final DateTime? createdAt;
 
@@ -70,6 +71,7 @@ class PropertyModel {
     this.ownerAadhaarNumber,
     this.totalFloors = 1,
     this.totalRooms = 0,
+    this.groundFloorHasRooms = true,
     this.ownerId,
     this.createdAt,
   });
@@ -134,6 +136,11 @@ class PropertyModel {
       totalRooms: json['total_rooms'] is int
           ? json['total_rooms']
           : (int.tryParse(json['total_rooms']?.toString() ?? '0') ?? 0),
+      groundFloorHasRooms: json['ground_floor_has_rooms'] is bool
+          ? json['ground_floor_has_rooms'] as bool
+          : (json['ground_floor_has_rooms'] == null
+              ? true
+              : (json['ground_floor_has_rooms'].toString().toLowerCase() == 'true')),
       ownerId: json['owner_id']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -175,6 +182,7 @@ class PropertyModel {
         'owner_aadhaar_number': ownerAadhaarNumber,
       'total_floors': totalFloors,
       'total_rooms': totalRooms,
+      'ground_floor_has_rooms': groundFloorHasRooms,
       if (ownerId != null) 'owner_id': ownerId,
     };
   }

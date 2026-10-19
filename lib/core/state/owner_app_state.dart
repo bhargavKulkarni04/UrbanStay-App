@@ -26,6 +26,7 @@ class OwnerAppState extends ChangeNotifier {
       notifyListeners();
     }
   }
+
   bool get isLoading => _isLoading;
 
   Map<String, dynamic>? get activeProperty {
@@ -69,8 +70,7 @@ class OwnerAppState extends ChangeNotifier {
     return (totalBeds - occupiedBeds).clamp(0, totalBeds);
   }
 
-  int get noticeBeds =>
-      (activeProperty?['noticeBeds'] as num?)?.toInt() ?? 0;
+  int get noticeBeds => (activeProperty?['noticeBeds'] as num?)?.toInt() ?? 0;
 
   String get occupancyPct {
     if (totalBeds == 0) return '0% Full';
@@ -83,11 +83,13 @@ class OwnerAppState extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // 📊 2. COLLECTION HEALTH & FINANCIAL METRICS STORE
   // ---------------------------------------------------------------------------
-  int get paidBedsCount =>
-      _rentLedgers.where((r) => r['status'] == 'paid' || r['status'] == 'PAID').length;
+  int get paidBedsCount => _rentLedgers
+      .where((r) => r['status'] == 'paid' || r['status'] == 'PAID')
+      .length;
 
-  int get pendingBedsCount =>
-      _rentLedgers.where((r) => r['status'] != 'paid' && r['status'] != 'PAID').length;
+  int get pendingBedsCount => _rentLedgers
+      .where((r) => r['status'] != 'paid' && r['status'] != 'PAID')
+      .length;
 
   int get overdueBedsCount =>
       _rentLedgers.where((r) => r['isOverdue'] == true).length;
@@ -140,8 +142,7 @@ class OwnerAppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> get floorsRentData =>
       List.unmodifiable(_floorsRentData);
-  List<Map<String, dynamic>> get rentLedgers =>
-      List.unmodifiable(_rentLedgers);
+  List<Map<String, dynamic>> get rentLedgers => List.unmodifiable(_rentLedgers);
   List<Map<String, dynamic>> get dayWiseSchedules =>
       List.unmodifiable(_dayWiseSchedules);
 
@@ -175,8 +176,9 @@ class OwnerAppState extends ChangeNotifier {
 
   List<Map<String, dynamic>> get complaints => List.unmodifiable(_complaints);
 
-  int get pendingComplaintsCount =>
-      _complaints.where((c) => c['status'] == 'open' || c['status'] == 'in_progress').length;
+  int get pendingComplaintsCount => _complaints
+      .where((c) => c['status'] == 'open' || c['status'] == 'in_progress')
+      .length;
 
   // ---------------------------------------------------------------------------
   // 📢 9. ANNOUNCEMENTS NOTICE BOARD STORE
@@ -204,9 +206,9 @@ class OwnerAppState extends ChangeNotifier {
 
   /// Sets or updates the active property immediately (e.g. from Owner Setup)
   void setActiveProperty(Map<String, dynamic> property) {
-    final existingIndex = _properties.indexWhere(
-        (p) => p['id']?.toString() == property['id']?.toString() ||
-               (property['code'] != null && p['code'] == property['code']));
+    final existingIndex = _properties.indexWhere((p) =>
+        p['id']?.toString() == property['id']?.toString() ||
+        (property['code'] != null && p['code'] == property['code']));
 
     if (existingIndex >= 0) {
       _properties[existingIndex] = Map<String, dynamic>.from(property);
@@ -244,7 +246,8 @@ class OwnerAppState extends ChangeNotifier {
         final occ = metrics['occupied'] ?? occupiedBeds;
         _properties[_activePropertyIndex]['totalBeds'] = total;
         _properties[_activePropertyIndex]['occupiedBeds'] = occ;
-        _properties[_activePropertyIndex]['vacantBeds'] = (total - occ).clamp(0, total);
+        _properties[_activePropertyIndex]['vacantBeds'] =
+            (total - occ).clamp(0, total);
         _properties[_activePropertyIndex]['occupancyPct'] =
             total > 0 ? '${((occ / total) * 100).round()}% Full' : '0% Full';
       }
@@ -255,12 +258,14 @@ class OwnerAppState extends ChangeNotifier {
       _rooms.addAll(roomsList);
 
       // 3. Fetch monthly rent ledger
-      final ledger = await SupabaseService.instance.getMonthlyRentLedger(propId);
+      final ledger =
+          await SupabaseService.instance.getMonthlyRentLedger(propId);
       _rentLedgers.clear();
       _rentLedgers.addAll(ledger);
 
       // 4. Fetch SaaS Invoices
-      final invoices = await SupabaseService.instance.getSaasInvoices(propertyId: propId);
+      final invoices =
+          await SupabaseService.instance.getSaasInvoices(propertyId: propId);
       _saasInvoices.clear();
       _saasInvoices.addAll(invoices);
     } catch (e) {
@@ -277,7 +282,8 @@ class OwnerAppState extends ChangeNotifier {
     if (itemIndex != -1) {
       final approved = Map<String, dynamic>.from(_pendingApprovals[itemIndex]);
       approved['status'] = 'approved';
-      approved['receiptNo'] = receiptNo ?? 'REC-${1000 + DateTime.now().millisecondsSinceEpoch % 9000}';
+      approved['receiptNo'] = receiptNo ??
+          'REC-${1000 + DateTime.now().millisecondsSinceEpoch % 9000}';
       approved['settledTime'] = 'Just now';
       _pendingApprovals.removeAt(itemIndex);
       _approvalHistory.insert(0, approved);

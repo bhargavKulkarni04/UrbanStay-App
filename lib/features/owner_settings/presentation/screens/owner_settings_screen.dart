@@ -104,7 +104,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   // View 7: Rent & Dues Collection Settings
   bool _allowOnlineUpi = true;
   bool _dailyLateFineEnabled = false;
-  bool _acceptPartialPayments = true;
+  bool _acceptPartialPayments = false;
   bool _autoSendWhatsappReceipts = true;
   bool _autoDuesReminders = true;
   String _receiptTerms = '';
@@ -125,10 +125,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   String? _scaleSubSection; // null, 'c1', 'c2', 'c3', 'c4'
   String _ownerFullName = '';
   String _ownerFatherName = '';
+  String _ownerPanNumber = '';
   String _ownerWhatsapp = '';
   String _ownerEmail = '';
   String _ownerAadhaar = '';
   String _ownerAddress = '';
+  String _wifiSsid = '';
+  String _wifiPassword = '';
+  String _emergencyPhone = '';
 
   String _scalePgName = '';
   String _scaleGenderCategory = '';
@@ -139,6 +143,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   String _scalePowerBackup = '';
 
   int _scaleFloorCount = 0;
+  bool _groundFloorHasRooms = true;
   int _scaleGroundRooms = 0;
   int _scaleRoomsEachFloor = 0;
   int _scaleTotalRooms = 0;
@@ -156,6 +161,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   int _scale3SharingDeposit = 0;
   int _scale4SharingRent = 0;
   int _scale4SharingDeposit = 0;
+  List<Map<String, dynamic>> _dynamicTariffs = [];
 
   bool _isLoading = true;
 
@@ -304,6 +310,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             if (propModel.powerBackup.isNotEmpty) {
               _scalePowerBackup = propModel.powerBackup;
             }
+            _groundFloorHasRooms = propModel.groundFloorHasRooms;
             if (propModel.totalFloors > 0) {
               _scaleFloorCount = propModel.totalFloors;
             }
@@ -380,38 +387,75 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               if (settingsModel.sharing4Deposit > 0)
                 _scale4SharingDeposit = settingsModel.sharing4Deposit;
 
-              // Fallback to sharingTariffs JSON list if columns were empty
-              if (_scale1SharingRent == 0 &&
-                  settingsModel.sharingTariffs.isNotEmpty) {
+              // Populate dynamic sharing tariffs from property_settings or setup
+              _dynamicTariffs = [];
+              if (settingsModel.sharingTariffs.isNotEmpty) {
                 for (final t in settingsModel.sharingTariffs) {
                   if (t is Map) {
-                    final s = t['sharing'];
+                    final s =
+                        int.tryParse(t['sharing']?.toString() ?? '0') ?? 0;
                     final r = int.tryParse(t['rent']?.toString() ?? '0') ?? 0;
                     final d =
                         int.tryParse(t['deposit']?.toString() ?? '0') ?? 0;
-                    if (s == 1) {
-                      _scale1SharingRent = r;
-                      _scale1SharingDeposit = d;
-                    }
-                    if (s == 2) {
-                      _scale2SharingRent = r;
-                      _scale2SharingDeposit = d;
-                    }
-                    if (s == 3) {
-                      _scale3SharingRent = r;
-                      _scale3SharingDeposit = d;
-                    }
-                    if (s == 4) {
-                      _scale4SharingRent = r;
-                      _scale4SharingDeposit = d;
+                    if (s > 0) {
+                      _dynamicTariffs
+                          .add({'sharing': s, 'rent': r, 'deposit': d});
+                      if (s == 1) {
+                        _scale1SharingRent = r;
+                        _scale1SharingDeposit = d;
+                      }
+                      if (s == 2) {
+                        _scale2SharingRent = r;
+                        _scale2SharingDeposit = d;
+                      }
+                      if (s == 3) {
+                        _scale3SharingRent = r;
+                        _scale3SharingDeposit = d;
+                      }
+                      if (s == 4) {
+                        _scale4SharingRent = r;
+                        _scale4SharingDeposit = d;
+                      }
                     }
                   }
+                }
+              }
+              // If sharing_tariffs array was not populated, build from legacy columns
+              if (_dynamicTariffs.isEmpty) {
+                if (_scale1SharingRent > 0 || _scale1SharingDeposit > 0) {
+                  _dynamicTariffs.add({
+                    'sharing': 1,
+                    'rent': _scale1SharingRent,
+                    'deposit': _scale1SharingDeposit
+                  });
+                }
+                if (_scale2SharingRent > 0 || _scale2SharingDeposit > 0) {
+                  _dynamicTariffs.add({
+                    'sharing': 2,
+                    'rent': _scale2SharingRent,
+                    'deposit': _scale2SharingDeposit
+                  });
+                }
+                if (_scale3SharingRent > 0 || _scale3SharingDeposit > 0) {
+                  _dynamicTariffs.add({
+                    'sharing': 3,
+                    'rent': _scale3SharingRent,
+                    'deposit': _scale3SharingDeposit
+                  });
+                }
+                if (_scale4SharingRent > 0 || _scale4SharingDeposit > 0) {
+                  _dynamicTariffs.add({
+                    'sharing': 4,
+                    'rent': _scale4SharingRent,
+                    'deposit': _scale4SharingDeposit
+                  });
                 }
               }
 
               // View 6: Rent & Dues Collection Settings
               _dailyLateFineEnabled = settingsModel.dailyLateFineEnabled;
-              _acceptPartialPayments = settingsModel.acceptPartialPayments;
+              _acceptPartialPayments =
+                  false; // Strictly No (hardcoded single full payment)
               _autoSendWhatsappReceipts =
                   settingsModel.autoSendWhatsappReceipts;
               _autoDuesReminders = settingsModel.autoDuesReminders;
@@ -434,6 +478,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               }
               if (settingsModel.authorizedSignatory.isNotEmpty) {
                 _authorizedSignatory = settingsModel.authorizedSignatory;
+              }
+              if (settingsModel.ownerFatherName.isNotEmpty) {
+                _ownerFatherName = settingsModel.ownerFatherName;
+              }
+              if (settingsModel.ownerPanNumber.isNotEmpty) {
+                _ownerPanNumber = settingsModel.ownerPanNumber;
+              }
+              if (settingsModel.appLanguage.isNotEmpty) {
+                _appLanguage = settingsModel.appLanguage;
               }
             }
 
@@ -1290,12 +1343,21 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           rows: [
             _DetailRow(
               'Owner Identity Proof',
-              _ownerAadhaar.isNotEmpty
-                  ? '$_ownerGovtIdType • $_ownerAadhaar'
-                  : 'Aadhaar • Not Configured',
+              _ownerGovtIdType == 'PAN Card' && _ownerPanNumber.isNotEmpty
+                  ? 'PAN • $_ownerPanNumber'
+                  : (_ownerAadhaar.isNotEmpty
+                      ? '$_ownerGovtIdType • $_ownerAadhaar'
+                      : (_ownerGovtIdType == 'PAN Card'
+                          ? 'PAN • Not Configured'
+                          : 'Aadhaar • Not Configured')),
             ),
-            _DetailRow('ID Document Status', _ownerGovtIdProofStatus,
-                isGreen: _ownerAadhaar.isNotEmpty),
+            _DetailRow(
+              'ID Document Status',
+              _ownerGovtIdProofStatus,
+              isGreen: _ownerGovtIdType == 'PAN Card'
+                  ? _ownerPanNumber.isNotEmpty
+                  : _ownerAadhaar.isNotEmpty,
+            ),
             _DetailRow('GSTIN Tax Certificate', _bizGstProofStatus,
                 isGreen: _bizGst.isNotEmpty),
             _DetailRow(
@@ -1449,69 +1511,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               _DetailRow('Gateway Cut', '0% (Lifetime Direct Bank Settlement)',
                   isGreen: true),
             ],
-          ),
-          const SizedBox(height: 14),
-
-          // Standee Generator Card (Active for UPI)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FBFA),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                  color: AppColors.green.withValues(alpha: 0.35), width: 1.2),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.green.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(Icons.qr_code_2_rounded,
-                          size: 20, color: AppColors.greenDark),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Reception Desk QR Standee',
-                        style: GoogleFonts.outfit(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Printable high-resolution QR standee for your reception desk. Tenants scan to check in and pay rent directly to your bank account with ₹0 gateway commission.',
-                  style: GoogleFonts.outfit(
-                      fontSize: 11.5, color: AppColors.muted, height: 1.4),
-                ),
-                const SizedBox(height: 12),
-                ElevatedButton(
-                  onPressed: _openReceptionDeskStandeeModal,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.green,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(44),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    elevation: 0,
-                  ),
-                  child: Text(
-                    'Download Standee PDF (Ready to Print)',
-                    style: GoogleFonts.outfit(
-                        fontSize: 12.5, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
           ),
         ] else ...[
           // Cash Only Warning & Mandatory Notification Instruction Card
@@ -1905,50 +1904,50 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
   // C4 Detail View
   Widget _buildC4SharingRentsView() {
+    final List<_DetailRow> dynamicRows = [];
+    if (_dynamicTariffs.isNotEmpty) {
+      for (final t in _dynamicTariffs) {
+        final s = t['sharing'] is int
+            ? t['sharing'] as int
+            : int.tryParse(t['sharing']?.toString() ?? '1') ?? 1;
+        final r = t['rent'] is int
+            ? t['rent'] as int
+            : int.tryParse(t['rent']?.toString() ?? '0') ?? 0;
+        final d = t['deposit'] is int
+            ? t['deposit'] as int
+            : int.tryParse(t['deposit']?.toString() ?? '0') ?? 0;
+        final label = s == 1 ? '1-Sharing (Single Room)' : '$s-Sharing Room';
+        dynamicRows.add(
+          _DetailRow(
+            label,
+            r > 0 ? '₹$r / mo • ₹$d Deposit' : 'Not Configured',
+          ),
+        );
+      }
+    } else {
+      dynamicRows.add(_DetailRow(
+          'Room Tariffs', 'No tariffs configured yet (Tap to set)',
+          isGreen: false));
+    }
+
+    dynamicRows.addAll([
+      _DetailRow('Rent Due Day',
+          _rentDueDay.isNotEmpty ? _rentDueDay : '5th of Every Month'),
+      _DetailRow(
+        'Grace Period & Late Fee',
+        '${_gracePeriod.isNotEmpty ? _gracePeriod : "5 Days"} Grace • ${_dailyRate.isNotEmpty ? _dailyRate : "₹100 / day"} late fee',
+      ),
+      _DetailRow('Notice Period Requirement',
+          _noticePeriod.isNotEmpty ? _noticePeriod : '30 Days'),
+    ]);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildElevatedCard(
           title: 'Sharing Types & Stay Policies',
           onEdit: _openEditC4RentsModal,
-          rows: [
-            _DetailRow(
-              '1-Sharing (Single Room)',
-              _scale1SharingRent > 0
-                  ? '₹$_scale1SharingRent / mo • ₹$_scale1SharingDeposit Deposit'
-                  : 'Not Configured',
-              isGreen: _scale1SharingRent > 0,
-            ),
-            _DetailRow(
-              '2-Sharing Room',
-              _scale2SharingRent > 0
-                  ? '₹$_scale2SharingRent / mo • ₹$_scale2SharingDeposit Deposit'
-                  : 'Not Configured',
-              isGreen: _scale2SharingRent > 0,
-            ),
-            _DetailRow(
-              '3-Sharing Room',
-              _scale3SharingRent > 0
-                  ? '₹$_scale3SharingRent / mo • ₹$_scale3SharingDeposit Deposit'
-                  : 'Not Configured',
-              isGreen: _scale3SharingRent > 0,
-            ),
-            _DetailRow(
-              '4-Sharing Room',
-              _scale4SharingRent > 0
-                  ? '₹$_scale4SharingRent / mo • ₹$_scale4SharingDeposit Deposit'
-                  : 'Not Configured',
-              isGreen: _scale4SharingRent > 0,
-            ),
-            _DetailRow('Rent Due Day',
-                _rentDueDay.isNotEmpty ? _rentDueDay : '5th of Every Month'),
-            _DetailRow(
-              'Grace Period & Late Fee',
-              '${_gracePeriod.isNotEmpty ? _gracePeriod : "5 Days"} Grace • ${_dailyRate.isNotEmpty ? _dailyRate : "₹100 / day"} late fee',
-            ),
-            _DetailRow('Notice Period Requirement',
-                _noticePeriod.isNotEmpty ? _noticePeriod : '30 Days'),
-          ],
+          rows: dynamicRows,
         ),
         const SizedBox(height: 14),
         OutlinedButton(
@@ -2125,6 +2124,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                       ? aadhaar
                                       : _ownerAadhaar,
                                 }).eq('id', _propId);
+
+                                await SupabaseService.instance
+                                    .updatePropertySettings(
+                                  propertyId: _propId,
+                                  settings: {
+                                    'owner_father_name': _ownerFatherName,
+                                  },
+                                );
                               } catch (e) {
                                 debugPrint(
                                     'Error updating owner identity in Supabase: $e');
@@ -2170,8 +2177,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   void _openEditGovtKycModal() {
     String tempGovtType = _ownerGovtIdType;
     final gstCtrl = TextEditingController(text: _bizGst);
-    final aadhaarCtrl = TextEditingController(
-        text: _ownerAadhaar.replaceAll(RegExp(r'\D'), ''));
+    final idCtrl = TextEditingController(
+      text: tempGovtType == 'PAN Card'
+          ? _ownerPanNumber
+          : _ownerAadhaar.replaceAll(RegExp(r'\D'), ''),
+    );
     final bbmpCtrl = TextEditingController(text: _bbmpLicense);
 
     showModalBottomSheet(
@@ -2181,6 +2191,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (modalCtx, setModalState) {
+            final isPan = tempGovtType == 'PAN Card';
             return _buildModalBottomSheetWrapper(
               ctx,
               title: 'Government KYC & Proofs',
@@ -2194,28 +2205,50 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         title: 'Aadhaar',
                         sub: '12 Digits',
                         isSelected: tempGovtType == 'Aadhaar Card',
-                        onTap: () =>
-                            setModalState(() => tempGovtType = 'Aadhaar Card'),
+                        onTap: () {
+                          setModalState(() {
+                            tempGovtType = 'Aadhaar Card';
+                            idCtrl.text =
+                                _ownerAadhaar.replaceAll(RegExp(r'\D'), '');
+                          });
+                        },
                       ),
                       const SizedBox(width: 6),
                       _buildSettingsInteractiveCard(
                         title: 'PAN Card',
                         sub: '10 Digits',
                         isSelected: tempGovtType == 'PAN Card',
-                        onTap: () =>
-                            setModalState(() => tempGovtType = 'PAN Card'),
+                        onTap: () {
+                          setModalState(() {
+                            tempGovtType = 'PAN Card';
+                            idCtrl.text = _ownerPanNumber;
+                          });
+                        },
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
 
-                  _buildModalTextField('Government ID Number', aadhaarCtrl),
+                  _buildModalTextField(
+                    isPan ? '10-Digit PAN Number' : '12-Digit Aadhaar Number',
+                    idCtrl,
+                    maxLength: isPan ? 10 : 12,
+                    keyboardType:
+                        isPan ? TextInputType.text : TextInputType.number,
+                    inputFormatters: isPan
+                        ? [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'[a-zA-Z0-9]')),
+                          ]
+                        : [FilteringTextInputFormatter.digitsOnly],
+                    hintText: isPan ? 'e.g. ABCDE1234F' : 'e.g. 542198761234',
+                  ),
                   const SizedBox(height: 8),
 
                   // Upload ID Proof Button
                   InkWell(
                     onTap: () => _showToast(
-                        'Government ID File Attached ✓ (aadhaar_front_back.pdf)'),
+                        'Government ID File Attached ✓ (${isPan ? 'pan_card.pdf' : 'aadhaar_front_back.pdf'})'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
@@ -2341,18 +2374,29 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
                   OutlinedButton(
                     onPressed: () async {
+                      final isPanDoc = tempGovtType == 'PAN Card';
+                      final enteredId = idCtrl.text.trim();
                       final cleanAadhaar =
-                          aadhaarCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
+                          enteredId.replaceAll(RegExp(r'\D'), '');
+                      final cleanPan = enteredId.toUpperCase();
+
                       setState(() {
                         _ownerGovtIdType = tempGovtType;
-                        if (cleanAadhaar.isNotEmpty) {
-                          _ownerAadhaar = cleanAadhaar.length >= 12
-                              ? '${cleanAadhaar.substring(0, 4)} •••• ${cleanAadhaar.substring(cleanAadhaar.length - 4)}'
-                              : cleanAadhaar;
-                          _ownerGovtIdProofStatus = 'Verified & Approved';
+                        if (isPanDoc) {
+                          _ownerPanNumber = cleanPan;
+                          _ownerGovtIdProofStatus = cleanPan.isNotEmpty
+                              ? 'Verified & Approved'
+                              : 'Pending Verification';
                         } else {
-                          _ownerAadhaar = '';
-                          _ownerGovtIdProofStatus = 'Pending Verification';
+                          if (cleanAadhaar.isNotEmpty) {
+                            _ownerAadhaar = cleanAadhaar.length >= 12
+                                ? '${cleanAadhaar.substring(0, 4)} •••• ${cleanAadhaar.substring(cleanAadhaar.length - 4)}'
+                                : cleanAadhaar;
+                            _ownerGovtIdProofStatus = 'Verified & Approved';
+                          } else {
+                            _ownerAadhaar = '';
+                            _ownerGovtIdProofStatus = 'Pending Verification';
+                          }
                         }
                         _bizGst = gstCtrl.text.trim();
                         _bbmpLicense = bbmpCtrl.text.trim();
@@ -2368,8 +2412,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           await SupabaseService.instance.client
                               .from('properties')
                               .update({
-                            'owner_aadhaar_number':
-                                cleanAadhaar.isNotEmpty ? cleanAadhaar : null,
+                            if (!isPanDoc && cleanAadhaar.isNotEmpty)
+                              'owner_aadhaar_number': cleanAadhaar,
                           }).eq('id', _propId);
 
                           await SupabaseService.instance.updatePropertySettings(
@@ -2377,6 +2421,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                             settings: {
                               'gst_number': _bizGst,
                               'bbmp_license_number': _bbmpLicense,
+                              'owner_pan_number': _ownerPanNumber,
                             },
                           );
                         } catch (e) {
@@ -3026,7 +3071,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
 
                   // White Button with Bold Green Text and Subtle Border
                   OutlinedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       setState(() {
                         _scaleFloorCount = tempFloors;
                         _scaleGroundRooms =
@@ -3040,7 +3085,28 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         _scaleTotalRooms = calculatedRooms;
                         _scaleTotalBeds = calculatedBeds;
                       });
-                      Navigator.of(ctx).pop();
+                      if (_propId.isNotEmpty) {
+                        try {
+                          await SupabaseService.instance.scalePropertyCapacity(
+                            propertyId: _propId,
+                            totalFloors: tempFloors,
+                            totalRooms: calculatedRooms,
+                            totalBeds: calculatedBeds,
+                            groundFloorHasRooms: tempGroundHasRooms,
+                            groundRooms: tempGroundHasRooms ? tempGfRooms : 0,
+                            roomsPerUpperFloor: tempRoomsPerUpperFloor,
+                            sharing1Rooms: s1,
+                            sharing2Rooms: s2,
+                            sharing3Rooms: s3,
+                            sharing4Rooms: s4,
+                          );
+                        } catch (e) {
+                          debugPrint('Error scaling property capacity: $e');
+                        }
+                      }
+                      if (ctx.mounted) {
+                        Navigator.of(ctx).pop();
+                      }
                       _showToast(
                           'Bed Capacity Scaled to $_scaleTotalBeds Beds ($calculatedRooms Rooms) ✓');
                     },
@@ -3072,26 +3138,27 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   }
 
   void _openEditC4RentsModal() {
-    final s1RentCtrl = TextEditingController(
-        text: _scale1SharingRent > 0 ? _scale1SharingRent.toString() : '');
-    final s1DepCtrl = TextEditingController(
-        text:
-            _scale1SharingDeposit > 0 ? _scale1SharingDeposit.toString() : '');
-    final s2RentCtrl = TextEditingController(
-        text: _scale2SharingRent > 0 ? _scale2SharingRent.toString() : '');
-    final s2DepCtrl = TextEditingController(
-        text:
-            _scale2SharingDeposit > 0 ? _scale2SharingDeposit.toString() : '');
-    final s3RentCtrl = TextEditingController(
-        text: _scale3SharingRent > 0 ? _scale3SharingRent.toString() : '');
-    final s3DepCtrl = TextEditingController(
-        text:
-            _scale3SharingDeposit > 0 ? _scale3SharingDeposit.toString() : '');
-    final s4RentCtrl = TextEditingController(
-        text: _scale4SharingRent > 0 ? _scale4SharingRent.toString() : '');
-    final s4DepCtrl = TextEditingController(
-        text:
-            _scale4SharingDeposit > 0 ? _scale4SharingDeposit.toString() : '');
+    // Dynamic tariffs list cloned directly from active property settings
+    final List<Map<String, dynamic>> localTariffs =
+        _dynamicTariffs.map((t) => Map<String, dynamic>.from(t)).toList();
+
+    // Ensure sorted by sharing count
+    localTariffs.sort((a, b) => ((a['sharing'] as num?)?.toInt() ?? 0)
+        .compareTo((b['sharing'] as num?)?.toInt() ?? 0));
+
+    // Map of controllers per sharing count
+    final Map<int, TextEditingController> rentCtrls = {};
+    final Map<int, TextEditingController> depCtrls = {};
+
+    for (final t in localTariffs) {
+      final s = (t['sharing'] as num?)?.toInt() ?? 1;
+      final r = (t['rent'] as num?)?.toInt() ?? 0;
+      final d = (t['deposit'] as num?)?.toInt() ?? 0;
+      rentCtrls[s] = TextEditingController(text: r > 0 ? r.toString() : '');
+      depCtrls[s] = TextEditingController(text: d > 0 ? d.toString() : '');
+    }
+
+    final newSharingCtrl = TextEditingController();
     bool isSaving = false;
 
     showModalBottomSheet(
@@ -3107,116 +3174,203 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
+                  ...localTariffs.map((t) {
+                    final s = (t['sharing'] as num?)?.toInt() ?? 1;
+                    final rentCtrl =
+                        rentCtrls.putIfAbsent(s, () => TextEditingController());
+                    final depCtrl =
+                        depCtrls.putIfAbsent(s, () => TextEditingController());
+                    final title = s == 1
+                        ? '1-Sharing (Private Single)'
+                        : '$s-Sharing Room';
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                title,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink,
+                                ),
+                              ),
+                              if (localTariffs.length > 1)
+                                InkWell(
+                                  onTap: () {
+                                    setModalState(() {
+                                      localTariffs.removeWhere((item) =>
+                                          (item['sharing'] as num?)?.toInt() ==
+                                          s);
+                                      rentCtrls.remove(s)?.dispose();
+                                      depCtrls.remove(s)?.dispose();
+                                    });
+                                  },
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: Icon(Icons.remove_circle_outline,
+                                        size: 18, color: Colors.redAccent),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildModalTextField(
+                                  'Monthly Rent (₹)',
+                                  rentCtrl,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: _buildModalTextField(
+                                  'Security Deposit (₹)',
+                                  depCtrl,
+                                  keyboardType: TextInputType.number,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  if (localTariffs.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          'No tariffs set yet. Tap below to add your room sharing rates.',
+                          style: GoogleFonts.outfit(
+                              fontSize: 13, color: AppColors.muted),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
                           child: _buildModalTextField(
-                              '1-Sharing Rent', s1RentCtrl,
-                              keyboardType: TextInputType.number)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: _buildModalTextField(
-                              '1-Sharing Deposit', s1DepCtrl,
-                              keyboardType: TextInputType.number)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _buildModalTextField(
-                              '2-Sharing Rent', s2RentCtrl,
-                              keyboardType: TextInputType.number)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: _buildModalTextField(
-                              '2-Sharing Deposit', s2DepCtrl,
-                              keyboardType: TextInputType.number)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _buildModalTextField(
-                              '3-Sharing Rent', s3RentCtrl,
-                              keyboardType: TextInputType.number)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: _buildModalTextField(
-                              '3-Sharing Deposit', s3DepCtrl,
-                              keyboardType: TextInputType.number)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                          child: _buildModalTextField(
-                              '4-Sharing Rent', s4RentCtrl,
-                              keyboardType: TextInputType.number)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: _buildModalTextField(
-                              '4-Sharing Deposit', s4DepCtrl,
-                              keyboardType: TextInputType.number)),
-                    ],
+                            'Enter Sharing Beds (e.g. 1, 2, 3, 5)',
+                            newSharingCtrl,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            final text = newSharingCtrl.text.trim();
+                            final numVal = int.tryParse(text);
+                            if (numVal == null || numVal <= 0) {
+                              _showToast(
+                                  'Enter a valid sharing number (e.g. 1, 2, 5)');
+                              return;
+                            }
+                            final existing = localTariffs
+                                .map(
+                                    (e) => (e['sharing'] as num?)?.toInt() ?? 0)
+                                .toSet();
+                            if (existing.contains(numVal)) {
+                              _showToast(
+                                  '$numVal-Sharing already exists in list');
+                              return;
+                            }
+                            setModalState(() {
+                              localTariffs.add({
+                                'sharing': numVal,
+                                'rent': 0,
+                                'deposit': 0,
+                              });
+                              localTariffs.sort((a, b) =>
+                                  ((a['sharing'] as num?)?.toInt() ?? 0)
+                                      .compareTo(
+                                          (b['sharing'] as num?)?.toInt() ??
+                                              0));
+                              rentCtrls[numVal] =
+                                  TextEditingController(text: '');
+                              depCtrls[numVal] =
+                                  TextEditingController(text: '');
+                              newSharingCtrl.clear();
+                            });
+                          },
+                          icon: const Icon(Icons.add,
+                              size: 16, color: Colors.white),
+                          label: Text(
+                            'Add',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.green,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            elevation: 0,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 20),
                   OutlinedButton(
                     onPressed: isSaving
                         ? null
                         : () async {
-                            final s1R =
-                                int.tryParse(s1RentCtrl.text.trim()) ?? 0;
-                            final s1D =
-                                int.tryParse(s1DepCtrl.text.trim()) ?? 0;
-                            final s2R =
-                                int.tryParse(s2RentCtrl.text.trim()) ?? 0;
-                            final s2D =
-                                int.tryParse(s2DepCtrl.text.trim()) ?? 0;
-                            final s3R =
-                                int.tryParse(s3RentCtrl.text.trim()) ?? 0;
-                            final s3D =
-                                int.tryParse(s3DepCtrl.text.trim()) ?? 0;
-                            final s4R =
-                                int.tryParse(s4RentCtrl.text.trim()) ?? 0;
-                            final s4D =
-                                int.tryParse(s4DepCtrl.text.trim()) ?? 0;
-
                             setModalState(() => isSaving = true);
+
+                            final List<Map<String, dynamic>> updatedTariffs =
+                                [];
+
+                            for (final t in localTariffs) {
+                              final s = (t['sharing'] as num?)?.toInt() ?? 1;
+                              final r = int.tryParse(
+                                      rentCtrls[s]?.text.trim() ?? '') ??
+                                  0;
+                              final d = int.tryParse(
+                                      depCtrls[s]?.text.trim() ?? '') ??
+                                  0;
+                              updatedTariffs
+                                  .add({'sharing': s, 'rent': r, 'deposit': d});
+                            }
+
                             setState(() {
-                              _scale1SharingRent = s1R;
-                              _scale1SharingDeposit = s1D;
-                              _scale2SharingRent = s2R;
-                              _scale2SharingDeposit = s2D;
-                              _scale3SharingRent = s3R;
-                              _scale3SharingDeposit = s3D;
-                              _scale4SharingRent = s4R;
-                              _scale4SharingDeposit = s4D;
+                              _dynamicTariffs = updatedTariffs;
                             });
 
                             if (_propId.isNotEmpty) {
                               try {
-                                final tariffsPayload = [
-                                  {'sharing': 1, 'rent': s1R, 'deposit': s1D},
-                                  {'sharing': 2, 'rent': s2R, 'deposit': s2D},
-                                  {'sharing': 3, 'rent': s3R, 'deposit': s3D},
-                                  {'sharing': 4, 'rent': s4R, 'deposit': s4D},
-                                ];
                                 await SupabaseService.instance
                                     .updatePropertySettings(
                                   propertyId: _propId,
                                   settings: {
-                                    'sharing_tariffs': tariffsPayload,
-                                    'sharing_1_rent': s1R,
-                                    'sharing_1_deposit': s1D,
-                                    'sharing_2_rent': s2R,
-                                    'sharing_2_deposit': s2D,
-                                    'sharing_3_rent': s3R,
-                                    'sharing_3_deposit': s3D,
-                                    'sharing_4_rent': s4R,
-                                    'sharing_4_deposit': s4D,
+                                    'sharing_tariffs': updatedTariffs,
                                   },
                                 );
                               } catch (e) {
@@ -3224,6 +3378,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                     'Error updating tariffs in Supabase: $e');
                               }
                             }
+
                             if (ctx.mounted) {
                               Navigator.of(ctx).pop();
                             }
@@ -3246,11 +3401,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                               color: AppColors.green,
                             ),
                           )
-                        : Text('Save Tariff Rates',
+                        : Text(
+                            'Save Tariff Rates',
                             style: GoogleFonts.outfit(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.green)),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.green,
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -3518,21 +3676,49 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 'Accept In-App Direct UPI Payments',
                 'Tenants pay via GPay/PhonePe with 0% fee. If OFF, cash only is mandated.',
                 _allowOnlineUpi,
-                (v) => setState(() => _allowOnlineUpi = v),
+                (v) {
+                  setState(() => _allowOnlineUpi = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'allow_online_upi',
+                      value: v,
+                    );
+                  }
+                },
               ),
               const Divider(height: 24, color: Color(0xFFEEF0F2)),
               _buildToggleSwitchRow(
                 'Auto-Debit Daily Late Fine (₹100/day)',
                 'Automatically adds ₹100/day penalty for payments made after the 5th.',
                 _dailyLateFineEnabled,
-                (v) => setState(() => _dailyLateFineEnabled = v),
+                (v) {
+                  setState(() => _dailyLateFineEnabled = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'daily_late_fine_enabled',
+                      value: v,
+                    );
+                  }
+                },
               ),
               const Divider(height: 24, color: Color(0xFFEEF0F2)),
               _buildToggleSwitchRow(
                 'Accept Partial Rent Payments',
-                'Allows tenants to pay rent in multiple installments across the month.',
-                _acceptPartialPayments,
-                (v) => setState(() => _acceptPartialPayments = v),
+                'Strictly No. Full rent payment required in a single settlement.',
+                false,
+                (v) {
+                  _showToast(
+                      'Partial payments are disabled. Full settlement required.');
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'accept_partial_payments',
+                      value: false,
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -3549,14 +3735,32 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 'Auto-Send WhatsApp PDF Receipts',
                 'Dispatches 50ms HRA-stamped PDF rent receipt instantly upon payment approval.',
                 _autoSendWhatsappReceipts,
-                (v) => setState(() => _autoSendWhatsappReceipts = v),
+                (v) {
+                  setState(() => _autoSendWhatsappReceipts = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'auto_send_whatsapp_receipts',
+                      value: v,
+                    );
+                  }
+                },
               ),
               const Divider(height: 24, color: Color(0xFFEEF0F2)),
               _buildToggleSwitchRow(
                 'Automated Dues WhatsApp Reminders',
                 'Sends polite payment notifications to tenants between 1st and 5th of month.',
                 _autoDuesReminders,
-                (v) => setState(() => _autoDuesReminders = v),
+                (v) {
+                  setState(() => _autoDuesReminders = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'auto_dues_reminders',
+                      value: v,
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -3604,28 +3808,64 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 'Auto-Send Welcome WhatsApp Pack',
                 'Dispatches Wi-Fi password, gate curfew rules & mess timings on check-in.',
                 _autoWelcomeWhatsapp,
-                (v) => setState(() => _autoWelcomeWhatsapp = v),
+                (v) {
+                  setState(() => _autoWelcomeWhatsapp = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'auto_welcome_whatsapp',
+                      value: v,
+                    );
+                  }
+                },
               ),
               const Divider(height: 24, color: Color(0xFFEEF0F2)),
               _buildToggleSwitchRow(
                 'Auto-Approve Move-In Bookings',
                 'Instantly locks bed when deposit is paid. If OFF, requires owner manual approval.',
                 _autoApproveBookings,
-                (v) => setState(() => _autoApproveBookings = v),
+                (v) {
+                  setState(() => _autoApproveBookings = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'auto_approve_bookings',
+                      value: v,
+                    );
+                  }
+                },
               ),
               const Divider(height: 24, color: Color(0xFFEEF0F2)),
               _buildToggleSwitchRow(
                 'Send Advance Deposit Reminders',
                 'Sends automated advance payment reminders before the move-in date.',
                 _sendDepositReminders,
-                (v) => setState(() => _sendDepositReminders = v),
+                (v) {
+                  setState(() => _sendDepositReminders = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'send_deposit_reminders',
+                      value: v,
+                    );
+                  }
+                },
               ),
               const Divider(height: 24, color: Color(0xFFEEF0F2)),
               _buildToggleSwitchRow(
                 'Lock Resident Profile After Move-In',
                 'Prevents residents from modifying their name, phone, or KYC proof post check-in.',
                 _lockProfileAfterMovein,
-                (v) => setState(() => _lockProfileAfterMovein = v),
+                (v) {
+                  setState(() => _lockProfileAfterMovein = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'lock_profile_after_movein',
+                      value: v,
+                    );
+                  }
+                },
               ),
             ],
           ),
@@ -3642,14 +3882,32 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 'Mandatory Aadhaar KYC Verification',
                 'Blocks room keycard allocation until identity documents are verified.',
                 _mandatoryTenantKyc,
-                (v) => setState(() => _mandatoryTenantKyc = v),
+                (v) {
+                  setState(() => _mandatoryTenantKyc = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'mandatory_tenant_kyc',
+                      value: v,
+                    );
+                  }
+                },
               ),
               const Divider(height: 24, color: Color(0xFFEEF0F2)),
               _buildToggleSwitchRow(
                 'Require Photo Proof for Maintenance Tickets',
                 'Residents must attach a photo before submitting maintenance complaints.',
                 _requireComplaintPhoto,
-                (v) => setState(() => _requireComplaintPhoto = v),
+                (v) {
+                  setState(() => _requireComplaintPhoto = v);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'require_complaint_photo',
+                      value: v,
+                    );
+                  }
+                },
               ),
               const Divider(height: 24, color: Color(0xFFEEF0F2)),
               Row(
@@ -3746,15 +4004,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 onTap: _openEditAccountModal),
             _DetailRow('Registered Email', _adminEmail,
                 onTap: _openEditAccountModal),
-            _DetailRow('App Language', _appLanguage, onTap: () {
-              _openEditModal(
-                title: 'Select Language',
-                fields: [
-                  _ModalField('Language', _appLanguage,
-                      (v) => setState(() => _appLanguage = v)),
-                ],
-              );
-            }),
+            _DetailRow('App Language', 'English (Default)'),
           ],
         ),
         const SizedBox(height: 14),
@@ -3771,7 +4021,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             }
             _showToast('Logged out from current session');
             if (mounted) {
-              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+              Navigator.of(context)
+                  .pushNamedAndRemoveUntil('/', (route) => false);
             }
           },
         ),
@@ -3782,13 +4033,15 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           icon: Icons.devices_other_rounded,
           onTap: () async {
             try {
-              await SupabaseService.instance.client.auth.signOut(scope: SignOutScope.global);
+              await SupabaseService.instance.client.auth
+                  .signOut(scope: SignOutScope.global);
             } catch (e) {
               debugPrint('Error signing out globally: $e');
             }
             _showToast('Logged out from all active sessions');
             if (mounted) {
-              Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
+              Navigator.of(context)
+                  .pushNamedAndRemoveUntil('/', (route) => false);
             }
           },
         ),
@@ -6370,6 +6623,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 _autoSendWhatsappReceipts,
                 (val) {
                   setState(() => _autoSendWhatsappReceipts = val);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'auto_send_whatsapp_receipts',
+                      value: val,
+                    );
+                  }
                   _showToast(val
                       ? '✓ Auto WhatsApp Receipts Enabled'
                       : 'Auto WhatsApp Receipts Disabled (Silent Recording)');
@@ -6384,6 +6644,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 _dailyLateFineEnabled,
                 (val) {
                   setState(() => _dailyLateFineEnabled = val);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'daily_late_fine_enabled',
+                      value: val,
+                    );
+                  }
                   _showToast(val
                       ? '✓ Daily Late Fine Active (₹100/day after 5th)'
                       : 'Late Fine Enforcement Waived');
@@ -6404,6 +6671,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 _mandatoryTenantKyc,
                 (val) {
                   setState(() => _mandatoryTenantKyc = val);
+                  if (_propId.isNotEmpty) {
+                    SupabaseService.instance.updateSinglePropertySetting(
+                      propertyId: _propId,
+                      key: 'mandatory_tenant_kyc',
+                      value: val,
+                    );
+                  }
                   _showToast(val
                       ? '✓ Mandatory Tenant KYC Active'
                       : 'Direct Self Check-In Enabled (No KYC Block)');
@@ -6489,271 +6763,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  // ===========================================================================
-  // MODAL: RECEPTION DESK QR STANDEE PREVIEW & EXPORT
-  // ===========================================================================
-  void _openReceptionDeskStandeeModal() {
-    final livePgName =
-        _propName.isNotEmpty ? _propName : 'UrbanStay Partner PG';
-    final liveAddress = _propAddress.isNotEmpty
-        ? _propAddress
-        : (_locality.isNotEmpty ? _locality : 'Bengaluru, Karnataka');
-    final liveUpi = _upiId.isNotEmpty ? _upiId : 'urbanstay@okhdfcbank';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return _buildNativeBottomSheetWrapper(
-          title: 'Reception Desk QR Standee',
-          modalContext: ctx,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'High-resolution printable reception standee with 0% direct bank UPI settlement. Tenants scan to check-in or settle rent directly.',
-                  style: GoogleFonts.outfit(
-                      fontSize: 12, color: AppColors.muted, height: 1.4),
-                ),
-                const SizedBox(height: 16),
-
-                // Standee Printable Card Preview
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                        color: AppColors.green.withValues(alpha: 0.35),
-                        width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 14,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Header Badge
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.greenLight,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color:
-                                      AppColors.green.withValues(alpha: 0.2)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.verified_rounded,
-                                    size: 14, color: AppColors.greenDark),
-                                const SizedBox(width: 5),
-                                Text(
-                                  '0% DIRECT BANK UPI',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.greenDark,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // PG Name
-                      Text(
-                        livePgName,
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.ink,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        liveAddress,
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-
-                      // QR Code Frame
-                      Container(
-                        width: 190,
-                        height: 190,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                              color: const Color(0xFFE5E7EB), width: 1.5),
-                        ),
-                        child: CustomPaint(
-                          painter: _StandeeQrPainter(),
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(6),
-                                border:
-                                    Border.all(color: const Color(0xFFE5E7EB)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.08),
-                                    blurRadius: 4,
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                'UPI',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.greenDark,
-                                  letterSpacing: 0.6,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // UPI ID Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF9FAFB),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE5E7EB)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.account_balance_outlined,
-                                size: 14, color: AppColors.muted),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                liveUpi,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.ink,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      Text(
-                        'Scan with Any UPI App • GPay, PhonePe, Paytm',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-
-                // Action Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(
-                            text:
-                                'https://urbanstay.living/checkin?pg=${_propId.isNotEmpty ? _propId : "demo"}',
-                          ));
-                          _showToast('Check-In Link Copied to Clipboard ✓');
-                        },
-                        icon: const Icon(Icons.copy_rounded,
-                            size: 16, color: AppColors.ink),
-                        label: Text(
-                          'Copy Link',
-                          style: GoogleFonts.outfit(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          side: const BorderSide(
-                              color: Color(0xFFE5E7EB), width: 1.5),
-                          minimumSize: const Size.fromHeight(46),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          _showToast('Printing Standee PDF ($livePgName)... ✓');
-                        },
-                        icon: const Icon(Icons.print_rounded,
-                            size: 16, color: Colors.white),
-                        label: Text(
-                          'Print Standee',
-                          style: GoogleFonts.outfit(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.green,
-                          elevation: 0,
-                          minimumSize: const Size.fromHeight(46),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 
@@ -7048,79 +7057,4 @@ class _ModalField {
   final ValueChanged<String> onSave;
 
   _ModalField(this.label, this.initialVal, this.onSave);
-}
-
-class _StandeeQrPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF111827)
-      ..style = PaintingStyle.fill;
-
-    const modules = 25;
-    final moduleSize = size.width / modules;
-
-    void drawFinder(double x, double y) {
-      // Outer 7x7 box
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x, y, moduleSize * 7, moduleSize * 7),
-          const Radius.circular(4),
-        ),
-        paint,
-      );
-      // Inner 5x5 white
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-              x + moduleSize, y + moduleSize, moduleSize * 5, moduleSize * 5),
-          const Radius.circular(2),
-        ),
-        Paint()..color = Colors.white,
-      );
-      // Inner 3x3 solid center
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(x + moduleSize * 2, y + moduleSize * 2, moduleSize * 3,
-              moduleSize * 3),
-          const Radius.circular(2),
-        ),
-        paint,
-      );
-    }
-
-    drawFinder(0, 0);
-    drawFinder((modules - 7) * moduleSize, 0);
-    drawFinder(0, (modules - 7) * moduleSize);
-
-    // Decorative matrix
-    for (int r = 0; r < modules; r++) {
-      for (int c = 0; c < modules; c++) {
-        if ((r < 8 && c < 8) ||
-            (r < 8 && c >= modules - 8) ||
-            (r >= modules - 8 && c < 8)) {
-          continue;
-        }
-        if (r >= modules ~/ 2 - 2 &&
-            r <= modules ~/ 2 + 2 &&
-            c >= modules ~/ 2 - 3 &&
-            c <= modules ~/ 2 + 3) {
-          continue;
-        }
-        if ((r * 7 + c * 13 + (r % 3) * (c % 5)) % 3 == 0) {
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(c * moduleSize + 0.5, r * moduleSize + 0.5,
-                  moduleSize - 1, moduleSize - 1),
-              const Radius.circular(1.5),
-            ),
-            paint,
-          );
-        }
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

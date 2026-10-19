@@ -737,13 +737,13 @@ class SupabaseService {
         try {
           await client.from('tenants').update({
             if (cleanName.isNotEmpty) 'name': cleanName,
-            if (cleanName.isNotEmpty) 'tenant_name': cleanName,
             if (pName.isNotEmpty) 'property_name': pName,
-            if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
+            if (roomId != null && roomId.isNotEmpty && roomId.length == 36)
+              'room_id': roomId,
             if (roomNumber != null && roomNumber.isNotEmpty)
               'room_number': roomNumber,
-            if (bedId != null && bedId.isNotEmpty) 'bed_id': bedId,
-            if (bedLabel != null && bedLabel.isNotEmpty) 'bed_label': bedLabel,
+            if (bedId != null && bedId.isNotEmpty && bedId.length == 36)
+              'bed_id': bedId,
             if (cleanPhone.isNotEmpty) 'phone': cleanPhone,
             if (rent != null) 'monthly_rent': rent,
             if (deposit != null) 'security_deposit': deposit,
@@ -771,15 +771,15 @@ class SupabaseService {
           : '+91 98${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
 
       final insertPayload = {
-        if (pId.isNotEmpty) 'property_id': pId,
+        if (pId.isNotEmpty && pId.length == 36) 'property_id': pId,
         if (pName.isNotEmpty) 'property_name': pName,
-        if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
+        if (roomId != null && roomId.isNotEmpty && roomId.length == 36)
+          'room_id': roomId,
         if (roomNumber != null && roomNumber.isNotEmpty)
           'room_number': roomNumber,
-        if (bedId != null && bedId.isNotEmpty) 'bed_id': bedId,
-        if (bedLabel != null && bedLabel.isNotEmpty) 'bed_label': bedLabel,
+        if (bedId != null && bedId.isNotEmpty && bedId.length == 36)
+          'bed_id': bedId,
         'name': cleanName.isNotEmpty ? cleanName : 'Resident',
-        'tenant_name': cleanName.isNotEmpty ? cleanName : 'Resident',
         'phone': newPhone,
         if (rent != null) 'monthly_rent': rent,
         if (deposit != null) 'security_deposit': deposit,
@@ -810,13 +810,11 @@ class SupabaseService {
       } catch (e) {
         debugPrint('Fallback tenant insert: $e');
         final minInsert = {
-          if (pId.isNotEmpty) 'property_id': pId,
+          if (pId.isNotEmpty && pId.length == 36) 'property_id': pId,
           if (pName.isNotEmpty) 'property_name': pName,
           if (roomNumber != null && roomNumber.isNotEmpty)
             'room_number': roomNumber,
-          if (bedLabel != null && bedLabel.isNotEmpty) 'bed_label': bedLabel,
           'name': cleanName.isNotEmpty ? cleanName : 'Resident',
-          'tenant_name': cleanName.isNotEmpty ? cleanName : 'Resident',
           'phone': newPhone,
           if (rent != null) 'monthly_rent': rent,
           if (deposit != null) 'security_deposit': deposit,
@@ -918,14 +916,14 @@ class SupabaseService {
         if (realTenantId != null && realTenantId.isNotEmpty) {
           try {
             await client.from('tenants').update({
-              if (propId.isNotEmpty) 'property_id': propId,
+              if (propId.isNotEmpty && propId.length == 36)
+                'property_id': propId,
               if (pName.isNotEmpty) 'property_name': pName,
-              if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
+              if (roomId != null && roomId.isNotEmpty && roomId.length == 36)
+                'room_id': roomId,
               if (finalRoomNumber.isNotEmpty) 'room_number': finalRoomNumber,
-              'bed_id': bedId,
-              if (bedLabel.isNotEmpty) 'bed_label': bedLabel,
+              if (bedId.isNotEmpty && bedId.length == 36) 'bed_id': bedId,
               'name': name,
-              'tenant_name': name,
               'phone': phone,
               if (rent != null) 'monthly_rent': rent,
               if (deposit != null) 'security_deposit': deposit,
@@ -937,10 +935,10 @@ class SupabaseService {
             // If foreign key constraint failed on room_id or bed_id, still update the financial & text fields!
             try {
               await client.from('tenants').update({
-                if (propId.isNotEmpty) 'property_id': propId,
+                if (propId.isNotEmpty && propId.length == 36)
+                  'property_id': propId,
                 if (pName.isNotEmpty) 'property_name': pName,
                 if (finalRoomNumber.isNotEmpty) 'room_number': finalRoomNumber,
-                if (bedLabel.isNotEmpty) 'bed_label': bedLabel,
                 'name': name,
                 'phone': phone,
                 if (rent != null) 'monthly_rent': rent,
@@ -1121,10 +1119,11 @@ class SupabaseService {
         if (resolvedTenantId != null && resolvedTenantId.isNotEmpty) {
           try {
             await client.from('tenants').update({
-              if (newRoomId != null) 'room_id': newRoomId,
+              if (newRoomId != null && newRoomId.length == 36)
+                'room_id': newRoomId,
               if (newRoomNumber.isNotEmpty) 'room_number': newRoomNumber,
-              'bed_id': newBedId,
-              if (newBedLabel.isNotEmpty) 'bed_label': newBedLabel,
+              if (newBedId.isNotEmpty && newBedId.length == 36)
+                'bed_id': newBedId,
               if (resolvedPhone.isNotEmpty) 'phone': resolvedPhone,
               if (rent != null) 'monthly_rent': rent,
               if (deposit != null) 'security_deposit': deposit,
@@ -1331,10 +1330,10 @@ class SupabaseService {
         if (res1TenantId != null && res1TenantId.isNotEmpty) {
           try {
             await client.from('tenants').update({
-              if (bed2RoomId != null) 'room_id': bed2RoomId,
+              if (bed2RoomId != null && bed2RoomId.length == 36)
+                'room_id': bed2RoomId,
               if (bed2RoomNumber.isNotEmpty) 'room_number': bed2RoomNumber,
-              'bed_id': bed2Id,
-              if (bed2BedLabel.isNotEmpty) 'bed_label': bed2BedLabel,
+              if (bed2Id.isNotEmpty && bed2Id.length == 36) 'bed_id': bed2Id,
               if (resolvedRes1Phone.isNotEmpty) 'phone': resolvedRes1Phone,
               if (res1Rent != null) 'monthly_rent': res1Rent,
               if (res1Deposit != null) 'security_deposit': res1Deposit,
@@ -1348,10 +1347,10 @@ class SupabaseService {
         if (res2TenantId != null && res2TenantId.isNotEmpty) {
           try {
             await client.from('tenants').update({
-              if (bed1RoomId != null) 'room_id': bed1RoomId,
+              if (bed1RoomId != null && bed1RoomId.length == 36)
+                'room_id': bed1RoomId,
               if (bed1RoomNumber.isNotEmpty) 'room_number': bed1RoomNumber,
-              'bed_id': bed1Id,
-              if (bed1BedLabel.isNotEmpty) 'bed_label': bed1BedLabel,
+              if (bed1Id.isNotEmpty && bed1Id.length == 36) 'bed_id': bed1Id,
               if (resolvedRes2Phone.isNotEmpty) 'phone': resolvedRes2Phone,
               if (res2Rent != null) 'monthly_rent': res2Rent,
               if (res2Deposit != null) 'security_deposit': res2Deposit,
@@ -2412,7 +2411,9 @@ class SupabaseService {
         final tName = row['tenant_name']?.toString().trim().toLowerCase() ?? '';
         final key = tId.isNotEmpty
             ? 'id_$tId'
-            : (tName.isNotEmpty ? 'name_$tName' : 'id_${row['id']}');
+            : (tName.isNotEmpty && tName != 'resident'
+                ? 'name_$tName'
+                : 'ledger_${row['id']}');
         tenantLedgerMap.putIfAbsent(key, () => []).add(row);
       }
 
@@ -2450,12 +2451,15 @@ class SupabaseService {
           .eq('billing_month', cycleMonth);
 
       final List remainingList = (remaining as List?) ?? [];
-      final Set<String> existingRooms = remainingList
-          .map((e) =>
-              e['room_number']?.toString().replaceAll(RegExp(r'[^0-9]'), '') ??
-              '')
-          .where((r) => r.isNotEmpty)
-          .toSet();
+      final Map<String, int> roomLedgerCounts = {};
+      for (final e in remainingList) {
+        final rStr =
+            e['room_number']?.toString().replaceAll(RegExp(r'[^0-9]'), '') ??
+                '';
+        if (rStr.isNotEmpty) {
+          roomLedgerCounts[rStr] = (roomLedgerCounts[rStr] ?? 0) + 1;
+        }
+      }
 
       final Set<String> existingTenantIds = remainingList
           .map((e) => e['tenant_id']?.toString() ?? '')
@@ -2503,11 +2507,17 @@ class SupabaseService {
                     cleanTName != 'resident' &&
                     existingTenantNames.contains(cleanTName));
 
-            // Also check room
-            final bool roomAlreadyBilled =
-                cleanRoom.isNotEmpty && existingRooms.contains(cleanRoom);
+            // For unassigned anonymous 'Resident' beds, check if roomLedgerCounts already covers it
+            bool anonymousBedAlreadyCovered = false;
+            if (validTenantId == null && cleanTName == 'resident') {
+              final existingCount = roomLedgerCounts[cleanRoom] ?? 0;
+              if (existingCount > 0) {
+                anonymousBedAlreadyCovered = true;
+                roomLedgerCounts[cleanRoom] = existingCount - 1;
+              }
+            }
 
-            if (!tenantAlreadyBilled && !roomAlreadyBilled) {
+            if (!tenantAlreadyBilled && !anonymousBedAlreadyCovered) {
               toInsert.add({
                 'property_id': propertyId,
                 'property_name': activePropertyName ?? '',
@@ -2524,8 +2534,9 @@ class SupabaseService {
               });
               // Mark as existing so subsequent beds in same loop don't duplicate
               if (validTenantId != null) existingTenantIds.add(validTenantId);
-              if (cleanTName.isNotEmpty) existingTenantNames.add(cleanTName);
-              if (cleanRoom.isNotEmpty) existingRooms.add(cleanRoom);
+              if (cleanTName.isNotEmpty && cleanTName != 'resident') {
+                existingTenantNames.add(cleanTName);
+              }
             }
           }
         }
@@ -3021,9 +3032,29 @@ class SupabaseService {
           settingsUpdates.addAll(settings);
         }
 
-        await client
-            .from('property_settings')
-            .upsert(settingsUpdates, onConflict: 'property_id');
+        // Auto-healing upsert: drops non-existent columns if Supabase table has not migrated yet
+        final copy = Map<String, dynamic>.from(settingsUpdates);
+        for (int retry = 0; retry < 5; retry++) {
+          try {
+            await client
+                .from('property_settings')
+                .upsert(copy, onConflict: 'property_id');
+            break;
+          } catch (e) {
+            final msg = e.toString();
+            final match = RegExp(r'column "([^"]+)" of relation "property_settings" does not exist').firstMatch(msg);
+            if (match != null) {
+              final missingCol = match.group(1);
+              if (missingCol != null && copy.containsKey(missingCol)) {
+                debugPrint('Auto-healing property_settings: omitting non-existent column $missingCol');
+                copy.remove(missingCol);
+                continue;
+              }
+            }
+            debugPrint('Error updating property settings: $e');
+            return false;
+          }
+        }
 
         return true;
       } catch (e) {
@@ -3044,9 +3075,30 @@ class SupabaseService {
             activePropertyName!.isNotEmpty) {
           payload['property_name'] = activePropertyName!;
         }
-        await client
-            .from('property_settings')
-            .upsert(payload, onConflict: 'property_id');
+
+        // Auto-healing upsert
+        final copy = Map<String, dynamic>.from(payload);
+        for (int retry = 0; retry < 5; retry++) {
+          try {
+            await client
+                .from('property_settings')
+                .upsert(copy, onConflict: 'property_id');
+            break;
+          } catch (e) {
+            final msg = e.toString();
+            final match = RegExp(r'column "([^"]+)" of relation "property_settings" does not exist').firstMatch(msg);
+            if (match != null) {
+              final missingCol = match.group(1);
+              if (missingCol != null && copy.containsKey(missingCol)) {
+                debugPrint('Auto-healing savePropertySettingsModel: omitting non-existent column $missingCol');
+                copy.remove(missingCol);
+                continue;
+              }
+            }
+            debugPrint('Error saving PropertySettingsModel: $e');
+            return false;
+          }
+        }
         return true;
       } catch (e) {
         debugPrint('Error saving PropertySettingsModel: $e');
@@ -3073,7 +3125,127 @@ class SupabaseService {
     }
   }
 
-  /// 25. Fetch strongly-typed PropertySettingsModel with all 35 columns
+  /// Scale Property Capacity and auto-generate actual Room and Bed rows in database
+  Future<bool> scalePropertyCapacity({
+    required String propertyId,
+    required int totalFloors,
+    required int totalRooms,
+    required int totalBeds,
+    bool groundFloorHasRooms = true,
+    int groundRooms = 0,
+    int roomsPerUpperFloor = 0,
+    int sharing1Rooms = 0,
+    int sharing2Rooms = 0,
+    int sharing3Rooms = 0,
+    int sharing4Rooms = 0,
+  }) async {
+    return await _withLoading('Updating Building Scale...', () async {
+      try {
+        // 1. Update properties table totals
+        await client.from('properties').update({
+          'total_floors': totalFloors,
+          'total_rooms': totalRooms,
+          'total_beds': totalBeds,
+          'ground_floor_has_rooms': groundFloorHasRooms,
+        }).eq('id', propertyId);
+
+        // 2. Fetch existing rooms in database
+        final existingRoomsRes = await client
+            .from('rooms')
+            .select('id, room_number, floor_number')
+            .eq('property_id', propertyId);
+        final existingRooms = List<Map<String, dynamic>>.from(existingRoomsRes);
+        final existingRoomNumbers = existingRooms
+            .map((r) => r['room_number']?.toString().trim().toUpperCase())
+            .toSet();
+
+        // 3. Determine if we need to auto-generate missing rooms and beds
+        final List<Map<String, dynamic>> roomsToCreate = [];
+        if (groundFloorHasRooms && groundRooms > 0) {
+          for (int r = 1; r <= groundRooms; r++) {
+            final rNum = '00$r';
+            if (!existingRoomNumbers.contains(rNum)) {
+              roomsToCreate.add({
+                'floor': 0,
+                'number': rNum,
+                'sharing': 2,
+              });
+            }
+          }
+        }
+
+        final upperFloorCount = totalFloors > 1 ? (totalFloors - 1) : 1;
+        for (int fl = 1; fl <= upperFloorCount; fl++) {
+          final rCount = roomsPerUpperFloor > 0
+              ? roomsPerUpperFloor
+              : (totalRooms ~/ (totalFloors > 0 ? totalFloors : 1));
+          for (int r = 1; r <= rCount; r++) {
+            final rNum = '${fl}0$r';
+            if (!existingRoomNumbers.contains(rNum)) {
+              roomsToCreate.add({
+                'floor': fl,
+                'number': rNum,
+                'sharing': 2,
+              });
+            }
+          }
+        }
+
+        // 4. Insert missing rooms and beds into database
+        for (final rDef in roomsToCreate) {
+          final sharing = rDef['sharing'] as int;
+          final insertRoomRes = await client.from('rooms').insert({
+            'property_id': propertyId,
+            'room_number': rDef['number'],
+            'floor_number': rDef['floor'],
+            'sharing_type': '$sharing-Sharing',
+            'capacity': sharing,
+          }).select('id').single();
+
+          final newRoomId = insertRoomRes['id']?.toString();
+          if (newRoomId != null) {
+            for (int b = 0; b < sharing; b++) {
+              final bedChar = String.fromCharCode(65 + b);
+              await client.from('beds').insert({
+                'property_id': propertyId,
+                'room_id': newRoomId,
+                'bed_number': '${rDef['number']}-$bedChar',
+                'is_occupied': false,
+                'tenant_id': null,
+              });
+            }
+          }
+        }
+
+        return true;
+      } catch (e) {
+        debugPrint('Error scaling property capacity: $e');
+        return false;
+      }
+    });
+  }
+
+  /// Upload KYC proof file to Supabase storage
+  Future<String?> uploadKycProofFile({
+    required String propertyId,
+    required String docType,
+    required Uint8List bytes,
+    required String fileExt,
+  }) async {
+    try {
+      final fileName =
+          '${propertyId}_${docType}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final path = 'kyc/$fileName';
+      await client.storage.from('documents').uploadBinary(path, bytes);
+      final publicUrl = client.storage.from('documents').getPublicUrl(path);
+      return publicUrl;
+    } catch (e) {
+      debugPrint('Error uploading KYC proof file: $e');
+      return null;
+    }
+  }
+
+  /// 25. Fetch strongly-typed PropertySettingsModel with all columns
   Future<PropertySettingsModel?> getPropertySettingsModel(
       String propertyId) async {
     try {

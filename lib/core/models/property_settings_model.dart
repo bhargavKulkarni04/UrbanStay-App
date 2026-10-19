@@ -64,6 +64,12 @@ class PropertySettingsModel {
   final String kycApplicableTo;
   final String stampBusinessName;
   final String authorizedSignatory;
+  // Custom Identity & Document Proofs
+  final String ownerFatherName;
+  final String ownerPanNumber;
+  final String gstDocUrl;
+  final String tradeLicenseDocUrl;
+  final String appLanguage;
 
   final Map<String, dynamic>? tenantControls;
   final DateTime? createdAt;
@@ -111,6 +117,11 @@ class PropertySettingsModel {
     this.kycApplicableTo = 'All Residents',
     this.stampBusinessName = '',
     this.authorizedSignatory = '',
+    this.ownerFatherName = '',
+    this.ownerPanNumber = '',
+    this.gstDocUrl = '',
+    this.tradeLicenseDocUrl = '',
+    this.appLanguage = 'English',
     this.tenantControls,
     this.createdAt,
   });
@@ -203,6 +214,11 @@ class PropertySettingsModel {
           json['kyc_applicable_to']?.toString() ?? 'All Residents',
       stampBusinessName: json['stamp_business_name']?.toString() ?? '',
       authorizedSignatory: json['authorized_signatory']?.toString() ?? '',
+      ownerFatherName: json['owner_father_name']?.toString() ?? '',
+      ownerPanNumber: json['owner_pan_number']?.toString() ?? '',
+      gstDocUrl: json['gst_doc_url']?.toString() ?? '',
+      tradeLicenseDocUrl: json['trade_license_doc_url']?.toString() ?? '',
+      appLanguage: json['app_language']?.toString() ?? 'English',
       tenantControls: json['tenant_controls'] is Map
           ? Map<String, dynamic>.from(json['tenant_controls'])
           : null,
@@ -260,6 +276,12 @@ class PropertySettingsModel {
         'stamp_business_name': stampBusinessName,
       if (authorizedSignatory.isNotEmpty)
         'authorized_signatory': authorizedSignatory,
+      if (ownerFatherName.isNotEmpty) 'owner_father_name': ownerFatherName,
+      if (ownerPanNumber.isNotEmpty) 'owner_pan_number': ownerPanNumber,
+      if (gstDocUrl.isNotEmpty) 'gst_doc_url': gstDocUrl,
+      if (tradeLicenseDocUrl.isNotEmpty)
+        'trade_license_doc_url': tradeLicenseDocUrl,
+      'app_language': appLanguage,
       if (tenantControls != null) 'tenant_controls': tenantControls,
     };
   }

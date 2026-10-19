@@ -25,6 +25,7 @@ import '../../../owner_dashboard/presentation/screens/owner_dashboard_screen.dar
 class OwnerSetupScreen extends StatefulWidget {
   final bool isScaleMode;
   final int initialStep;
+  final bool? initialGroundFloorHasRooms;
   final VoidCallback? onBack;
   final Function(int newTotalBeds, int newTotalRooms, int newFloors)?
       onCapacityUpdated;
@@ -34,6 +35,7 @@ class OwnerSetupScreen extends StatefulWidget {
     super.key,
     this.isScaleMode = false,
     this.initialStep = 1,
+    this.initialGroundFloorHasRooms,
     this.onBack,
     this.onCapacityUpdated,
     this.onPropertyCreated,
@@ -162,7 +164,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
     super.initState();
     if (widget.isScaleMode) {
       _currentStep = 3;
-      _groundFloorHasRooms = true;
+      _groundFloorHasRooms = widget.initialGroundFloorHasRooms;
       _gfRoomsCountController.text = '2';
       _floorCount = '4';
       _roomsEachFloorController.text = '4';
