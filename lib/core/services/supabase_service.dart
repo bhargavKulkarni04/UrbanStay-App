@@ -521,8 +521,18 @@ class SupabaseService {
               : DateTime(now.year, now.month + 2, 1));
 
       const monthNames = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec'
       ];
       final monthStr = monthNames[targetDate.month - 1];
 
@@ -535,7 +545,8 @@ class SupabaseService {
         'payment_mode': 'Cashfree AutoPay (Trial)',
         'utr_number':
             'CF-TRIAL-${now.millisecondsSinceEpoch.toString().substring(7)}',
-        'billing_period': 'Trial Period (Free until 1 $monthStr ${targetDate.year})',
+        'billing_period':
+            'Trial Period (Free until 1 $monthStr ${targetDate.year})',
       });
     } catch (e) {
       debugPrint('Notice creating inaugural SaaS invoice: $e');
@@ -3042,11 +3053,14 @@ class SupabaseService {
             break;
           } catch (e) {
             final msg = e.toString();
-            final match = RegExp(r'column "([^"]+)" of relation "property_settings" does not exist').firstMatch(msg);
+            final match = RegExp(
+                    r'column "([^"]+)" of relation "property_settings" does not exist')
+                .firstMatch(msg);
             if (match != null) {
               final missingCol = match.group(1);
               if (missingCol != null && copy.containsKey(missingCol)) {
-                debugPrint('Auto-healing property_settings: omitting non-existent column $missingCol');
+                debugPrint(
+                    'Auto-healing property_settings: omitting non-existent column $missingCol');
                 copy.remove(missingCol);
                 continue;
               }
@@ -3086,11 +3100,14 @@ class SupabaseService {
             break;
           } catch (e) {
             final msg = e.toString();
-            final match = RegExp(r'column "([^"]+)" of relation "property_settings" does not exist').firstMatch(msg);
+            final match = RegExp(
+                    r'column "([^"]+)" of relation "property_settings" does not exist')
+                .firstMatch(msg);
             if (match != null) {
               final missingCol = match.group(1);
               if (missingCol != null && copy.containsKey(missingCol)) {
-                debugPrint('Auto-healing savePropertySettingsModel: omitting non-existent column $missingCol');
+                debugPrint(
+                    'Auto-healing savePropertySettingsModel: omitting non-existent column $missingCol');
                 copy.remove(missingCol);
                 continue;
               }
@@ -3141,13 +3158,27 @@ class SupabaseService {
   }) async {
     return await _withLoading('Updating Building Scale...', () async {
       try {
-        // 1. Update properties table totals
-        await client.from('properties').update({
-          'total_floors': totalFloors,
-          'total_rooms': totalRooms,
-          'total_beds': totalBeds,
-          'ground_floor_has_rooms': groundFloorHasRooms,
-        }).eq('id', propertyId);
+        // 1. Fetch existing property info (blueprint JSON and structure)
+        final propRes = await client
+            .from('properties')
+            .select('floor_wise_rooms, property_structure')
+            .eq('id', propertyId)
+            .maybeSingle();
+
+        final Map<String, dynamic> floorWiseMap =
+            (propRes != null && propRes['floor_wise_rooms'] is Map)
+                ? Map<String, dynamic>.from(propRes['floor_wise_rooms'])
+                : {};
+        final String propStructure =
+            propRes?['property_structure']?.toString() ?? 'Standard PG';
+
+        String getFloorLabel(int fl) {
+          if (fl == 0) return 'Ground Floor';
+          if (fl == 1) return '1st Floor';
+          if (fl == 2) return '2nd Floor';
+          if (fl == 3) return '3rd Floor';
+          return '${fl}th Floor';
+        }
 
         // 2. Fetch existing rooms in database
         final existingRoomsRes = await client
@@ -3159,7 +3190,21 @@ class SupabaseService {
             .map((r) => r['room_number']?.toString().trim().toUpperCase())
             .toSet();
 
-        // 3. Determine if we need to auto-generate missing rooms and beds
+        // 3. Determine sharing pool and missing rooms/beds to auto-generate
+        final List<int> requestedSharings = [];
+        for (int i = 0; i < sharing1Rooms; i++) requestedSharings.add(1);
+        for (int i = 0; i < sharing2Rooms; i++) requestedSharings.add(2);
+        for (int i = 0; i < sharing3Rooms; i++) requestedSharings.add(3);
+        for (int i = 0; i < sharing4Rooms; i++) requestedSharings.add(4);
+        int sharingPoolIdx = 0;
+
+        int getNextSharing() {
+          if (sharingPoolIdx < requestedSharings.length) {
+            return requestedSharings[sharingPoolIdx++];
+          }
+          return 2;
+        }
+
         final List<Map<String, dynamic>> roomsToCreate = [];
         if (groundFloorHasRooms && groundRooms > 0) {
           for (int r = 1; r <= groundRooms; r++) {
@@ -3168,7 +3213,7 @@ class SupabaseService {
               roomsToCreate.add({
                 'floor': 0,
                 'number': rNum,
-                'sharing': 2,
+                'sharing': getNextSharing(),
               });
             }
           }
@@ -3185,22 +3230,67 @@ class SupabaseService {
               roomsToCreate.add({
                 'floor': fl,
                 'number': rNum,
-                'sharing': 2,
+                'sharing': getNextSharing(),
               });
             }
           }
         }
 
-        // 4. Insert missing rooms and beds into database
+        // 4. Append new rooms to floor_wise_rooms JSON blueprint (Supports both Standard PG & Apartment Units)
+        final bool isApartment = propStructure == 'Apartment Units' ||
+            (floorWiseMap.values.any((floor) =>
+                floor is Map &&
+                floor.values.any((room) =>
+                    room is Map &&
+                    (room.containsKey('breakdown') ||
+                        room.containsKey('type')))));
+
+        for (final rDef in roomsToCreate) {
+          final floorLabel = getFloorLabel(rDef['floor'] as int);
+          final floorRooms = (floorWiseMap[floorLabel] is Map)
+              ? Map<String, dynamic>.from(floorWiseMap[floorLabel] as Map)
+              : <String, dynamic>{};
+          final sh = rDef['sharing'] as int;
+
+          if (isApartment) {
+            floorRooms[rDef['number'].toString()] = {
+              'type': '$sh BHK',
+              'breakdown': {
+                'hall': 0,
+                'master': 0,
+                'bedroom': sh,
+              },
+              'total_beds': sh,
+            };
+          } else {
+            floorRooms[rDef['number'].toString()] = '$sh-Share';
+          }
+          floorWiseMap[floorLabel] = floorRooms;
+        }
+
+        // 5. Update properties table totals and updated floor_wise_rooms JSON
+        await client.from('properties').update({
+          'total_floors': totalFloors,
+          'total_rooms': totalRooms,
+          'total_beds': totalBeds,
+          'ground_floor_has_rooms': groundFloorHasRooms,
+          'floor_wise_rooms': floorWiseMap,
+        }).eq('id', propertyId);
+
+        // 6. Insert missing rooms and beds into relational database
         for (final rDef in roomsToCreate) {
           final sharing = rDef['sharing'] as int;
-          final insertRoomRes = await client.from('rooms').insert({
-            'property_id': propertyId,
-            'room_number': rDef['number'],
-            'floor_number': rDef['floor'],
-            'sharing_type': '$sharing-Sharing',
-            'capacity': sharing,
-          }).select('id').single();
+          final insertRoomRes = await client
+              .from('rooms')
+              .insert({
+                'property_id': propertyId,
+                'room_number': rDef['number'],
+                'floor_number': rDef['floor'],
+                'sharing_type': '$sharing-Sharing',
+                'capacity': sharing,
+              })
+              .select('id')
+              .single();
 
           final newRoomId = insertRoomRes['id']?.toString();
           if (newRoomId != null) {
