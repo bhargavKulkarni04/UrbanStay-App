@@ -71,6 +71,17 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   bool _isLoadingContacts = false;
   bool _contactsPermissionDenied = false;
 
+  // Property Notice Period Policy (Configured in Owner Setup / Settings)
+  String _noticePeriod = '30 Days';
+
+  int get _noticeDaysInt {
+    final match = RegExp(r'\d+').firstMatch(_noticePeriod);
+    if (match != null) {
+      return int.tryParse(match.group(0) ?? '') ?? 30;
+    }
+    return 30;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -100,6 +111,12 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
         if (pName != null && pName.isNotEmpty && OwnerAppState.instance.activePropertyName.isEmpty) {
           OwnerAppState.instance.setActiveProperty({'id': propId, 'property_name': pName});
         }
+        try {
+          final propData = await SupabaseService.instance.getOwnerProperty(propertyId: propId);
+          if (propData != null && propData['notice_period'] != null && propData['notice_period'].toString().isNotEmpty) {
+            _noticePeriod = propData['notice_period'].toString();
+          }
+        } catch (_) {}
         final roomsWithBeds =
             await SupabaseService.instance.getRoomsWithBeds(_propertyId!);
         if (mounted) {
@@ -499,13 +516,18 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         final isNotice =
                             resident['status']?.toString().toLowerCase() ==
                                 'notice';
+                        final vacateTarget =
+                            DateTime.now().add(Duration(days: _noticeDaysInt));
+                        final formattedVacateDate =
+                            '${vacateTarget.day.toString().padLeft(2, '0')}/${vacateTarget.month.toString().padLeft(2, '0')}/${vacateTarget.year}';
+
                         return _buildActionSubButton(
                           isNotice
                               ? Icons.undo_rounded
                               : Icons.event_note_outlined,
                           isNotice
                               ? 'Cancel Notice (Revert to Active)'
-                              : 'Give Move-Out Notice (30 Days)',
+                              : 'Give Move-Out Notice ($_noticePeriod)',
                           textColor: isNotice ? AppColors.greenDark : null,
                           bgColor: isNotice ? AppColors.greenLight : null,
                           borderColor: isNotice
@@ -530,7 +552,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                 content: Text(
                                   isNotice
                                       ? 'Are you sure you want to cancel the move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName and revert to Active Occupied?'
-                                      : 'Are you sure you want to start a 30-day move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName?',
+                                      : 'Are you sure you want to start a $_noticePeriod move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName? Vacate date will be set to $formattedVacateDate based on your PG policy.',
                                   style: GoogleFonts.outfit(
                                       fontSize: 13, color: AppColors.muted),
                                 ),
@@ -549,6 +571,19 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                       final bedId = resident['id']?.toString();
                                       final targetStatus =
                                           isNotice ? 'Occupied' : 'Notice';
+                                      final roomNum =
+                                          resident['room_number']?.toString() ??
+                                              roomName;
+                                      final bedLabel =
+                                          resident['bed']?.toString() ??
+                                              resident['label']?.toString() ??
+                                              '';
+                                      final tenantId =
+                                          resident['tenant_id']?.toString();
+                                      final residentName =
+                                          resident['name']?.toString() ??
+                                              'Resident';
+
                                       if (bedId != null && bedId.isNotEmpty) {
                                         try {
                                           await SupabaseService.instance.client
@@ -558,9 +593,58 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                           }).eq('id', bedId);
                                         } catch (e) {
                                           debugPrint(
-                                              'Error updating notice status: $e');
+                                              'Error updating notice status in beds: $e');
                                         }
                                       }
+
+                                      if (_propertyId != null &&
+                                          _propertyId!.isNotEmpty) {
+                                        try {
+                                          if (isNotice) {
+                                            // Cancel existing notice row in move_out_notices
+                                            await SupabaseService
+                                                .instance.client
+                                                .from('move_out_notices')
+                                                .update({'status': 'cancelled'})
+                                                .eq('property_id', _propertyId!)
+                                                .eq('room_number', roomNum)
+                                                .eq('bed_identifier', bedLabel)
+                                                .eq('status', 'ACTIVE');
+                                          } else {
+                                            // Insert new notice record in move_out_notices
+                                            final isoVacateDate =
+                                                '${vacateTarget.year}-${vacateTarget.month.toString().padLeft(2, '0')}-${vacateTarget.day.toString().padLeft(2, '0')}';
+                                            await SupabaseService
+                                                .instance.client
+                                                .from('move_out_notices')
+                                                .insert({
+                                              'property_id': _propertyId!,
+                                              if (_propertyName != null &&
+                                                  _propertyName!.isNotEmpty)
+                                                'property_name': _propertyName,
+                                              if (tenantId != null &&
+                                                  tenantId.isNotEmpty &&
+                                                  !tenantId.startsWith('bed_'))
+                                                'tenant_id': tenantId,
+                                              'tenant_name': residentName,
+                                              'room_number': roomNum,
+                                              'bed_identifier': bedLabel,
+                                              'vacate_date': isoVacateDate,
+                                              'notice_days': _noticeDaysInt,
+                                              'reason':
+                                                  'Owner Initiated Notice ($_noticePeriod)',
+                                              'refund_upi_id':
+                                                  resident['refund_upi_id'] ??
+                                                      '',
+                                              'status': 'ACTIVE',
+                                            });
+                                          }
+                                        } catch (e) {
+                                          debugPrint(
+                                              'Error syncing move_out_notices: $e');
+                                        }
+                                      }
+
                                       setState(() {
                                         resident['status'] = targetStatus;
                                       });
@@ -570,7 +654,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                       }
                                       _showToast(isNotice
                                           ? 'Move-Out Notice Cancelled • Reverted to Active ✓'
-                                          : 'Initiated 30-Day Move Out Notice for ${resident['name']} ✓');
+                                          : 'Initiated $_noticePeriod Move Out Notice for ${resident['name']} ✓');
                                     },
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: isNotice

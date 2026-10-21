@@ -929,6 +929,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             ? _bankHolderNameController.text.trim()
             : 'Owner',
         creditingPhone: _creditingPhoneController.text.trim(),
+        ownerPhone: _whatsappController.text.trim(),
         rentDueDay: _dueDay,
         gracePeriod: _gracePeriod,
         lateFee: _showCustomLateFee &&

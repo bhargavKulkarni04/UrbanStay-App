@@ -326,7 +326,9 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                         amount: amount.toDouble(),
                         vendor: vendor.isNotEmpty ? vendor : 'Direct Expense',
                         receiptUrl: _attachedBillName,
-                        expenseDate: DateTime.now(),
+                        expenseDate: (isEditing && expenseToEdit != null)
+                            ? expenseToEdit.expenseDate
+                            : DateTime.now(),
                       );
 
                       final success = await SupabaseService.instance.recordExpenseModel(expenseModel);
@@ -368,6 +370,81 @@ class _OwnerExpensesScreenState extends State<OwnerExpensesScreen> {
                           color: Colors.white),
                     ),
                   ),
+                  if (isEditing && expenseToEdit != null) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: ctx,
+                          builder: (dCtx) => AlertDialog(
+                            backgroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16)),
+                            title: Text('Delete Expense',
+                                style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.ink)),
+                            content: Text(
+                                'Are you sure you want to delete "${expenseToEdit.title}" (₹${expenseToEdit.amount.toInt()}) from the ledger?',
+                                style: GoogleFonts.outfit(
+                                    fontSize: 13, color: AppColors.muted)),
+                            actions: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(dCtx).pop(false),
+                                child: Text('Cancel',
+                                    style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.muted)),
+                              ),
+                              TextButton(
+                                onPressed: () => Navigator.of(dCtx).pop(true),
+                                child: Text('Delete',
+                                    style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFFDC2626))),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          final ok = await SupabaseService.instance
+                              .deleteExpense(expenseToEdit.id);
+                          if (ok) {
+                            setState(() {
+                              _expenses
+                                  .removeWhere((e) => e.id == expenseToEdit.id);
+                            });
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('Expense deleted successfully ✓');
+                          } else {
+                            _showToast(
+                                'Failed to delete expense. Please try again.');
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          size: 18, color: Color(0xFFDC2626)),
+                      label: Text(
+                        'Delete Expense from Ledger',
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFDC2626),
+                        side: const BorderSide(
+                            color: Color(0xFFFCA5A5), width: 1.2),
+                        minimumSize: const Size.fromHeight(44),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),

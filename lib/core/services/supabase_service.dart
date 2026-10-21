@@ -164,6 +164,7 @@ class SupabaseService {
     required String bankName,
     required String bankHolderName,
     String? creditingPhone,
+    String? ownerPhone,
     String? rentDueDay,
     String? gracePeriod,
     String? lateFee,
@@ -228,6 +229,10 @@ class SupabaseService {
       'bank_name': bankName,
       'bank_holder_name': bankHolderName,
       'crediting_phone': creditingPhone,
+      if (ownerPhone != null && ownerPhone.isNotEmpty)
+        'owner_phone': ownerPhone
+      else if (creditingPhone != null && creditingPhone.isNotEmpty)
+        'owner_phone': creditingPhone,
       'rent_due_day': rentDueDay ?? '5th',
       'grace_period': gracePeriod ?? '3 Days',
       'late_fee': numLateFee,
@@ -2732,9 +2737,13 @@ class SupabaseService {
     }
   }
 
-  /// 12. Record operating expense using typed ExpenseModel
+  /// 12. Record or update operating expense using typed ExpenseModel
   Future<bool> recordExpenseModel(ExpenseModel expense) async {
-    return await _withLoading('Recording Operating Expense...', () async {
+    final isUpdate = expense.id.isNotEmpty;
+    final loadingMsg = isUpdate
+        ? 'Updating Operating Expense...'
+        : 'Recording Operating Expense...';
+    return await _withLoading(loadingMsg, () async {
       try {
         final payload = expense.toJson();
         if ((payload['property_name'] == null ||
@@ -2742,13 +2751,60 @@ class SupabaseService {
             activePropertyName != null) {
           payload['property_name'] = activePropertyName!;
         }
-        await client.from('expenses').insert(payload);
+        if (isUpdate) {
+          await client.from('expenses').update(payload).eq('id', expense.id);
+        } else {
+          await client.from('expenses').insert(payload);
+        }
         return true;
       } catch (e) {
         debugPrint('Error recording expense model: $e');
         return false;
       }
     });
+  }
+
+  /// Delete operating expense by ID
+  Future<bool> deleteExpense(String expenseId) async {
+    return await _withLoading('Deleting Expense...', () async {
+      try {
+        await client.from('expenses').delete().eq('id', expenseId);
+        return true;
+      } catch (e) {
+        debugPrint('Error deleting expense: $e');
+        return false;
+      }
+    });
+  }
+
+  /// Cascades property name update across rooms, beds, property_settings, and expenses
+  Future<void> cascadePropertyNameUpdate({
+    required String propertyId,
+    required String newName,
+  }) async {
+    if (propertyId.isEmpty || newName.isEmpty) return;
+    try {
+      activePropertyName = newName;
+      await Future.wait([
+        client
+            .from('properties')
+            .update({'property_name': newName}).eq('id', propertyId),
+        client
+            .from('property_settings')
+            .update({'property_name': newName}).eq('property_id', propertyId),
+        client
+            .from('rooms')
+            .update({'property_name': newName}).eq('property_id', propertyId),
+        client
+            .from('beds')
+            .update({'property_name': newName}).eq('property_id', propertyId),
+        client
+            .from('expenses')
+            .update({'property_name': newName}).eq('property_id', propertyId),
+      ]);
+    } catch (e) {
+      debugPrint('Error cascading property_name update: $e');
+    }
   }
 
   /// 13. Fetch strongly-typed staff members (StaffModel: Cooks, Wardens, Maids, Security payroll)

@@ -32,6 +32,7 @@ class PropertyModel {
   final String? bankName;
   final String? upiVpa;
   final String? creditingPhone;
+  final String? ownerPhone;
   final String? bankQrUrl;
   final String? ownerAadhaarNumber;
   final int totalFloors;
@@ -67,6 +68,7 @@ class PropertyModel {
     this.bankName,
     this.upiVpa,
     this.creditingPhone,
+    this.ownerPhone,
     this.bankQrUrl,
     this.ownerAadhaarNumber,
     this.totalFloors = 1,
@@ -128,6 +130,8 @@ class PropertyModel {
       bankName: json['bank_name']?.toString(),
       upiVpa: json['upi_vpa']?.toString() ?? json['upi_id']?.toString(),
       creditingPhone: json['crediting_phone']?.toString(),
+      ownerPhone: json['owner_phone']?.toString() ??
+          json['owner_whatsapp']?.toString(),
       bankQrUrl: json['bank_qr_url']?.toString(),
       ownerAadhaarNumber: json['owner_aadhaar_number']?.toString(),
       totalFloors: json['total_floors'] is int
@@ -177,6 +181,7 @@ class PropertyModel {
       if (bankName != null) 'bank_name': bankName,
       if (upiVpa != null) 'upi_vpa': upiVpa,
       if (creditingPhone != null) 'crediting_phone': creditingPhone,
+      if (ownerPhone != null) 'owner_phone': ownerPhone,
       if (bankQrUrl != null) 'bank_qr_url': bankQrUrl,
       if (ownerAadhaarNumber != null)
         'owner_aadhaar_number': ownerAadhaarNumber,

@@ -69,8 +69,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   ];
 
   // View 2: Management & Business
-  String _bizStatus = 'Verified & Registered';
-  String _bizEntityType = 'Partnership / LLP';
+  String _bizStatus = 'Unregistered / Exempted';
+  String _bizEntityType = 'Proprietorship / Individual';
   String _bizLegalName = '';
   String _bizGst = '';
   String _bizCin = '';
@@ -79,8 +79,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   String _adminEmail = '';
   String _adminPhone = '';
   String _ownerGovtIdType = 'Aadhaar Card';
-  String _ownerGovtIdProofStatus = 'Verified & Approved';
-  String _bizGstProofStatus = 'Verified • Active';
+  String _ownerGovtIdProofStatus = 'Optional • Not Uploaded';
+  String _bizGstProofStatus = 'Optional • Not Uploaded';
 
   // View 3: Renting & Stay Rules
   String _rentDueDay = '';
@@ -265,6 +265,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             // Banking & UPI
             if (propModel.upiVpa != null && propModel.upiVpa!.isNotEmpty) {
               _upiId = propModel.upiVpa!;
+              OwnerAppState.instance.updateActivePropertyUpi(_upiId);
             }
             if (propModel.bankName != null && propModel.bankName!.isNotEmpty) {
               _bankName = propModel.bankName!;
@@ -285,7 +286,11 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
               _adminEmail = propModel.ownerEmail!;
               _ownerEmail = _adminEmail;
             }
-            if (propModel.creditingPhone != null &&
+            if (propModel.ownerPhone != null &&
+                propModel.ownerPhone!.isNotEmpty) {
+              _adminPhone = propModel.ownerPhone!;
+              _ownerWhatsapp = _adminPhone;
+            } else if (propModel.creditingPhone != null &&
                 propModel.creditingPhone!.isNotEmpty) {
               _adminPhone = propModel.creditingPhone!;
               _ownerWhatsapp = _adminPhone;
@@ -297,10 +302,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                   ? '${a.substring(0, 4)} •••• ${a.substring(a.length - 4)}'
                   : a;
               _ownerGovtIdType = 'Aadhaar Card';
-              _ownerGovtIdProofStatus = 'Verified & Approved';
+              _ownerGovtIdProofStatus = 'Aadhaar Recorded';
             } else {
               _ownerGovtIdType = 'Aadhaar Card';
-              _ownerGovtIdProofStatus = 'Pending Verification';
+              _ownerGovtIdProofStatus = 'Optional • Not Uploaded';
             }
 
             // Building Infrastructure & Capacity
@@ -331,16 +336,27 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 _morningOpen = settingsModel.morningGateOpenTime;
               }
 
+              // Card 1.4: Wi-Fi & Emergency Contact
+              if (settingsModel.wifiSsid.isNotEmpty) {
+                _wifiSsid = settingsModel.wifiSsid;
+              }
+              if (settingsModel.wifiPassword.isNotEmpty) {
+                _wifiPassword = settingsModel.wifiPassword;
+              }
+              if (settingsModel.emergencyPhone.isNotEmpty) {
+                _emergencyPhone = settingsModel.emergencyPhone;
+              }
+
               // Card 2.1: Business & Tax Details
               if (settingsModel.legalEntityName.isNotEmpty) {
                 _bizLegalName = settingsModel.legalEntityName;
               }
               if (settingsModel.gstNumber.isNotEmpty) {
                 _bizGst = settingsModel.gstNumber;
-                _bizGstProofStatus = 'Verified • Active';
-                _bizStatus = 'Verified & Registered';
+                _bizGstProofStatus = 'GSTIN Added';
+                _bizStatus = 'Registered';
               } else {
-                _bizGstProofStatus = 'Not Uploaded';
+                _bizGstProofStatus = 'Optional • Not Uploaded';
                 _bizStatus = 'Unregistered / Exempted';
               }
               if (settingsModel.cinNumber.isNotEmpty) {
@@ -1207,7 +1223,32 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
         ),
         const SizedBox(height: 14),
 
-        // 4. Digital Business Card
+        // 4. Wi-Fi & Emergency Contact Card
+        _buildElevatedCard(
+          title: 'Wi-Fi & Emergency Contact',
+          onEdit: _openEditWifiEmergencyModal,
+          rows: [
+            _DetailRow(
+              'Wi-Fi Network (SSID)',
+              _wifiSsid.isNotEmpty ? _wifiSsid : 'Not Configured',
+              isCode: _wifiSsid.isNotEmpty,
+            ),
+            _DetailRow(
+              'Wi-Fi Password',
+              _wifiPassword.isNotEmpty ? '••••••••' : 'Not Set',
+              isCode: _wifiPassword.isNotEmpty,
+            ),
+            _DetailRow(
+              'Emergency Contact Phone',
+              _emergencyPhone.isNotEmpty ? _emergencyPhone : 'Not Set',
+              isCode: true,
+              isGreen: _emergencyPhone.isNotEmpty,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+
+        // 5. Digital Business Card
         _buildDigitalBusinessCard(),
       ],
     );
@@ -1264,12 +1305,24 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            '$_propAddress\nDirect Bank UPI • Free High-Speed WiFi • 3 Meals Food',
-            style: GoogleFonts.outfit(
-                fontSize: 11.5,
-                color: Colors.white.withValues(alpha: 0.9),
-                height: 1.4),
+          Builder(
+            builder: (context) {
+              final cat = _tenantPreference.isNotEmpty
+                  ? '$_tenantPreference PG'
+                  : 'PG Living';
+              final pay = _allowOnlineUpi ? 'Direct Bank UPI' : 'Cash Payments';
+              final loc = _locality.isNotEmpty
+                  ? _locality
+                  : (_selectedCity.isNotEmpty ? _selectedCity : 'UrbanStay');
+              final tagline = '$cat • $pay • $loc';
+              return Text(
+                '$_propAddress\n$tagline',
+                style: GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    height: 1.4),
+              );
+            },
           ),
           const SizedBox(height: 12),
           InkWell(
@@ -1363,8 +1416,8 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
             _DetailRow(
               'Trade License / BBMP',
               _bbmpLicense.isNotEmpty
-                  ? 'Verified • $_bbmpLicense'
-                  : 'Not Uploaded',
+                  ? 'Active • $_bbmpLicense'
+                  : 'Optional • Not Uploaded',
               isGreen: _bbmpLicense.isNotEmpty,
             ),
           ],
@@ -1757,11 +1810,13 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
           onEdit: _openEditC1OwnerModal,
           rows: [
             _DetailRow('Legal Full Name', _ownerFullName),
-            _DetailRow("Father's Name", _ownerFatherName),
             _DetailRow('WhatsApp Mobile Number', _ownerWhatsapp),
             _DetailRow('Official Email Address', _ownerEmail),
-            _DetailRow('12-Digit Aadhaar Number', 'Verified • $_ownerAadhaar',
-                isGreen: true),
+            _DetailRow(
+              '12-Digit Aadhaar Number',
+              _ownerAadhaar.isNotEmpty ? _ownerAadhaar : 'Not Provided',
+              isGreen: _ownerAadhaar.isNotEmpty,
+            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -1976,7 +2031,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
   // ===========================================================================
   void _openEditC1OwnerModal() {
     final nameCtrl = TextEditingController(text: _ownerFullName);
-    final fatherCtrl = TextEditingController(text: _ownerFatherName);
     String initialPhone = _ownerWhatsapp.replaceAll(RegExp(r'\D'), '');
     if (initialPhone.length > 10)
       initialPhone = initialPhone.substring(initialPhone.length - 10);
@@ -2001,8 +2055,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildModalTextField('Legal Full Name', nameCtrl),
-                  const SizedBox(height: 12),
-                  _buildModalTextField("Father's Name", fatherCtrl),
                   const SizedBox(height: 12),
                   _buildModalTextField(
                     'WhatsApp Mobile Number (10 Digits)',
@@ -2102,7 +2154,6 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                             setState(() {
                               _ownerFullName = nameCtrl.text.trim();
                               _adminName = _ownerFullName;
-                              _ownerFatherName = fatherCtrl.text.trim();
                               _ownerWhatsapp = '+91 $phone';
                               _adminPhone = _ownerWhatsapp;
                               _ownerEmail = emailCtrl.text.trim();
@@ -2119,19 +2170,12 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                     .update({
                                   'owner_legal_name': _ownerFullName,
                                   'owner_email': _ownerEmail,
+                                  'owner_phone': _ownerWhatsapp,
                                   'crediting_phone': _ownerWhatsapp,
                                   'owner_aadhaar_number': aadhaar.isNotEmpty
                                       ? aadhaar
                                       : _ownerAadhaar,
                                 }).eq('id', _propId);
-
-                                await SupabaseService.instance
-                                    .updatePropertySettings(
-                                  propertyId: _propId,
-                                  settings: {
-                                    'owner_father_name': _ownerFatherName,
-                                  },
-                                );
                               } catch (e) {
                                 debugPrint(
                                     'Error updating owner identity in Supabase: $e');
@@ -2385,26 +2429,26 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                         if (isPanDoc) {
                           _ownerPanNumber = cleanPan;
                           _ownerGovtIdProofStatus = cleanPan.isNotEmpty
-                              ? 'Verified & Approved'
-                              : 'Pending Verification';
+                              ? 'PAN Recorded'
+                              : 'Optional • Not Uploaded';
                         } else {
                           if (cleanAadhaar.isNotEmpty) {
                             _ownerAadhaar = cleanAadhaar.length >= 12
                                 ? '${cleanAadhaar.substring(0, 4)} •••• ${cleanAadhaar.substring(cleanAadhaar.length - 4)}'
                                 : cleanAadhaar;
-                            _ownerGovtIdProofStatus = 'Verified & Approved';
+                            _ownerGovtIdProofStatus = 'Aadhaar Recorded';
                           } else {
                             _ownerAadhaar = '';
-                            _ownerGovtIdProofStatus = 'Pending Verification';
+                            _ownerGovtIdProofStatus = 'Optional • Not Uploaded';
                           }
                         }
                         _bizGst = gstCtrl.text.trim();
                         _bbmpLicense = bbmpCtrl.text.trim();
                         _bizGstProofStatus = _bizGst.isNotEmpty
-                            ? 'Verified • Active'
-                            : 'Not Uploaded';
+                            ? 'GSTIN Added • Active'
+                            : 'Optional • Not Uploaded';
                         _bizStatus = _bizGst.isNotEmpty
-                            ? 'Verified & Registered'
+                            ? 'Registered'
                             : 'Unregistered / Exempted';
                       });
                       if (_propId.isNotEmpty) {
@@ -2629,6 +2673,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                   'lift_count': _scaleLiftCount,
                                   'power_backup': _scalePowerBackup,
                                 }).eq('id', _propId);
+
+                                await SupabaseService.instance
+                                    .cascadePropertyNameUpdate(
+                                  propertyId: _propId,
+                                  newName: _scalePgName,
+                                );
+                                OwnerAppState.instance
+                                    .updateActivePropertyName(_scalePgName);
                               } catch (e) {
                                 debugPrint(
                                     'Error updating infrastructure in Supabase: $e');
@@ -4544,6 +4596,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                     onPressed: () async {
                       setState(() {
                         _propName = nameCtrl.text.trim();
+                        _scalePgName = _propName;
                         _propType = tempType;
                         _streetAddress = streetCtrl.text.trim();
                         _locality = localityCtrl.text.trim();
@@ -4575,6 +4628,14 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                             'street_address': _propAddress,
                             'maps_url': _propMapPin,
                           }).eq('id', _propId);
+
+                          await SupabaseService.instance
+                              .cascadePropertyNameUpdate(
+                            propertyId: _propId,
+                            newName: _propName,
+                          );
+                          OwnerAppState.instance
+                              .updateActivePropertyName(_propName);
                         } catch (e) {
                           debugPrint('Error updating property in Supabase: $e');
                         }
@@ -4979,6 +5040,156 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           )
                         : Text(
                             'Save Changes',
+                            style: GoogleFonts.outfit(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.green),
+                          ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openEditWifiEmergencyModal() {
+    final wifiCtrl = TextEditingController(text: _wifiSsid);
+    final passCtrl = TextEditingController(text: _wifiPassword);
+    final emergencyCtrl = TextEditingController(text: _emergencyPhone);
+    bool obscurePass = true;
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return _buildNativeBottomSheetWrapper(
+              title: 'Edit Wi-Fi & Emergency Contact',
+              modalContext: ctx,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Configure high-speed resident Wi-Fi credentials and 24/7 on-call emergency contact for your PG.',
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: AppColors.muted, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildModalSectionLabel('Wi-Fi Network Name (SSID)'),
+                  _buildModalTextField('e.g. UrbanStay_5G_HighSpeed', wifiCtrl),
+                  const SizedBox(height: 12),
+                  _buildModalSectionLabel('Wi-Fi Password'),
+                  TextField(
+                    controller: passCtrl,
+                    obscureText: obscurePass,
+                    style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.ink),
+                    decoration: InputDecoration(
+                      hintText: 'Enter Wi-Fi password',
+                      hintStyle: GoogleFonts.outfit(
+                          fontSize: 12, color: AppColors.muted),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(
+                            color: AppColors.green, width: 1.5),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          obscurePass
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: 18,
+                          color: AppColors.muted,
+                        ),
+                        onPressed: () {
+                          setModalState(() => obscurePass = !obscurePass);
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildModalSectionLabel('Emergency Contact Phone Number'),
+                  _buildModalTextField(
+                    'e.g. +91 98450 12345 (Warden / Helpdesk)',
+                    emergencyCtrl,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 20),
+                  OutlinedButton(
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            final wSsid = wifiCtrl.text.trim();
+                            final wPass = passCtrl.text.trim();
+                            final ePhone = emergencyCtrl.text.trim();
+
+                            setModalState(() => isSaving = true);
+                            setState(() {
+                              _wifiSsid = wSsid;
+                              _wifiPassword = wPass;
+                              _emergencyPhone = ePhone;
+                            });
+
+                            if (_propId.isNotEmpty) {
+                              try {
+                                await SupabaseService.instance
+                                    .updatePropertySettings(
+                                  propertyId: _propId,
+                                  settings: {
+                                    'wifi_ssid': wSsid,
+                                    'wifi_password': wPass,
+                                    'emergency_phone': ePhone,
+                                  },
+                                );
+                              } catch (e) {
+                                debugPrint(
+                                    'Error saving wifi & emergency settings: $e');
+                              }
+                            }
+
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            _showToast('Wi-Fi & Emergency Contact Updated ✓');
+                          },
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.green,
+                      side: const BorderSide(
+                          color: Color(0xFFE5E7EB), width: 1.5),
+                      minimumSize: const Size.fromHeight(46),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    child: isSaving
+                        ? const Center(
+                            child: UrbanSpinner(
+                              size: 20,
+                              color: AppColors.green,
+                            ),
+                          )
+                        : Text(
+                            'Save Wi-Fi & Emergency Info',
                             style: GoogleFonts.outfit(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -6008,6 +6219,7 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                           .from('properties')
                           .update({
                         'owner_email': _adminEmail,
+                        'owner_phone': _adminPhone,
                         'crediting_phone': _adminPhone,
                       }).eq('id', _propId);
                     } catch (e) {
@@ -6872,6 +7084,9 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                         : 'Unregistered / Exempted';
                                   });
                                 } else if (title == 'Edit Banking Details') {
+                                  OwnerAppState.instance
+                                      .updateActivePropertyUpi(_upiId);
+
                                   await SupabaseService.instance.client
                                       .from('properties')
                                       .update({
@@ -6892,6 +7107,10 @@ class _OwnerSettingsScreenState extends State<OwnerSettingsScreen> {
                                     morningGateOpenTime: _morningOpen,
                                   );
                                 } else {
+                                  if (_upiId.isNotEmpty) {
+                                    OwnerAppState.instance
+                                        .updateActivePropertyUpi(_upiId);
+                                  }
                                   await SupabaseService.instance.client
                                       .from('properties')
                                       .update({

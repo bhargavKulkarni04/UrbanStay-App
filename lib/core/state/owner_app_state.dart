@@ -27,6 +27,23 @@ class OwnerAppState extends ChangeNotifier {
     }
   }
 
+  void updateActivePropertyName(String newName) {
+    if (_properties.isNotEmpty && _activePropertyIndex < _properties.length) {
+      _properties[_activePropertyIndex]['property_name'] = newName;
+      _properties[_activePropertyIndex]['name'] = newName;
+      _properties[_activePropertyIndex]['brand_name'] = newName;
+    }
+    notifyListeners();
+  }
+
+  void updateActivePropertyUpi(String newUpi) {
+    if (_properties.isNotEmpty && _activePropertyIndex < _properties.length) {
+      _properties[_activePropertyIndex]['upi_vpa'] = newUpi;
+      _properties[_activePropertyIndex]['upi_id'] = newUpi;
+    }
+    notifyListeners();
+  }
+
   bool get isLoading => _isLoading;
 
   Map<String, dynamic>? get activeProperty {
@@ -54,6 +71,11 @@ class OwnerAppState extends ChangeNotifier {
   String get activePropertyLocation =>
       activeProperty?['location']?.toString() ??
       activeProperty?['area_locality']?.toString() ??
+      '';
+
+  String get activePropertyUpi =>
+      activeProperty?['upi_vpa']?.toString() ??
+      activeProperty?['upi_id']?.toString() ??
       '';
 
   int get totalBeds =>
