@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/app_colors.dart';
 import 'features/owner_setup/presentation/screens/owner_setup_screen.dart';
+import 'features/tenant_checkin/presentation/screens/tenant_checkin_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/widgets/urban_loading.dart';
 import 'core/config/supabase_config.dart';
@@ -136,8 +137,11 @@ class UrbanStayApp extends StatelessWidget {
           },
         );
       },
-      // 🚀 Directly open Owner Setup Screen
-      home: const OwnerSetupScreen(),
+      // 🚀 Directly open Tenant Checkin Screen for Apartment Units
+      home: const TenantCheckinScreen(
+        propertyId: '94e3f186-d80f-4b37-b8ad-dc099c5f54ee',
+        initialPgCode: 'JP2577G',
+      ),
     );
   }
 }
