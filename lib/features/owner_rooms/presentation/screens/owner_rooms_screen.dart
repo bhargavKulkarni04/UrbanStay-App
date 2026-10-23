@@ -10,6 +10,7 @@ import '../../../../core/state/owner_app_state.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/widgets/urban_loading.dart';
 import 'shift_bed_screen.dart';
+import 'owner_move_out_notice_screen.dart';
 
 /// Screen 6: Tenants & Rooms Matrix.
 /// Production-Grade Responsive Flutter Implementation of `ProductionCode/owner_rooms.html`.
@@ -108,12 +109,18 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       if (propId != null && propId.isNotEmpty) {
         _propertyId = propId;
         _propertyName = pName;
-        if (pName != null && pName.isNotEmpty && OwnerAppState.instance.activePropertyName.isEmpty) {
-          OwnerAppState.instance.setActiveProperty({'id': propId, 'property_name': pName});
+        if (pName != null &&
+            pName.isNotEmpty &&
+            OwnerAppState.instance.activePropertyName.isEmpty) {
+          OwnerAppState.instance
+              .setActiveProperty({'id': propId, 'property_name': pName});
         }
         try {
-          final propData = await SupabaseService.instance.getOwnerProperty(propertyId: propId);
-          if (propData != null && propData['notice_period'] != null && propData['notice_period'].toString().isNotEmpty) {
+          final propData = await SupabaseService.instance
+              .getOwnerProperty(propertyId: propId);
+          if (propData != null &&
+              propData['notice_period'] != null &&
+              propData['notice_period'].toString().isNotEmpty) {
             _noticePeriod = propData['notice_period'].toString();
           }
         } catch (_) {}
@@ -172,6 +179,11 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               final actualBedDeposit = isOcc
                   ? ((b['deposit'] ?? r['deposit_per_bed'] ?? 0) as num)
                   : 0;
+              final actualBedRefundableDeposit = isOcc
+                  ? ((b['refundable_deposit'] ??
+                      r['refundable_deposit'] ??
+                      actualBedDeposit) as num)
+                  : 0;
               return {
                 'id': b['id']?.toString() ?? '',
                 'label': bedLabel,
@@ -188,6 +200,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 'rent': actualBedRent > 0 ? actualBedRent.toString() : '0',
                 'deposit':
                     actualBedDeposit > 0 ? actualBedDeposit.toString() : '0',
+                'refundable_deposit': actualBedRefundableDeposit > 0
+                    ? actualBedRefundableDeposit.toString()
+                    : actualBedDeposit.toString(),
                 'docs': docsLabel,
                 'docsVerified': docsVerified,
                 'title': !isOcc ? 'Vacant $bedLabel — Available' : null,
@@ -534,74 +549,64 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                               ? AppColors.green.withValues(alpha: 0.3)
                               : null,
                           onTap: () {
-                            showDialog(
-                              context: context,
-                              builder: (dialogCtx) => AlertDialog(
-                                backgroundColor: Colors.white,
-                                surfaceTintColor: Colors.transparent,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16)),
-                                title: Text(
-                                  isNotice
-                                      ? 'Cancel Move-Out Notice'
-                                      : 'Confirm Move-Out Notice',
-                                  style: GoogleFonts.outfit(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 17),
-                                ),
-                                content: Text(
-                                  isNotice
-                                      ? 'Are you sure you want to cancel the move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName and revert to Active Occupied?'
-                                      : 'Are you sure you want to start a $_noticePeriod move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName? Vacate date will be set to $formattedVacateDate based on your PG policy.',
-                                  style: GoogleFonts.outfit(
-                                      fontSize: 13, color: AppColors.muted),
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(dialogCtx).pop(),
-                                    child: Text('Cancel',
-                                        style: GoogleFonts.outfit(
-                                            color: AppColors.muted,
-                                            fontWeight: FontWeight.w700)),
+                            if (isNotice) {
+                              showDialog(
+                                context: context,
+                                builder: (dialogCtx) => AlertDialog(
+                                  backgroundColor: Colors.white,
+                                  surfaceTintColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16)),
+                                  title: Text(
+                                    'Cancel Move-Out Notice',
+                                    style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 17),
                                   ),
-                                  ElevatedButton(
-                                    onPressed: () async {
-                                      Navigator.of(dialogCtx).pop();
-                                      final bedId = resident['id']?.toString();
-                                      final targetStatus =
-                                          isNotice ? 'Occupied' : 'Notice';
-                                      final roomNum =
-                                          resident['room_number']?.toString() ??
-                                              roomName;
-                                      final bedLabel =
-                                          resident['bed']?.toString() ??
-                                              resident['label']?.toString() ??
-                                              '';
-                                      final tenantId =
-                                          resident['tenant_id']?.toString();
-                                      final residentName =
-                                          resident['name']?.toString() ??
-                                              'Resident';
+                                  content: Text(
+                                    'Are you sure you want to cancel the move-out notice for ${resident['name'] ?? "this resident"} in Room $roomName and revert to Active Occupied?',
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 13, color: AppColors.muted),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(dialogCtx).pop(),
+                                      child: Text('Cancel',
+                                          style: GoogleFonts.outfit(
+                                              color: AppColors.muted,
+                                              fontWeight: FontWeight.w700)),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () async {
+                                        Navigator.of(dialogCtx).pop();
+                                        final bedId =
+                                            resident['id']?.toString();
+                                        final roomNum = resident['room_number']
+                                                ?.toString() ??
+                                            roomName;
+                                        final bedLabel =
+                                            resident['bed']?.toString() ??
+                                                resident['label']?.toString() ??
+                                                '';
 
-                                      if (bedId != null && bedId.isNotEmpty) {
-                                        try {
-                                          await SupabaseService.instance.client
-                                              .from('beds')
-                                              .update({
-                                            'status': targetStatus
-                                          }).eq('id', bedId);
-                                        } catch (e) {
-                                          debugPrint(
-                                              'Error updating notice status in beds: $e');
+                                        if (bedId != null && bedId.isNotEmpty) {
+                                          try {
+                                            await SupabaseService
+                                                .instance.client
+                                                .from('beds')
+                                                .update({
+                                              'status': 'Occupied'
+                                            }).eq('id', bedId);
+                                          } catch (e) {
+                                            debugPrint(
+                                                'Error updating notice status in beds: $e');
+                                          }
                                         }
-                                      }
 
-                                      if (_propertyId != null &&
-                                          _propertyId!.isNotEmpty) {
-                                        try {
-                                          if (isNotice) {
-                                            // Cancel existing notice row in move_out_notices
+                                        if (_propertyId != null &&
+                                            _propertyId!.isNotEmpty) {
+                                          try {
                                             await SupabaseService
                                                 .instance.client
                                                 .from('move_out_notices')
@@ -610,72 +615,55 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                                 .eq('room_number', roomNum)
                                                 .eq('bed_identifier', bedLabel)
                                                 .eq('status', 'ACTIVE');
-                                          } else {
-                                            // Insert new notice record in move_out_notices
-                                            final isoVacateDate =
-                                                '${vacateTarget.year}-${vacateTarget.month.toString().padLeft(2, '0')}-${vacateTarget.day.toString().padLeft(2, '0')}';
-                                            await SupabaseService
-                                                .instance.client
-                                                .from('move_out_notices')
-                                                .insert({
-                                              'property_id': _propertyId!,
-                                              if (_propertyName != null &&
-                                                  _propertyName!.isNotEmpty)
-                                                'property_name': _propertyName,
-                                              if (tenantId != null &&
-                                                  tenantId.isNotEmpty &&
-                                                  !tenantId.startsWith('bed_'))
-                                                'tenant_id': tenantId,
-                                              'tenant_name': residentName,
-                                              'room_number': roomNum,
-                                              'bed_identifier': bedLabel,
-                                              'vacate_date': isoVacateDate,
-                                              'notice_days': _noticeDaysInt,
-                                              'reason':
-                                                  'Owner Initiated Notice ($_noticePeriod)',
-                                              'refund_upi_id':
-                                                  resident['refund_upi_id'] ??
-                                                      '',
-                                              'status': 'ACTIVE',
-                                            });
+                                          } catch (e) {
+                                            debugPrint(
+                                                'Error syncing move_out_notices: $e');
                                           }
-                                        } catch (e) {
-                                          debugPrint(
-                                              'Error syncing move_out_notices: $e');
                                         }
-                                      }
 
-                                      setState(() {
-                                        resident['status'] = targetStatus;
-                                      });
-                                      await _loadRoomsFromSupabase();
-                                      if (ctx.mounted) {
-                                        Navigator.of(ctx).pop();
-                                      }
-                                      _showToast(isNotice
-                                          ? 'Move-Out Notice Cancelled • Reverted to Active ✓'
-                                          : 'Initiated $_noticePeriod Move Out Notice for ${resident['name']} ✓');
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: isNotice
-                                          ? AppColors.green
-                                          : AppColors.ink,
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8)),
+                                        setState(() {
+                                          resident['status'] = 'Occupied';
+                                        });
+                                        await _loadRoomsFromSupabase();
+                                        if (ctx.mounted) {
+                                          Navigator.of(ctx).pop();
+                                        }
+                                        _showToast(
+                                            'Move-Out Notice Cancelled • Reverted to Active ✓');
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.green,
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8)),
+                                      ),
+                                      child: Text('Yes, Cancel Notice',
+                                          style: GoogleFonts.outfit(
+                                              fontWeight: FontWeight.w800)),
                                     ),
-                                    child: Text(
-                                        isNotice
-                                            ? 'Yes, Cancel Notice'
-                                            : 'Yes, Give Notice',
-                                        style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.w800)),
+                                  ],
+                                ),
+                              );
+                            } else {
+                              Navigator.of(ctx).pop();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (c) => OwnerMoveOutNoticeScreen(
+                                    resident: resident,
+                                    roomName: roomName,
+                                    propertyId: _propertyId,
+                                    propertyName: _propertyName,
+                                    noticePeriod: _noticePeriod,
+                                    noticeDaysInt: _noticeDaysInt,
+                                    onNoticeSuccess: () async {
+                                      await _loadRoomsFromSupabase();
+                                    },
                                   ),
-                                ],
-                              ),
-                            );
+                                ),
+                              );
+                            }
                           },
                         );
                       },
@@ -816,7 +804,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   elevation: 0,
                   surfaceTintColor: Colors.transparent,
                   leading: IconButton(
-                    icon: const Icon(Icons.arrow_back_rounded, color: AppColors.ink),
+                    icon: const Icon(Icons.arrow_back_rounded,
+                        color: AppColors.ink),
                     onPressed: () => Navigator.of(ctx).pop(),
                   ),
                   title: Text(
@@ -829,7 +818,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                   ),
                 ),
                 body: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -885,7 +875,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                 color: const Color(0xFFF0FDF4),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                    color: AppColors.green.withValues(alpha: 0.2)),
+                                    color:
+                                        AppColors.green.withValues(alpha: 0.2)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -959,7 +950,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           itemCount: loggedDamages.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 8),
                           itemBuilder: (context, idx) {
                             final dmg = loggedDamages[idx];
                             final item =
@@ -996,11 +988,20 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                   Expanded(
                                     child: Builder(
                                       builder: (context) {
-                                        final dRoom = dmg['room_number']?.toString().isNotEmpty == true
+                                        final dRoom = dmg['room_number']
+                                                    ?.toString()
+                                                    .isNotEmpty ==
+                                                true
                                             ? dmg['room_number'].toString()
                                             : roomName;
-                                        final dTenantId = dmg['tenant_id']?.toString() ?? resident['tenant_id']?.toString() ?? '';
-                                        final dRoomId = dmg['room_id']?.toString() ?? resident['room_id']?.toString() ?? '';
+                                        final dTenantId = dmg['tenant_id']
+                                                ?.toString() ??
+                                            resident['tenant_id']?.toString() ??
+                                            '';
+                                        final dRoomId = dmg['room_id']
+                                                ?.toString() ??
+                                            resident['room_id']?.toString() ??
+                                            '';
 
                                         return Column(
                                           crossAxisAlignment:
@@ -1021,15 +1022,19 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                                   fontWeight: FontWeight.w600,
                                                   color: AppColors.muted),
                                             ),
-                                            if (dTenantId.isNotEmpty || dRoomId.isNotEmpty)
+                                            if (dTenantId.isNotEmpty ||
+                                                dRoomId.isNotEmpty)
                                               Padding(
-                                                padding: const EdgeInsets.only(top: 2),
+                                                padding: const EdgeInsets.only(
+                                                    top: 2),
                                                 child: Text(
                                                   '${dTenantId.isNotEmpty ? "Tenant: ${dTenantId.substring(0, dTenantId.length > 8 ? 8 : dTenantId.length)}…" : ""}${dRoomId.isNotEmpty ? " • Room ID: ${dRoomId.substring(0, dRoomId.length > 8 ? 8 : dRoomId.length)}…" : ""}',
                                                   style: GoogleFonts.outfit(
                                                       fontSize: 10,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: const Color(0xFF6B7280)),
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: const Color(
+                                                          0xFF6B7280)),
                                                 ),
                                               ),
                                           ],
@@ -1070,16 +1075,19 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                             children: [
                                               TextField(
                                                 controller: editItemCtrl,
-                                                decoration: const InputDecoration(
-                                                    labelText: 'Item Name'),
+                                                decoration:
+                                                    const InputDecoration(
+                                                        labelText: 'Item Name'),
                                               ),
                                               const SizedBox(height: 10),
                                               TextField(
                                                 controller: editAmtCtrl,
                                                 keyboardType:
                                                     TextInputType.number,
-                                                decoration: const InputDecoration(
-                                                    labelText: 'Amount (₹)'),
+                                                decoration:
+                                                    const InputDecoration(
+                                                        labelText:
+                                                            'Amount (₹)'),
                                               ),
                                             ],
                                           ),
@@ -1115,15 +1123,16 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                                 );
                                                 if (ok) {
                                                   if (mode == 'deposit') {
-                                                    final curDep = double.tryParse(
-                                                            resident['deposit']
+                                                    final curDep = double
+                                                            .tryParse(resident[
+                                                                        'deposit']
                                                                     ?.toString() ??
                                                                 '0') ??
                                                         0.0;
                                                     final updatedDep = (curDep +
                                                             (amt - newAmt))
-                                                        .clamp(
-                                                            0.0, double.infinity);
+                                                        .clamp(0.0,
+                                                            double.infinity);
                                                     setState(() {
                                                       resident['deposit'] =
                                                           updatedDep
@@ -1227,9 +1236,10 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                                         '0') ??
                                                 0.0;
                                             setState(() {
-                                              resident['deposit'] = (curDep + amt)
-                                                  .toInt()
-                                                  .toString();
+                                              resident['deposit'] =
+                                                  (curDep + amt)
+                                                      .toInt()
+                                                      .toString();
                                             });
                                           }
                                           setPageState(() {
@@ -1271,7 +1281,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              '+ Log New Damage Deduction',
+                              ' Log New Damage Deduction',
                               style: GoogleFonts.outfit(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
@@ -1281,7 +1291,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                             _buildFormField(
                               'Damage Item / Reason',
                               _damageItemController,
-                              hint: 'e.g. Broken Bathroom Mirror, Wall Stain, AC Remote',
+                              hint:
+                                  'e.g. Broken Bathroom Mirror, Wall Stain, AC Remote',
                             ),
                             const SizedBox(height: 12),
                             _buildFormField(
@@ -1289,7 +1300,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                               _damageAmountController,
                               hint: 'e.g. 1200',
                               keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
                             ),
                             const SizedBox(height: 14),
 
@@ -1305,7 +1318,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                             InkWell(
                               onTap: () {
                                 setPageState(() {
-                                  _damageAttachedPhoto = _damageAttachedPhoto == null
+                                  _damageAttachedPhoto = _damageAttachedPhoto ==
+                                          null
                                       ? 'damage_proof_photo_${DateTime.now().millisecondsSinceEpoch}.jpg'
                                       : null;
                                 });
@@ -1369,7 +1383,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                             ),
                             const SizedBox(height: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(10),
@@ -1413,7 +1428,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                 color: AppColors.greenLight,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                    color: AppColors.green.withValues(alpha: 0.2)),
+                                    color:
+                                        AppColors.green.withValues(alpha: 0.2)),
                               ),
                               child: Row(
                                 children: [
@@ -1439,7 +1455,8 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                             ElevatedButton(
                               onPressed: () async {
                                 final item = _damageItemController.text.trim();
-                                final amount = _damageAmountController.text.trim();
+                                final amount =
+                                    _damageAmountController.text.trim();
                                 if (item.isEmpty || amount.isEmpty) {
                                   _showToast(
                                       'Please enter damage item and amount');
@@ -1459,10 +1476,10 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                     : ((widget.propertyName != null &&
                                             widget.propertyName!.isNotEmpty)
                                         ? widget.propertyName!
-                                        : (SupabaseService.instance
-                                                .activePropertyName ??
-                                            OwnerAppState.instance
-                                                .activePropertyName));
+                                        : (SupabaseService
+                                                .instance.activePropertyName ??
+                                            OwnerAppState
+                                                .instance.activePropertyName));
 
                                 final success = await SupabaseService.instance
                                     .addDamageDeduction(
@@ -1490,8 +1507,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                                           resident['deposit']?.toString() ??
                                               '0') ??
                                       0.0;
-                                  final newDeposit = (currentDeposit - dmgAmount)
-                                      .clamp(0.0, double.infinity);
+                                  final newDeposit =
+                                      (currentDeposit - dmgAmount)
+                                          .clamp(0.0, double.infinity);
                                   setState(() {
                                     resident['deposit'] =
                                         newDeposit.toInt().toString();
@@ -2802,9 +2820,10 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               ),
               Builder(
                 builder: (context) {
-                  final name = (_propertyName != null && _propertyName!.isNotEmpty)
-                      ? _propertyName!
-                      : OwnerAppState.instance.activePropertyName;
+                  final name =
+                      (_propertyName != null && _propertyName!.isNotEmpty)
+                          ? _propertyName!
+                          : OwnerAppState.instance.activePropertyName;
                   final loc = OwnerAppState.instance.activePropertyLocation;
                   final parts = [
                     if (name.isNotEmpty) name,
@@ -3175,7 +3194,12 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                 (bed['name'] != null &&
                     bed['name'].toString().trim().isNotEmpty);
             if (isOcc) {
-              return _buildTenantCard(bed, room['room']?.toString() ?? '');
+              return _buildTenantCard(
+                bed,
+                room['room']?.toString() ?? '',
+                room['floorLabel']?.toString() ?? '',
+                room['type']?.toString() ?? '',
+              );
             } else {
               return _buildVacantBedCard(bed, room['room']?.toString() ?? '',
                   room['floorLabel']?.toString() ?? '');
@@ -3189,8 +3213,45 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
   // ===========================================================================
   // 6. OCCUPIED RESIDENT CARD (Spacious, Big & Eye-Catching)
   // ===========================================================================
-  Widget _buildTenantCard(Map<String, dynamic> tenant, String roomName) {
+  Widget _buildTenantCard(Map<String, dynamic> tenant, String roomName,
+      [String? floorLabel, String? roomType]) {
     final isNotice = tenant['status'] == 'Notice';
+
+    // 1. Resolve Floor String
+    final rawFloor = (floorLabel != null && floorLabel.isNotEmpty)
+        ? floorLabel
+        : (tenant['floorLabel']?.toString() ?? '1st Floor');
+    final displayFloor =
+        rawFloor.toLowerCase().contains('floor') ? rawFloor : '$rawFloor Floor';
+
+    // 2. Resolve Room String
+    final rawRoom = (roomName.isNotEmpty)
+        ? roomName
+        : (tenant['room_number']?.toString() ??
+            tenant['room']?.toString() ??
+            'Room');
+    final displayRoom = (rawRoom.toLowerCase().startsWith('room') ||
+            rawRoom.toLowerCase().startsWith('flat'))
+        ? rawRoom
+        : 'Room $rawRoom';
+
+    // 3. Resolve Sharing Type (Studio PG vs Apartment Unit)
+    final bedLabel = (tenant['label'] ?? tenant['bed'] ?? '').toString();
+    String displaySharing = '';
+    if (bedLabel.contains('(Hall)')) {
+      displaySharing = 'Hall';
+    } else if (bedLabel.contains('(Master)')) {
+      displaySharing = 'Master';
+    } else if (bedLabel.contains('(Bedroom)')) {
+      displaySharing = 'Bedroom';
+    } else if (tenant['sharing_type'] != null &&
+        tenant['sharing_type'].toString().trim().isNotEmpty) {
+      displaySharing = tenant['sharing_type'].toString().trim();
+    } else if (roomType != null && roomType.trim().isNotEmpty) {
+      displaySharing = roomType.trim();
+    } else {
+      displaySharing = tenant['type']?.toString().trim() ?? '2-Sharing';
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -3417,7 +3478,67 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
+
+          // Clean & Visible Stay Line: Floor • Room • Sharing Type (No box, medium & breathable)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Center(
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                alignment: WrapAlignment.center,
+                children: [
+                  Text(
+                    displayFloor,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
+                    child: Text(
+                      '•',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    displayRoom,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 7),
+                    child: Text(
+                      '•',
+                      style: GoogleFonts.outfit(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF9CA3AF),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    displaySharing,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.greenDark,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
 
           // 4. Simplified Details Trigger (Clean & Minimal)
           InkWell(

@@ -23,6 +23,7 @@ class TenantModel {
   final bool isAadhaarVerified;
   final String? refundUpiId;
   final String? emergencyContact;
+  final String? sharingType;
   final String status;
   final DateTime? createdAt;
 
@@ -44,6 +45,7 @@ class TenantModel {
     this.isAadhaarVerified = false,
     this.refundUpiId,
     this.emergencyContact,
+    this.sharingType,
     this.status = 'Active',
     this.createdAt,
   });
@@ -92,6 +94,7 @@ class TenantModel {
       isAadhaarVerified: json['is_aadhaar_verified'] == true,
       refundUpiId: json['refund_upi_id']?.toString(),
       emergencyContact: json['emergency_contact']?.toString(),
+      sharingType: json['sharing_type']?.toString(),
       status: json['status']?.toString() ?? 'Active',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -119,6 +122,7 @@ class TenantModel {
       'is_aadhaar_verified': isAadhaarVerified,
       if (refundUpiId != null) 'refund_upi_id': refundUpiId,
       if (emergencyContact != null) 'emergency_contact': emergencyContact,
+      if (sharingType != null) 'sharing_type': sharingType,
       'status': status,
     };
   }

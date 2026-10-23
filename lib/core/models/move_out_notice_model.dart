@@ -18,6 +18,8 @@ class MoveOutNoticeModel {
   final String reason;
   final String refundUpiId;
   final String status;
+  final double? settlementAmount;
+  final double? refundableDeposit;
   final DateTime? createdAt;
 
   MoveOutNoticeModel({
@@ -33,6 +35,8 @@ class MoveOutNoticeModel {
     required this.reason,
     required this.refundUpiId,
     this.status = 'ACTIVE',
+    this.settlementAmount,
+    this.refundableDeposit,
     this.createdAt,
   });
 
@@ -53,6 +57,16 @@ class MoveOutNoticeModel {
       parsedDate = DateTime.now();
     }
 
+    final rawSettlement = json['settlement_amount'];
+    final double? settlement = rawSettlement is num
+        ? rawSettlement.toDouble()
+        : (rawSettlement != null ? double.tryParse(rawSettlement.toString()) : null);
+
+    final rawRefundable = json['refundable_deposit'] ?? rawSettlement;
+    final double? refundable = rawRefundable is num
+        ? rawRefundable.toDouble()
+        : (rawRefundable != null ? double.tryParse(rawRefundable.toString()) : null);
+
     return MoveOutNoticeModel(
       id: json['id']?.toString() ?? '',
       propertyId: json['property_id']?.toString() ?? '',
@@ -68,6 +82,8 @@ class MoveOutNoticeModel {
       reason: json['reason']?.toString() ?? 'Relocation',
       refundUpiId: json['refund_upi_id']?.toString() ?? '',
       status: json['status']?.toString() ?? 'ACTIVE',
+      settlementAmount: settlement,
+      refundableDeposit: refundable,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -89,6 +105,8 @@ class MoveOutNoticeModel {
       'reason': reason,
       'refund_upi_id': refundUpiId,
       'status': status,
+      if (settlementAmount != null) 'settlement_amount': settlementAmount,
+      if (refundableDeposit != null) 'refundable_deposit': refundableDeposit,
     };
   }
 }

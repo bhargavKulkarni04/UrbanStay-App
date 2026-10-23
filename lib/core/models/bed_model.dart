@@ -20,6 +20,7 @@ class BedModel {
   final String? tenantPhone;
   final double? rent;
   final double? deposit;
+  final double? refundableDeposit;
   final DateTime? createdAt;
 
   BedModel({
@@ -37,6 +38,7 @@ class BedModel {
     this.tenantPhone,
     this.rent,
     this.deposit,
+    this.refundableDeposit,
     this.createdAt,
   });
 
@@ -68,6 +70,11 @@ class BedModel {
         ? rawDeposit.toDouble()
         : (rawDeposit != null ? double.tryParse(rawDeposit.toString()) : null);
 
+    final rawRefundable = json['refundable_deposit'];
+    final double? refundable = rawRefundable is num
+        ? rawRefundable.toDouble()
+        : (rawRefundable != null ? double.tryParse(rawRefundable.toString()) : deposit);
+
     final label = json['bed_label']?.toString() ??
         json['bed_number']?.toString() ??
         json['bed_code']?.toString() ??
@@ -88,6 +95,7 @@ class BedModel {
       tenantPhone: json['tenant_phone']?.toString(),
       rent: rent,
       deposit: deposit,
+      refundableDeposit: refundable,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -108,6 +116,7 @@ class BedModel {
       'status': status,
       if (tenantId != null && tenantId!.isNotEmpty) 'tenant_id': tenantId,
       if (tenantName != null) 'tenant_name': tenantName,
+      if (refundableDeposit != null) 'refundable_deposit': refundableDeposit,
       if (tenantPhone != null) 'tenant_phone': tenantPhone,
       if (rent != null) 'rent': rent,
       if (deposit != null) 'deposit': deposit,

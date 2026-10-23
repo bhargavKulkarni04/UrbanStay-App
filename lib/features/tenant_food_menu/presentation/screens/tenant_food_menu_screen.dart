@@ -9,10 +9,14 @@ import '../../../../core/models/models.dart';
 /// Clean, zero-bloat daily menu reader for residents.
 class TenantFoodMenuScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String pgName;
+  final String? propertyId;
 
   const TenantFoodMenuScreen({
     super.key,
     this.onBack,
+    this.pgName = '',
+    this.propertyId,
   });
 
   @override
@@ -28,6 +32,8 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
 
   // Active selected day (0 = MON ... 6 = SUN)
   late int _activeDayIndex;
+  late String _pgName;
+  String? _propertyId;
 
   final List<String> _dayNames = [
     'MON',
@@ -54,6 +60,9 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
   @override
   void initState() {
     super.initState();
+    _pgName = widget.pgName;
+    _propertyId = widget.propertyId;
+
     // Auto-select today's day of the week (DateTime: Mon=1, Sun=7 -> 0-indexed)
     final todayWeekday = DateTime.now().weekday;
     _activeDayIndex = (todayWeekday - 1).clamp(0, 6);
@@ -64,10 +73,28 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
 
   Future<void> _loadMenuFromSupabase() async {
     try {
-      final prop = await SupabaseService.instance.getOwnerProperty();
-      final propId = prop?['id']?.toString() ??
-          SupabaseService.instance.activePropertyId;
+      String? propId = _propertyId;
+      if (propId == null || propId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        propId = prop?['id']?.toString() ??
+            SupabaseService.instance.activePropertyId;
+      }
+
       if (propId != null && propId.isNotEmpty) {
+        _propertyId = propId;
+        if (_pgName.isEmpty) {
+          final propData = await SupabaseService.instance.client
+              .from('properties')
+              .select('property_name')
+              .eq('id', propId)
+              .maybeSingle();
+          if (propData != null && mounted) {
+            setState(() {
+              _pgName = propData['property_name']?.toString() ?? '';
+            });
+          }
+        }
+
         final list = await SupabaseService.instance.getFoodMenuModels(propId);
         if (mounted && list.isNotEmpty) {
           int maxCycle = _cycleWeeks;
@@ -109,192 +136,17 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
   }
 
   void _initializeMenuStore() {
-    _menuStore = {
-      // Week 1
-      0: {
-        0: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Masala Dosa, Coconut Chutney, Sambar, Tea'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Rice, Sambar, Mix Veg Curry, Curd'
-          },
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Chapati, Dal Tadka, Jeera Rice, Curd'
-          },
-        },
-        1: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Idli Vada, Chutney, Sambar, Filter Coffee'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Rice, Rasam, Aloo Fry, Papad'
-          },
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Roti, Paneer Butter Masala, Rice, Salad'
-          },
-        },
-        2: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Poori Sagu, Chutney, Tea'
-          },
-          'lunch': {'notProvided': true, 'dishes': ''},
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Egg Curry / Veg Kurma, Chapati, Ghee Rice'
-          },
-        },
-        3: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Poha, Sev, Sweet Kesari Bath, Tea'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Rice, Palak Dal, Curd, Pickle'
-          },
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Chapati, Mix Veg Gravy, Curd Rice'
-          },
-        },
-        4: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Aloo Paratha, Curd, Green Chutney'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Rice, Tomato Dal, Beans Poriyal'
-          },
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Veg Pulao, Raita, Gulab Jamun'
-          },
-        },
-        5: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Rava Upma, Coconut Chutney, Coffee'
-          },
-          'lunch': {'notProvided': false, 'dishes': 'Rice, Sambar, Curd'},
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Roti, Chana Masala, Rice'
-          },
-        },
-        6: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Special Set Dosa, Vada, Tea'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Chicken Biryani / Veg Biryani, Raita, Sweet'
-          },
-          'dinner': {'notProvided': true, 'dishes': ''},
-        },
-      },
-      // Week 2
-      1: {
-        0: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Onion Uttapam, Coconut Chutney, Sambar, Tea'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Rice, Dal Makhani, Bhindi Fry, Curd'
-          },
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Chapati, Green Peas Masala, Jeera Rice'
-          },
-        },
-        1: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Methi Paratha, Curd, Pickle, Coffee'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Rice, Lemon Rasam, Cabbage Poriyal, Papad'
-          },
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Roti, Rajma Masala, Steamed Rice'
-          },
-        },
-        2: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Rava Idli, Saagu, Chutney, Tea'
-          },
-          'lunch': {'notProvided': true, 'dishes': ''},
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Veg Korma / Chicken Curry, Chapati, Rice'
-          },
-        },
-        3: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Semiya Upma, Coconut Chutney, Coffee'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Rice, Drumstick Sambar, Carrot Beans Fry'
-          },
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Chapati, Dal Tadka, Ghee Rice, Curd'
-          },
-        },
-        4: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Gobi Paratha, Butter, Curd, Tea'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Rice, Palak Dal, Aloo Gobi Fry'
-          },
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Jeera Rice, Paneer Kadhai, Salad'
-          },
-        },
-        5: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Bisibelebath, Boondi, Filter Coffee'
-          },
-          'lunch': {'notProvided': false, 'dishes': 'Rice, Tomato Rasam, Curd'},
-          'dinner': {
-            'notProvided': false,
-            'dishes': 'Roti, Soya Chunks Curry, Rice'
-          },
-        },
-        6: {
-          'breakfast': {
-            'notProvided': false,
-            'dishes': 'Mysore Masala Dosa, Chutney, Sambar, Tea'
-          },
-          'lunch': {
-            'notProvided': false,
-            'dishes': 'Special Hyderabadi Dum Biryani, Mirchi Ka Salan'
-          },
-          'dinner': {'notProvided': true, 'dishes': ''},
-        },
-      },
-    };
+    _menuStore = {};
+    for (int w = 0; w < 4; w++) {
+      _menuStore[w] = {};
+      for (int d = 0; d < 7; d++) {
+        _menuStore[w]![d] = {
+          'breakfast': {'notProvided': false, 'dishes': ''},
+          'lunch': {'notProvided': false, 'dishes': ''},
+          'dinner': {'notProvided': false, 'dishes': ''},
+        };
+      }
+    }
   }
 
   String _getFormattedDateHeader() {
@@ -324,9 +176,9 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
 
     final dayPlan = _menuStore[_activeWeekIndex]?[_activeDayIndex] ??
         {
-          'breakfast': {'notProvided': false, 'dishes': 'Regular Breakfast'},
-          'lunch': {'notProvided': false, 'dishes': 'Regular Lunch'},
-          'dinner': {'notProvided': false, 'dishes': 'Regular Dinner'},
+          'breakfast': {'notProvided': false, 'dishes': ''},
+          'lunch': {'notProvided': false, 'dishes': ''},
+          'dinner': {'notProvided': false, 'dishes': ''},
         };
 
     return Scaffold(
@@ -349,7 +201,9 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
               ),
             ),
             Text(
-              'Maruthi Luxury PG • Daily Meals',
+              _pgName.isNotEmpty
+                  ? '$_pgName • Daily Meals'
+                  : 'Daily Meals & Mess Schedule',
               style: GoogleFonts.outfit(
                 fontSize: 12,
                 color: AppColors.muted,
@@ -842,11 +696,12 @@ class _TenantFoodMenuScreenState extends State<TenantFoodMenuScreen> {
                 border: Border.all(color: const Color(0xFFE5E7EB)),
               ),
               child: Text(
-                dishes.isEmpty ? 'Regular Menu' : dishes,
+                dishes.isEmpty ? 'Menu not published yet' : dishes,
                 style: GoogleFonts.outfit(
                   fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ink,
+                  fontWeight: dishes.isEmpty ? FontWeight.w500 : FontWeight.w600,
+                  color: dishes.isEmpty ? AppColors.muted : AppColors.ink,
+                  fontStyle: dishes.isEmpty ? FontStyle.italic : FontStyle.normal,
                   height: 1.35,
                 ),
               ),

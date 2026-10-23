@@ -153,9 +153,7 @@ class _RoleSelectorScreenState extends State<RoleSelectorScreen>
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => TenantCheckinScreen(
-              initialPgCode: _pgCodeController.text.trim().isNotEmpty
-                  ? _pgCodeController.text.trim().toUpperCase()
-                  : 'AR-101',
+              initialPgCode: _pgCodeController.text.trim().toUpperCase(),
               initialName: _nameController.text.trim().isNotEmpty
                   ? _nameController.text.trim()
                   : null,

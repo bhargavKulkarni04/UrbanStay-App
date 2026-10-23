@@ -359,6 +359,11 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                       SupabaseService.instance.updateCheckinStatus(
                         checkinId: req.id,
                         status: 'APPROVED',
+                        roomNumber: assignedRoom,
+                        sharingType: assignedSharing,
+                        rent: finalRent.toDouble(),
+                        deposit: finalDeposit.toDouble(),
+                        bedLabel: req.requestedBed,
                       );
                       setState(() {
                         _pendingList.removeWhere((item) => item.id == req.id);

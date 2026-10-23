@@ -15,12 +15,19 @@ import '../../../tenant_housekeeping/presentation/widgets/bedsheet_change_sheet.
 import '../../../tenant_notice/presentation/screens/move_out_notice_screen.dart';
 import '../../../tenant_food_menu/presentation/screens/tenant_food_menu_screen.dart';
 import '../../../tenant_notice_board/presentation/screens/tenant_notice_board_screen.dart';
+import '../../../../core/services/supabase_service.dart';
 
 class TenantDashboardScreen extends StatefulWidget {
   final String tenantName;
   final String roomNumber;
   final String bedId;
   final String pgName;
+  final String? propertyId;
+  final double? monthlyRent;
+  final double? securityDeposit;
+  final String? tenantPhone;
+  final String? sharingType;
+  final String? tenantId;
 
   const TenantDashboardScreen({
     super.key,
@@ -28,6 +35,12 @@ class TenantDashboardScreen extends StatefulWidget {
     this.roomNumber = '',
     this.bedId = '',
     this.pgName = '',
+    this.propertyId,
+    this.monthlyRent,
+    this.securityDeposit,
+    this.tenantPhone,
+    this.sharingType,
+    this.tenantId,
   });
 
   @override
@@ -41,41 +54,277 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   String _submittedPhone = '';
   String _submittedScreenshot = '';
   late String _currentCycleMonth;
+  late String _currentCycleMonthUpper;
   late String _currentDueDate;
-  final double _currentRentAmount = 0.0;
+  late String _nextCycleMonth;
+  late String _currentMonthShort;
+
+  // Dynamic Tenant & PG State
+  late String _tenantName;
+  late String _roomNumber;
+  late String _bedId;
+  late String _pgName;
+  String? _propertyId;
+  String? _tenantId;
+  String? _roomId;
+  double _currentRentAmount = 0.0;
+  double _currentSecurityDeposit = 0.0;
+  String _tenantPhone = '';
+  String _sharingType = '';
+  String _ownerName = 'Owner';
+  String _ownerUpiId = '';
+  String _ownerBankName = '';
+  String _propertyLocation = '';
   Map<String, dynamic>? _activeTicket;
-  bool _isEatingDinner = true;
 
   @override
   void initState() {
     super.initState();
+    _tenantName = widget.tenantName;
+    _roomNumber = widget.roomNumber;
+    _bedId = widget.bedId;
+    _pgName = widget.pgName;
+    _propertyId = widget.propertyId;
+    _tenantId = widget.tenantId;
+    _currentRentAmount = widget.monthlyRent ?? 0.0;
+    _currentSecurityDeposit = widget.securityDeposit ?? 0.0;
+    _tenantPhone = widget.tenantPhone ?? '';
+    _sharingType = widget.sharingType ?? '';
+
     final now = DateTime.now();
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     const shortMonths = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
     _currentCycleMonth = '${months[now.month - 1]} ${now.year}';
+    _currentCycleMonthUpper = months[now.month - 1].toUpperCase();
     _currentDueDate = '05 ${shortMonths[now.month - 1]}';
+    _currentMonthShort = shortMonths[now.month - 1];
+
+    final nextMonth = DateTime(now.year, now.month + 1, 1);
+    _nextCycleMonth =
+        '${months[nextMonth.month - 1]} ${nextMonth.year}'.toUpperCase();
+
+    _loadLiveTenantAndPropertyData();
   }
 
-  void _simulateOwnerApproval() {
-    setState(() {
-      _paymentStatus = 'PAID';
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '🎉 Rent payment verified and settled in bank account!',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: AppColors.greenDark,
-        duration: const Duration(seconds: 4),
-      ),
-    );
+  Future<void> _loadLiveTenantAndPropertyData() async {
+    try {
+      // 1. Property Details
+      String? pId = _propertyId ?? SupabaseService.instance.activePropertyId;
+      if (pId == null || pId.isEmpty) {
+        final prop = await SupabaseService.instance.getOwnerProperty();
+        pId = prop?['id']?.toString();
+      }
+
+      if (pId != null && pId.isNotEmpty) {
+        _propertyId = pId;
+        final propRes = await SupabaseService.instance.client
+            .from('properties')
+            .select(
+                'property_name, area_locality, city, owner_legal_name, bank_holder_name, upi_vpa, bank_name, rent_due_day')
+            .eq('id', pId)
+            .maybeSingle();
+
+        if (propRes != null && mounted) {
+          setState(() {
+            if (_pgName.isEmpty) {
+              _pgName = propRes['property_name']?.toString() ?? '';
+            }
+            final area = propRes['area_locality']?.toString() ?? '';
+            final city = propRes['city']?.toString() ?? '';
+            final loc = [area, city].where((s) => s.isNotEmpty).join(', ');
+            if (loc.isNotEmpty) _propertyLocation = loc;
+
+            final ownerLegal = propRes['owner_legal_name']?.toString();
+            final bankHolder = propRes['bank_holder_name']?.toString();
+            _ownerName = (ownerLegal != null && ownerLegal.isNotEmpty)
+                ? ownerLegal
+                : ((bankHolder != null && bankHolder.isNotEmpty)
+                    ? bankHolder
+                    : '');
+
+            _ownerUpiId = propRes['upi_vpa']?.toString() ?? '';
+            _ownerBankName =
+                propRes['bank_name']?.toString() ?? 'Direct Bank UPI';
+
+            final dueDay = propRes['rent_due_day']?.toString();
+            if (dueDay != null && dueDay.isNotEmpty) {
+              final cleanDay =
+                  RegExp(r'\d+').firstMatch(dueDay)?.group(0) ?? dueDay;
+              _currentDueDate =
+                  '${cleanDay.padLeft(2, '0')} $_currentMonthShort';
+            }
+          });
+        }
+      }
+
+      // 2. Tenant & Bed details from tenants table if rent, name, or sharing missing
+      if (_currentRentAmount == 0.0 ||
+          _tenantName.isEmpty ||
+          _sharingType.isEmpty ||
+          _tenantId == null) {
+        Map<String, dynamic>? tenantRecord;
+
+        // 1. Primary: Match by resident phone number
+        if (_tenantPhone.isNotEmpty) {
+          try {
+            tenantRecord =
+                await SupabaseService.instance.client.from('tenants').select('''
+                  id, room_id, name, phone, room_number, bed_id, sharing_type, monthly_rent, security_deposit,
+                  beds!bed_id(bed_label),
+                  rooms!room_id(sharing_type)
+                ''').eq('phone', _tenantPhone.trim()).maybeSingle();
+          } catch (_) {}
+        }
+
+        // 2. Secondary fallback: If bedId is a 36-character UUID, try matching by bed_id
+        if (tenantRecord == null && _bedId.isNotEmpty && _bedId.length == 36) {
+          try {
+            tenantRecord =
+                await SupabaseService.instance.client.from('tenants').select('''
+                  id, room_id, name, phone, room_number, bed_id, sharing_type, monthly_rent, security_deposit,
+                  beds!bed_id(bed_label),
+                  rooms!room_id(sharing_type)
+                ''').eq('bed_id', _bedId).maybeSingle();
+          } catch (_) {}
+        }
+
+        if (tenantRecord != null && mounted) {
+          final bedsData = tenantRecord!['beds'];
+          final roomsData = tenantRecord!['rooms'];
+          final resolvedBedLabel =
+              (bedsData is Map) ? bedsData['bed_label']?.toString() : null;
+          final resolvedSharing =
+              (roomsData is Map) ? roomsData['sharing_type']?.toString() : null;
+
+          setState(() {
+            _tenantId = tenantRecord!['id']?.toString() ?? _tenantId;
+            _roomId = tenantRecord!['room_id']?.toString() ?? _roomId;
+            if (_currentRentAmount == 0.0) {
+              _currentRentAmount =
+                  (tenantRecord!['monthly_rent'] as num?)?.toDouble() ?? 0.0;
+            }
+            if (_currentSecurityDeposit == 0.0) {
+              _currentSecurityDeposit =
+                  (tenantRecord!['security_deposit'] as num?)?.toDouble() ??
+                      0.0;
+            }
+            if (_tenantName.isEmpty) {
+              _tenantName = tenantRecord!['name']?.toString() ?? '';
+            }
+            if (_tenantPhone.isEmpty) {
+              _tenantPhone = tenantRecord!['phone']?.toString() ?? '';
+            }
+            if (_roomNumber.isEmpty) {
+              _roomNumber = tenantRecord!['room_number']?.toString() ?? '';
+            }
+            // Use relational bed_label if available, else fall back to bed_id
+            _bedId = resolvedBedLabel ??
+                tenantRecord!['bed_id']?.toString() ??
+                _bedId;
+            // Use relational sharing_type if available
+            _sharingType = resolvedSharing ??
+                tenantRecord!['sharing_type']?.toString() ??
+                _sharingType;
+          });
+        }
+      }
+
+      // 3. Payment Status Check from payment_approvals
+      if (pId != null) {
+        final approvals = await SupabaseService.instance.client
+            .from('payment_approvals')
+            .select('*')
+            .eq('property_id', pId)
+            .order('created_at', ascending: false)
+            .limit(10);
+
+        if (approvals.isNotEmpty && mounted) {
+          Map<String, dynamic>? matching;
+          for (final a in approvals) {
+            final aName = a['tenant_name']?.toString().toLowerCase() ?? '';
+            final aPhone = a['phone']?.toString() ?? '';
+            if ((_tenantName.isNotEmpty &&
+                    aName.contains(_tenantName.toLowerCase())) ||
+                (_tenantPhone.isNotEmpty && aPhone == _tenantPhone)) {
+              matching = Map<String, dynamic>.from(a);
+              break;
+            }
+          }
+
+          if (matching != null) {
+            final st = matching['status']?.toString().toLowerCase();
+            setState(() {
+              if (st == 'approved') {
+                _paymentStatus = 'PAID';
+              } else if (st == 'pending') {
+                _paymentStatus = 'UNDER_REVIEW';
+                _submittedUtr = matching!['utr_number']?.toString() ?? '';
+                _submittedPhone = matching['phone']?.toString() ?? _tenantPhone;
+              }
+            });
+          }
+        }
+      }
+
+      // 4. Maintenance Tickets Check
+      if (pId != null) {
+        final tickets = await SupabaseService.instance.client
+            .from('maintenance_tickets')
+            .select('*')
+            .eq('property_id', pId)
+            .order('created_at', ascending: false)
+            .limit(1);
+
+        if (tickets.isNotEmpty && mounted) {
+          final t = tickets.first;
+          setState(() {
+            _activeTicket = {
+              'id': t['ticket_number']?.toString() ??
+                  t['id']?.toString() ??
+                  'TKT-1',
+              'category': t['category']?.toString() ?? 'Maintenance',
+              'room': 'Room ${t['room_number'] ?? _roomNumber}',
+              'bed': 'Bed ${t['bed_label'] ?? t['bed_id'] ?? _bedId}',
+              'floor': t['floor']?.toString() ?? '1st Floor',
+              'issue': t['description']?.toString() ??
+                  t['issue']?.toString() ??
+                  'Reported Issue',
+              'reportedDate': 'Recently',
+              'photoName': t['photo_url'] ?? '',
+              'status': t['status']?.toString() ?? 'pending',
+            };
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading live tenant dashboard data: $e');
+    }
   }
 
   @override
@@ -98,7 +347,10 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
           child: _currentNavIndex == 0
               ? _buildHomeBody(context)
               : (_currentNavIndex == 1
-                  ? const TenantFoodMenuScreen()
+                  ? TenantFoodMenuScreen(
+                      pgName: _pgName,
+                      propertyId: _propertyId,
+                    )
                   : const TenantNoticeBoardScreen()),
         ),
       ),
@@ -157,7 +409,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
 
           const SizedBox(height: 20),
 
-          // 🚪 7. Tenancy & Exit Card (Custom Stepped Folder Tab)
+          // 🚪 6. Tenancy & Exit Card (Custom Stepped Folder Tab)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: _buildTenancyCard(),
@@ -256,16 +508,19 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   /// ⚡ 3. Hero Rent Status & Pay Banner (Clean Executive Split Card)
   Widget _buildHeroRentCard() {
     final isUnderReview = _paymentStatus == 'UNDER_REVIEW';
-    final isNextMonth = _paymentStatus == 'PAID_CYCLE_OCTOBER';
+    final isPaid = _paymentStatus == 'PAID';
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color:
-              isUnderReview ? const Color(0xFFFDE68A) : const Color(0xFFE5E7EB),
-          width: isUnderReview ? 1.4 : 1,
+          color: isPaid
+              ? AppColors.green.withValues(alpha: 0.3)
+              : (isUnderReview
+                  ? const Color(0xFFFDE68A)
+                  : const Color(0xFFE5E7EB)),
+          width: (isUnderReview || isPaid) ? 1.4 : 1,
         ),
         boxShadow: [
           BoxShadow(
@@ -285,14 +540,19 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             children: [
               Text(
                 isUnderReview
-                    ? 'SEPTEMBER RENT SUBMITTED'
-                    : (isNextMonth ? 'OCTOBER 2026 RENT' : 'SEPTEMBER RENT'),
+                    ? '$_currentCycleMonthUpper RENT SUBMITTED'
+                    : (isPaid
+                        ? '$_currentCycleMonthUpper RENT SETTLED'
+                        : '$_currentCycleMonthUpper RENT'),
                 style: GoogleFonts.outfit(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.8,
-                  color:
-                      isUnderReview ? const Color(0xFFD97706) : AppColors.muted,
+                  color: isPaid
+                      ? AppColors.greenDark
+                      : (isUnderReview
+                          ? const Color(0xFFD97706)
+                          : AppColors.muted),
                 ),
               ),
 
@@ -308,7 +568,11 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                   ),
                 ),
                 child: Text(
-                  'Room ${widget.roomNumber}',
+                  _roomNumber.isNotEmpty
+                      ? (_sharingType.isNotEmpty
+                          ? 'Room $_roomNumber • $_sharingType'
+                          : 'Room $_roomNumber')
+                      : 'Room --',
                   style: GoogleFonts.outfit(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
@@ -332,7 +596,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '₹8,500',
+                      _currentRentAmount > 0
+                          ? '₹${_currentRentAmount.round()}'
+                          : '₹0',
                       style: GoogleFonts.outfit(
                         fontSize: 27,
                         fontWeight: FontWeight.w800,
@@ -351,12 +617,16 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                             color: Color(0xFFD97706),
                           ),
                           const SizedBox(width: 4),
-                          Text(
-                            'Under Review by Arun Kumar',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFFD97706),
+                          Expanded(
+                            child: Text(
+                              'Under Review by $_ownerName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFD97706),
+                              ),
                             ),
                           ),
                         ],
@@ -364,6 +634,36 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                       const SizedBox(height: 2),
                       Text(
                         'UTR: $_submittedUtr • +91 $_submittedPhone',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ] else if (isPaid) ...[
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 13,
+                            color: AppColors.greenDark,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$_currentCycleMonth Rent Cleared ✓',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.greenDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Next cycle starts $_nextCycleMonth',
                         style: GoogleFonts.outfit(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -373,18 +673,14 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                     ] else ...[
                       Row(
                         children: [
-                          Icon(
-                            isNextMonth
-                                ? Icons.calendar_today_rounded
-                                : Icons.access_time_rounded,
+                          const Icon(
+                            Icons.access_time_rounded,
                             size: 13,
-                            color: const Color(0xFFD97706),
+                            color: Color(0xFFD97706),
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            isNextMonth
-                                ? 'Due by $_currentDueDate'
-                                : 'Due by 05 Sep',
+                            'Due by $_currentDueDate',
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -393,17 +689,6 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                           ),
                         ],
                       ),
-                      if (isNextMonth) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          '✅ September Rent Cleared & Verified',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.greenDark,
-                          ),
-                        ),
-                      ],
                     ],
                   ],
                 ),
@@ -413,17 +698,23 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
 
               // Right Column: Action Button
               GestureDetector(
-                onTap: _openRentPaymentSheet,
+                onTap: isPaid ? _openPaymentLedger : _openRentPaymentSheet,
                 child: Container(
                   height: 42,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: isUnderReview ? Colors.white : AppColors.green,
+                    color: isUnderReview
+                        ? Colors.white
+                        : (isPaid ? AppColors.greenLight : AppColors.green),
                     borderRadius: BorderRadius.circular(24),
                     border: isUnderReview
                         ? Border.all(color: const Color(0xFFD1D5DB), width: 1.2)
-                        : null,
-                    boxShadow: isUnderReview
+                        : (isPaid
+                            ? Border.all(
+                                color: AppColors.green.withValues(alpha: 0.3),
+                                width: 1.2)
+                            : null),
+                    boxShadow: (isUnderReview || isPaid)
                         ? null
                         : [
                             BoxShadow(
@@ -449,6 +740,21 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: AppColors.ink,
+                          ),
+                        ),
+                      ] else if (isPaid) ...[
+                        const Icon(
+                          Icons.receipt_long_rounded,
+                          color: AppColors.greenDark,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Receipt',
+                          style: GoogleFonts.outfit(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.greenDark,
                           ),
                         ),
                       ] else ...[
@@ -492,7 +798,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
               Text(
                 isUnderReview
                     ? 'Awaiting owner bank credit match'
-                    : 'All-inclusive monthly stay',
+                    : (isPaid
+                        ? '0% direct bank settlement confirmed'
+                        : 'All-inclusive monthly stay'),
                 style: GoogleFonts.outfit(
                   fontSize: 11,
                   fontWeight: FontWeight.w400,
@@ -501,9 +809,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
               ),
               if (isUnderReview)
                 InkWell(
-                  onTap: _simulateOwnerApproval,
+                  onTap: _loadLiveTenantAndPropertyData,
                   child: Text(
-                    'Simulate Approval >',
+                    'Refresh Status >',
                     style: GoogleFonts.outfit(
                       fontSize: 11.5,
                       fontWeight: FontWeight.w700,
@@ -511,13 +819,16 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                     ),
                   ),
                 )
-              else if (isNextMonth)
-                Text(
-                  'View Sep Receipt >',
-                  style: GoogleFonts.outfit(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.greenDark,
+              else if (isPaid)
+                GestureDetector(
+                  onTap: _openPaymentLedger,
+                  child: Text(
+                    'View Receipt >',
+                    style: GoogleFonts.outfit(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.greenDark,
+                    ),
                   ),
                 )
               else
@@ -579,12 +890,13 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => PaidViaCashScreen(
-          roomNumber: widget.roomNumber,
-          bedId: widget.bedId,
-          pgName: widget.pgName,
+          residentName: _tenantName,
+          roomNumber: _roomNumber,
+          bedId: _bedId,
+          pgName: _pgName,
           amount: _currentRentAmount,
           cycleMonth: _currentCycleMonth,
-          ownerName: 'Arun Kumar',
+          ownerName: _ownerName,
         ),
       ),
     );
@@ -616,9 +928,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => PaymentLedgerScreen(
-          roomNumber: widget.roomNumber,
-          bedLabel: 'Bed ${widget.bedId}',
-          propertyName: widget.pgName,
+          roomNumber: _roomNumber,
+          bedLabel: 'Bed $_bedId',
+          propertyName: _pgName,
         ),
       ),
     );
@@ -627,9 +939,11 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   void _openRequestExtension() {
     RequestExtensionSheet.show(
       context,
-      propertyName: widget.pgName,
-      tenantName: widget.tenantName,
-      roomNumber: widget.roomNumber,
+      propertyId: _propertyId,
+      propertyName: _pgName,
+      tenantName: _tenantName,
+      tenantId: _tenantId,
+      roomNumber: _roomNumber,
       onExtensionRequested: (selectedDay) {
         // Callback if needed for dashboard state updates
       },
@@ -642,19 +956,21 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => RentPaymentScreen(
-          roomNumber: widget.roomNumber,
-          bedId: widget.bedId,
-          pgName: widget.pgName,
-          ownerName: 'Arun Kumar',
-          ownerUpiId: 'arun.kumar@oksbi',
-          ownerBankName: 'State Bank of India (SBI)',
+          roomNumber: _roomNumber,
+          bedId: _bedId,
+          pgName: _pgName,
+          ownerName: _ownerName,
+          tenantPhone: _tenantPhone,
+          ownerUpiId: _ownerUpiId,
+          ownerBankName:
+              _ownerBankName.isNotEmpty ? _ownerBankName : 'Direct Bank UPI',
           amount: _currentRentAmount,
           cycleMonth: _currentCycleMonth,
           initialIsSubmitted: _paymentStatus == 'UNDER_REVIEW',
           initialUtr: _submittedUtr,
           initialPhone: _submittedPhone,
           initialScreenshot: _submittedScreenshot,
-          onOwnerApproved: _simulateOwnerApproval,
+          onOwnerApproved: () => setState(() => _paymentStatus = 'PAID'),
           onUtrSubmitted: (utr) {
             setState(() {
               _paymentStatus = 'UNDER_REVIEW';
@@ -682,7 +998,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
           }
         });
       } else if (result['status'] == 'APPROVED') {
-        _simulateOwnerApproval();
+        setState(() => _paymentStatus = 'PAID');
       }
     }
   }
@@ -727,8 +1043,14 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => WashingMachineBookingScreen(
-          roomNumber: widget.roomNumber,
-          bedId: widget.bedId,
+          roomNumber: _roomNumber,
+          bedId: _bedId,
+          propertyId: _propertyId,
+          propertyName: _pgName,
+          tenantId: _tenantId,
+          tenantName: _tenantName,
+          tenantPhone: _tenantPhone,
+          roomId: _roomId,
         ),
       ),
     );
@@ -736,30 +1058,40 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
 
   void _openRainAlert() {
     HapticFeedback.lightImpact();
-    // Rain Alert screen handler
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Terrace Rain Sensor: Weather is clear right now.',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+        ),
+        backgroundColor: AppColors.ink,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   void _openLiveRepairStatus() {
     HapticFeedback.lightImpact();
-    final ticket = _activeTicket ??
-        {
-          'id': 'TKT-104',
-          'category': 'Electrical',
-          'room': 'Room ${widget.roomNumber}',
-          'bed': 'Bed ${widget.bedId}',
-          'floor': '1st Floor',
-          'issue': 'Geyser in bathroom is tripping MCB switch every 2 minutes.',
-          'reportedDate': 'Today, 11:30 AM',
-          'photoName': 'geyser_mcb_photo.jpg',
-          'status': 'pending',
-        };
+    if (_activeTicket == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No active repair tickets. All room facilities operational. ✓',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: AppColors.ink,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => TicketStatusScreen(
-          ticketData: ticket,
-          pgName: widget.pgName,
+          ticketData: _activeTicket!,
+          pgName: _pgName,
         ),
       ),
     );
@@ -771,9 +1103,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => RaiseTicketScreen(
-          residentName: widget.tenantName,
-          roomNumber: widget.roomNumber,
-          bedId: widget.bedId,
+          residentName: _tenantName,
+          roomNumber: _roomNumber,
+          bedId: _bedId,
         ),
       ),
     );
@@ -802,8 +1134,12 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             onTap: () {
               RoomSweepSheet.show(
                 context,
-                roomNumber: widget.roomNumber,
-                pgName: widget.pgName,
+                roomNumber: _roomNumber,
+                pgName: _pgName,
+                propertyId: _propertyId,
+                roomId: _roomId,
+                tenantId: _tenantId,
+                tenantName: _tenantName,
               );
             },
           ),
@@ -813,8 +1149,12 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             onTap: () {
               FullRoomCleanSheet.show(
                 context,
-                roomNumber: widget.roomNumber,
-                pgName: widget.pgName,
+                roomNumber: _roomNumber,
+                pgName: _pgName,
+                propertyId: _propertyId,
+                roomId: _roomId,
+                tenantId: _tenantId,
+                tenantName: _tenantName,
               );
             },
           ),
@@ -824,8 +1164,12 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             onTap: () {
               BedsheetChangeSheet.show(
                 context,
-                roomNumber: widget.roomNumber,
-                pgName: widget.pgName,
+                roomNumber: _roomNumber,
+                pgName: _pgName,
+                propertyId: _propertyId,
+                roomId: _roomId,
+                tenantId: _tenantId,
+                tenantName: _tenantName,
               );
             },
           ),
@@ -846,7 +1190,18 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
           _buildItemButton(
             icon: Icons.article_outlined,
             label: 'Stay\nAgreement',
-            onTap: () {},
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'Stay Agreement active for $_pgName (Room $_roomNumber).',
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                  ),
+                  backgroundColor: AppColors.ink,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            },
           ),
           _buildItemButton(
             icon: Icons.event_busy_outlined,
@@ -856,19 +1211,21 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => MoveOutNoticeScreen(
-                    roomNumber: widget.roomNumber,
-                    bedIdentifier: widget.bedId,
+                    roomNumber: _roomNumber,
+                    bedIdentifier: _bedId,
+                    pgName: _pgName,
+                    propertyId: _propertyId,
+                    tenantId: _tenantId,
+                    tenantName: _tenantName,
+                    tenantPhone: _tenantPhone,
                     monthlyRent: _currentRentAmount,
-                    securityDeposit: 23000.0,
+                    securityDeposit: _currentSecurityDeposit > 0
+                        ? _currentSecurityDeposit
+                        : (_currentRentAmount * 2),
                   ),
                 ),
               );
             },
-          ),
-          _buildItemButton(
-            icon: Icons.payments_outlined,
-            label: 'Deposit\nSettlement',
-            onTap: () {},
           ),
         ],
       ),
@@ -1016,308 +1373,10 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     );
   }
 
-  /// 🍽️ Tab 1: Food & Mess Menu View
-  Widget _buildFoodMenuView() {
-    return const TenantFoodMenuScreen();
-  }
-
-  Widget _legacyFoodMenuView() {
-    return SafeArea(
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Food & Mess Menu',
-              style: GoogleFonts.outfit(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: AppColors.ink,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              'Daily freshly prepared meals • Pure & hygienic kitchen',
-              style: GoogleFonts.outfit(
-                fontSize: 12.5,
-                color: AppColors.muted,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Headcount Stopper Card (Prevents cook ration wastage)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFBBF7D0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'DINNER HEADCOUNT TODAY',
-                        style: GoogleFonts.outfit(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.greenDark,
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFBBF7D0)),
-                        ),
-                        child: Text(
-                          '64/75 Eating Tonight',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.greenDark,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Are you eating dinner at the PG tonight?',
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Update by 4:00 PM to help our cook avoid food ration wastage.',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            setState(() => _isEatingDinner = true);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Confirmed: You are marked as Eating Dinner tonight.'),
-                                backgroundColor: AppColors.green,
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isEatingDinner
-                                ? AppColors.green
-                                : Colors.white,
-                            foregroundColor:
-                                _isEatingDinner ? Colors.white : AppColors.ink,
-                            elevation: _isEatingDinner ? 2 : 0,
-                            side: BorderSide(
-                              color: _isEatingDinner
-                                  ? AppColors.green
-                                  : const Color(0xFFE5E7EB),
-                            ),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                          child: Text(
-                            'I am Eating ✓',
-                            style: GoogleFonts.outfit(
-                                fontSize: 13, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () {
-                            setState(() => _isEatingDinner = false);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Updated: You are marked as Skipping Dinner tonight.'),
-                                backgroundColor: AppColors.ink,
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor:
-                                !_isEatingDinner ? AppColors.ink : Colors.white,
-                            foregroundColor: !_isEatingDinner
-                                ? Colors.white
-                                : AppColors.muted,
-                            side: BorderSide(
-                              color: !_isEatingDinner
-                                  ? AppColors.ink
-                                  : const Color(0xFFE5E7EB),
-                            ),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                          child: Text(
-                            'Skipping Tonight ✕',
-                            style: GoogleFonts.outfit(
-                                fontSize: 13, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            Text(
-              "TODAY'S MENU",
-              style: GoogleFonts.outfit(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: AppColors.muted,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            _buildMealCard(
-              title: 'Breakfast',
-              timing: '7:30 AM – 10:00 AM',
-              status: 'Closed',
-              statusColor: const Color(0xFF9CA3AF),
-              statusBg: const Color(0xFFF3F4F6),
-              menuItems:
-                  'Idli, Crispy Medu Vada, Madras Sambar, Coconut Chutney & Fresh Filter Coffee / Tea',
-            ),
-            const SizedBox(height: 12),
-
-            _buildMealCard(
-              title: 'Lunch',
-              timing: '12:30 PM – 2:30 PM',
-              status: 'Closed',
-              statusColor: const Color(0xFF9CA3AF),
-              statusBg: const Color(0xFFF3F4F6),
-              menuItems:
-                  'Steamed Sona Masoori Rice, Dal Tadka, Aloo Gobi Dry, Soft Phulka Rotis, Fresh Curd & Mango Pickle',
-            ),
-            const SizedBox(height: 12),
-
-            _buildMealCard(
-              title: 'Dinner',
-              timing: '7:30 PM – 10:00 PM',
-              status: 'Upcoming Tonight',
-              statusColor: AppColors.greenDark,
-              statusBg: AppColors.greenLight,
-              menuItems:
-                  'Paneer Butter Masala, Hot Tawa Chapati, Jeera Rice, Mixed Vegetable Salad, Dal Fry & Gulab Jamun',
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMealCard({
-    required String title,
-    required String timing,
-    required String status,
-    required Color statusColor,
-    required Color statusBg,
-    required String menuItems,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x04000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.outfit(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  status,
-                  style: GoogleFonts.outfit(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            timing,
-            style: GoogleFonts.outfit(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: AppColors.muted,
-            ),
-          ),
-          const Divider(color: Color(0xFFF3F4F6), height: 18),
-          Text(
-            menuItems,
-            style: GoogleFonts.outfit(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.ink,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Smart Initial Generator (e.g. "Bhargav S Kulkarni" -> "BK", "Joy Sen" -> "JS")
   String _getInitials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts[0].isEmpty) return 'BK';
+    if (parts.isEmpty || parts[0].isEmpty) return 'TN';
     if (parts.length == 1) {
       return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
     }
@@ -1334,8 +1393,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   /// 🟢 Top Header with Tenant_nameBG.png Background Image
   Widget _buildSmoothCurvedHeader(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final initials = _getInitials(widget.tenantName);
-    final nameFontSize = _getNameFontSize(widget.tenantName);
+    final initials = _getInitials(_tenantName);
+    final nameFontSize =
+        _getNameFontSize(_tenantName.isNotEmpty ? _tenantName : 'Resident');
 
     return ClipPath(
       clipper: _SmoothHeaderClipper(),
@@ -1373,7 +1433,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Top Row: PG Name & Location (Left) + White BK Avatar (Right)
+                // Top Row: PG Name & Location (Left) + Avatar (Right)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1384,7 +1444,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            widget.pgName,
+                            _pgName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.outfit(
@@ -1394,24 +1454,26 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                               letterSpacing: -0.2,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'BTM Layout 2nd Stage, Bangalore',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.white.withValues(alpha: 0.90),
+                          if (_propertyLocation.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              _propertyLocation,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.outfit(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w400,
+                                color: Colors.white.withValues(alpha: 0.90),
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
 
                     const SizedBox(width: 14),
 
-                    // Clean White Circular Avatar (Bold 'BK' initials)
+                    // Clean Circular Avatar
                     Container(
                       width: 42,
                       height: 42,
@@ -1455,9 +1517,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                 ),
                 const SizedBox(height: 3),
 
-                // Resident Full Name (Auto-sized, 1-line lock)
+                // Resident Full Name
                 Text(
-                  widget.tenantName,
+                  _tenantName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.outfit(
@@ -1471,7 +1533,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
 
                 const SizedBox(height: 14),
 
-                // Actionable Room Pill: [ 🛏️ Room 104 - Bed B  > ]
+                // Actionable Room Pill
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.lightImpact();
@@ -1497,7 +1559,15 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Room ${widget.roomNumber} - Bed ${widget.bedId}',
+                          _roomNumber.isNotEmpty
+                              ? (_bedId.isNotEmpty && _bedId.length < 30
+                                  ? (_bedId.toLowerCase().startsWith('bed')
+                                      ? 'Room $_roomNumber • $_bedId'
+                                      : 'Room $_roomNumber • Bed $_bedId')
+                                  : (_sharingType.isNotEmpty
+                                      ? 'Room $_roomNumber • $_sharingType'
+                                      : 'Room $_roomNumber'))
+                              : 'Room --',
                           style: GoogleFonts.outfit(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,

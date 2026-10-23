@@ -18,6 +18,7 @@ class RoomModel {
   final int totalBeds;
   final double rentPerBed;
   final double depositPerBed;
+  final double refundableDeposit;
   final List<BedModel> beds;
   final DateTime? createdAt;
 
@@ -32,6 +33,7 @@ class RoomModel {
     this.totalBeds = 2,
     this.rentPerBed = 0.0,
     this.depositPerBed = 0.0,
+    this.refundableDeposit = 0.0,
     this.beds = const [],
     this.createdAt,
   });
@@ -52,6 +54,11 @@ class RoomModel {
     final double deposit = rawDeposit is num
         ? rawDeposit.toDouble()
         : (double.tryParse(rawDeposit?.toString() ?? '0.0') ?? 0.0);
+
+    final rawRefundable = json['refundable_deposit'];
+    final double refundable = rawRefundable is num
+        ? rawRefundable.toDouble()
+        : (double.tryParse(rawRefundable?.toString() ?? '') ?? deposit);
 
     List<BedModel> parsedBeds = [];
     if (json['beds'] != null && json['beds'] is List) {
@@ -75,6 +82,7 @@ class RoomModel {
           : (int.tryParse(json['total_beds']?.toString() ?? '2') ?? 2),
       rentPerBed: rent,
       depositPerBed: deposit,
+      refundableDeposit: refundable,
       beds: parsedBeds,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -95,6 +103,7 @@ class RoomModel {
       'total_beds': totalBeds,
       'rent_per_bed': rentPerBed,
       'deposit_per_bed': depositPerBed,
+      'refundable_deposit': refundableDeposit,
     };
   }
 }

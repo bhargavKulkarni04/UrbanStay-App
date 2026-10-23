@@ -1,21 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
 
 class BedsheetChangeSheet extends StatefulWidget {
   final String roomNumber;
   final String pgName;
+  final String? propertyId;
+  final String? roomId;
+  final String? tenantId;
+  final String? tenantName;
 
   const BedsheetChangeSheet({
     super.key,
-    this.roomNumber = '104',
-    this.pgName = 'Greenview PG',
+    required this.roomNumber,
+    required this.pgName,
+    this.propertyId,
+    this.roomId,
+    this.tenantId,
+    this.tenantName,
   });
 
   static Future<void> show(
     BuildContext context, {
-    String roomNumber = '104',
-    String pgName = 'Greenview PG',
+    required String roomNumber,
+    required String pgName,
+    String? propertyId,
+    String? roomId,
+    String? tenantId,
+    String? tenantName,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -24,6 +37,10 @@ class BedsheetChangeSheet extends StatefulWidget {
       builder: (ctx) => BedsheetChangeSheet(
         roomNumber: roomNumber,
         pgName: pgName,
+        propertyId: propertyId,
+        roomId: roomId,
+        tenantId: tenantId,
+        tenantName: tenantName,
       ),
     );
   }
@@ -36,6 +53,27 @@ class _BedsheetChangeSheetState extends State<BedsheetChangeSheet> {
   bool _bedsheetSelected = true;
   bool _pillowCoverSelected = true;
   bool _isScheduled = false;
+  String? _activeRequestId;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingScheduledRequest();
+  }
+
+  Future<void> _checkExistingScheduledRequest() async {
+    final active = await SupabaseService.instance.getActiveHousekeepingRequest(
+      roomNumber: widget.roomNumber,
+      propertyId: widget.propertyId,
+      serviceType: 'Bedsheet Change',
+    );
+    if (active != null && mounted) {
+      setState(() {
+        _isScheduled = true;
+        _activeRequestId = active['id']?.toString();
+      });
+    }
+  }
 
   String get _selectedItemsText {
     final items = <String>[];
@@ -178,9 +216,23 @@ class _BedsheetChangeSheetState extends State<BedsheetChangeSheet> {
     );
 
     if (confirmed == true && mounted) {
-      setState(() {
-        _isScheduled = true;
-      });
+      final record = await SupabaseService.instance.createHousekeepingRequest(
+        propertyId: widget.propertyId,
+        propertyName: widget.pgName,
+        roomId: widget.roomId,
+        roomNumber: widget.roomNumber,
+        tenantId: widget.tenantId,
+        tenantName: widget.tenantName,
+        serviceType: 'Bedsheet Change',
+        preferredSlot: _selectedItemsText,
+      );
+
+      if (record != null && mounted) {
+        setState(() {
+          _isScheduled = true;
+          _activeRequestId = record['id']?.toString();
+        });
+      }
     }
   }
 
@@ -270,8 +322,12 @@ class _BedsheetChangeSheetState extends State<BedsheetChangeSheet> {
     );
 
     if (cancelConfirmed == true && mounted) {
+      if (_activeRequestId != null) {
+        await SupabaseService.instance.cancelHousekeepingRequest(_activeRequestId!);
+      }
       setState(() {
         _isScheduled = false;
+        _activeRequestId = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

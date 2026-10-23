@@ -1,25 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
 
 class FullRoomCleanSheet extends StatefulWidget {
   final String roomNumber;
   final String pgName;
+  final String? propertyId;
+  final String? roomId;
+  final String? tenantId;
+  final String? tenantName;
   final DateTime? initialDate;
   final String? initialSlot;
 
   const FullRoomCleanSheet({
     super.key,
-    this.roomNumber = '104',
-    this.pgName = 'Greenview PG',
+    required this.roomNumber,
+    required this.pgName,
+    this.propertyId,
+    this.roomId,
+    this.tenantId,
+    this.tenantName,
     this.initialDate,
     this.initialSlot,
   });
 
   static Future<void> show(
     BuildContext context, {
-    String roomNumber = '104',
-    String pgName = 'Greenview PG',
+    required String roomNumber,
+    required String pgName,
+    String? propertyId,
+    String? roomId,
+    String? tenantId,
+    String? tenantName,
     DateTime? initialDate,
     String? initialSlot,
   }) {
@@ -30,6 +43,10 @@ class FullRoomCleanSheet extends StatefulWidget {
       builder: (ctx) => FullRoomCleanSheet(
         roomNumber: roomNumber,
         pgName: pgName,
+        propertyId: propertyId,
+        roomId: roomId,
+        tenantId: tenantId,
+        tenantName: tenantName,
         initialDate: initialDate,
         initialSlot: initialSlot,
       ),
@@ -47,6 +64,7 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
   bool _roomCleanSelected = true;
   bool _bathroomSelected = true;
   bool _isScheduled = false;
+  String? _activeRequestId;
 
   final List<Map<String, String>> _slots = [
     {
@@ -108,6 +126,25 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
         widget.initialDate ?? DateTime(now.year, now.month, now.day);
     _displayedMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
     _selectedSlot = widget.initialSlot ?? 'Morning Slot (9:00 AM – 11:30 AM)';
+    _checkExistingScheduledRequest();
+  }
+
+  Future<void> _checkExistingScheduledRequest() async {
+    final active = await SupabaseService.instance.getActiveHousekeepingRequest(
+      roomNumber: widget.roomNumber,
+      propertyId: widget.propertyId,
+      serviceType: 'Full Room Clean',
+    );
+    if (active != null && mounted) {
+      setState(() {
+        _isScheduled = true;
+        _activeRequestId = active['id']?.toString();
+        final slot = active['preferred_slot']?.toString();
+        if (slot != null && slot.isNotEmpty) {
+          _selectedSlot = slot;
+        }
+      });
+    }
   }
 
   void _prevMonth() {
@@ -305,9 +342,24 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
     );
 
     if (confirmed == true && mounted) {
-      setState(() {
-        _isScheduled = true;
-      });
+      final slotWithDate = '${_formatShortDate(_selectedDate)} • $_selectedSlot (${_selectedItemsText})';
+      final record = await SupabaseService.instance.createHousekeepingRequest(
+        propertyId: widget.propertyId,
+        propertyName: widget.pgName,
+        roomId: widget.roomId,
+        roomNumber: widget.roomNumber,
+        tenantId: widget.tenantId,
+        tenantName: widget.tenantName,
+        serviceType: 'Full Room Clean',
+        preferredSlot: slotWithDate,
+      );
+
+      if (record != null && mounted) {
+        setState(() {
+          _isScheduled = true;
+          _activeRequestId = record['id']?.toString();
+        });
+      }
     }
   }
 
@@ -397,8 +449,12 @@ class _FullRoomCleanSheetState extends State<FullRoomCleanSheet> {
     );
 
     if (cancelConfirmed == true && mounted) {
+      if (_activeRequestId != null) {
+        await SupabaseService.instance.cancelHousekeepingRequest(_activeRequestId!);
+      }
       setState(() {
         _isScheduled = false;
+        _activeRequestId = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

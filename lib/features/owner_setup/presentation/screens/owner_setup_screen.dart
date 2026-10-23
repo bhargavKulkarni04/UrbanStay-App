@@ -130,6 +130,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
   final List<String> _selectedSharings = [];
   final Map<String, TextEditingController> _rentControllers = {};
   final Map<String, TextEditingController> _depositControllers = {};
+  final Map<String, TextEditingController> _refundableDepositControllers = {};
   bool _showCustomSharingInput = false;
   final _customSharingController = TextEditingController();
 
@@ -306,6 +307,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
       c.dispose();
     }
     for (var c in _depositControllers.values) {
+      c.dispose();
+    }
+    for (var c in _refundableDepositControllers.values) {
       c.dispose();
     }
     super.dispose();
@@ -770,8 +774,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
         for (final roomName in roomNames) {
           String sharingType = '2-Sharing';
           int bedsCount = 2;
-          double rent = 8500.0;
-          double deposit = 15000.0;
+          double rent = 0.0;
+          double deposit = 0.0;
+          double refundableDeposit = 0.0;
           Map<String, int>? breakdownMap;
           final List<String> bedLabels = [];
 
@@ -825,6 +830,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             deposit = double.tryParse(
                     _depositControllers[assignedBhk]?.text.trim() ?? '') ??
                 25000.0;
+            final refDepText =
+                _refundableDepositControllers[assignedBhk]?.text.trim() ?? '';
+            refundableDeposit = double.tryParse(refDepText) ?? deposit;
           } else {
             String? assignedSharing;
             for (final sharingEntry in _sharingAssignedRooms.entries) {
@@ -857,6 +865,9 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                 (bedsCount == 1
                     ? 20000.0
                     : (bedsCount == 2 ? 15000.0 : 12000.0));
+
+            final refDepText = _refundableDepositControllers[sharingType]?.text.trim() ?? '';
+            refundableDeposit = double.tryParse(refDepText) ?? deposit;
           }
 
           roomsData.add({
@@ -867,6 +878,7 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             'total_beds': bedsCount,
             'rent_per_bed': rent,
             'deposit_per_bed': deposit,
+            'refundable_deposit': refundableDeposit,
             if (breakdownMap != null) 'breakdown': breakdownMap,
             if (bedLabels.isNotEmpty) 'bed_labels': bedLabels,
           });
@@ -1746,74 +1758,6 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
             ),
           ],
         ),
-        if (_genderCategory != null) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.qr_code_rounded,
-                        size: 14, color: AppColors.muted),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Generated PG Code:',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _generatePropertyCodeString(),
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                  ],
-                ),
-                InkWell(
-                  onTap: () {
-                    final code = _generatePropertyCodeString();
-                    Clipboard.setData(ClipboardData(text: code));
-                    _showSnackBar('🔑 Copied $code');
-                  },
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.copy_rounded,
-                            size: 12, color: AppColors.greenDark),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Copy',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.greenDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
         const SizedBox(height: 6),
         _buildDivider(),
 
@@ -2840,6 +2784,15 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  _FloatingInput(
+                    controller: _refundableDepositControllers.putIfAbsent(
+                      name,
+                      () => TextEditingController(),
+                    ),
+                    label: 'Refundable Amount in Deposit (₹)',
+                    keyboardType: TextInputType.number,
+                  ),
                 ],
               ),
             );
@@ -3194,6 +3147,15 @@ class _OwnerSetupScreenState extends State<OwnerSetupScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    _FloatingInput(
+                      controller: _refundableDepositControllers.putIfAbsent(
+                        sharing,
+                        () => TextEditingController(),
+                      ),
+                      label: 'Refundable Amount in Deposit (₹)',
+                      keyboardType: TextInputType.number,
                     ),
                   ],
                 ),

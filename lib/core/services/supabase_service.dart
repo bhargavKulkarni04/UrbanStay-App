@@ -717,6 +717,7 @@ class SupabaseService {
     double? rent,
     double? deposit,
     int? rentDueDay,
+    String? sharingType,
   }) async {
     try {
       final pId = propertyId.isNotEmpty ? propertyId : (activePropertyId ?? '');
@@ -726,6 +727,19 @@ class SupabaseService {
       final cleanName = tenantName.trim();
       final cleanPhone = phone?.trim() ?? '';
       final dueDay = (rentDueDay ?? 5).clamp(1, 31);
+
+      // Auto-resolve sharing type from space in bedLabel if not explicitly provided
+      String? resolvedSharing = sharingType;
+      if (resolvedSharing == null || resolvedSharing.isEmpty) {
+        final label = bedLabel ?? '';
+        if (label.contains('(Hall)')) {
+          resolvedSharing = 'Hall';
+        } else if (label.contains('(Master)')) {
+          resolvedSharing = 'Master';
+        } else if (label.contains('(Bedroom)')) {
+          resolvedSharing = 'Bedroom';
+        }
+      }
 
       // 1. Check if tenant already exists by phone or name
       Map<String, dynamic>? tRow;
@@ -760,9 +774,13 @@ class SupabaseService {
               'room_number': roomNumber,
             if (bedId != null && bedId.isNotEmpty && bedId.length == 36)
               'bed_id': bedId,
+            if (bedLabel != null && bedLabel.isNotEmpty)
+              'bed_label': bedLabel,
             if (cleanPhone.isNotEmpty) 'phone': cleanPhone,
             if (rent != null) 'monthly_rent': rent,
             if (deposit != null) 'security_deposit': deposit,
+            if (resolvedSharing != null && resolvedSharing.isNotEmpty)
+              'sharing_type': resolvedSharing,
             'rent_due_day': dueDay,
             'status': 'Active',
           }).eq('id', existingId);
@@ -795,10 +813,14 @@ class SupabaseService {
           'room_number': roomNumber,
         if (bedId != null && bedId.isNotEmpty && bedId.length == 36)
           'bed_id': bedId,
+        if (bedLabel != null && bedLabel.isNotEmpty)
+          'bed_label': bedLabel,
         'name': cleanName.isNotEmpty ? cleanName : 'Resident',
         'phone': newPhone,
         if (rent != null) 'monthly_rent': rent,
         if (deposit != null) 'security_deposit': deposit,
+        if (resolvedSharing != null && resolvedSharing.isNotEmpty)
+          'sharing_type': resolvedSharing,
         'rent_due_day': dueDay,
         'status': 'Active',
       };
@@ -830,10 +852,14 @@ class SupabaseService {
           if (pName.isNotEmpty) 'property_name': pName,
           if (roomNumber != null && roomNumber.isNotEmpty)
             'room_number': roomNumber,
+          if (bedLabel != null && bedLabel.isNotEmpty)
+            'bed_label': bedLabel,
           'name': cleanName.isNotEmpty ? cleanName : 'Resident',
           'phone': newPhone,
           if (rent != null) 'monthly_rent': rent,
           if (deposit != null) 'security_deposit': deposit,
+          if (resolvedSharing != null && resolvedSharing.isNotEmpty)
+            'sharing_type': resolvedSharing,
           'rent_due_day': dueDay,
           'status': 'Active',
         };
@@ -874,6 +900,7 @@ class SupabaseService {
     double? rent,
     double? deposit,
     int? rentDueDay,
+    String? sharingType,
   }) async {
     return await _withLoading('Assigning Resident...', () async {
       try {
@@ -898,6 +925,30 @@ class SupabaseService {
             ? roomNumber
             : (bedRes?['room_number']?.toString() ?? '');
 
+        // Auto-resolve sharing type from bed label or room metadata if not explicitly provided
+        String? resolvedSharing = sharingType;
+        if (resolvedSharing == null || resolvedSharing.isEmpty) {
+          if (bedLabel.contains('(Hall)')) {
+            resolvedSharing = 'Hall';
+          } else if (bedLabel.contains('(Master)')) {
+            resolvedSharing = 'Master';
+          } else if (bedLabel.contains('(Bedroom)')) {
+            resolvedSharing = 'Bedroom';
+          } else if (roomId != null && roomId.isNotEmpty) {
+            try {
+              final rRes = await client
+                  .from('rooms')
+                  .select('sharing_type')
+                  .eq('id', roomId)
+                  .maybeSingle();
+              final rSharing = rRes?['sharing_type']?.toString();
+              if (rSharing != null && rSharing.isNotEmpty) {
+                resolvedSharing = rSharing;
+              }
+            } catch (_) {}
+          }
+        }
+
         // 2. Ensure tenant profile exists and get real UUID
         final realTenantId = await ensureTenantExists(
           propertyId: propId,
@@ -911,6 +962,7 @@ class SupabaseService {
           rent: rent,
           deposit: deposit,
           rentDueDay: chosenDueDay,
+          sharingType: resolvedSharing,
         );
 
         // 3. Update beds table with occupant info, tenant_id, and rent_due_day
@@ -928,7 +980,7 @@ class SupabaseService {
           if (deposit != null) 'deposit': deposit,
         }).eq('id', bedId);
 
-        // 3b. GUARANTEED TENANT SYNC: Update tenants table with exact rent, deposit, due day, room, and bed
+        // 3b. GUARANTEED TENANT SYNC: Update tenants table with exact rent, deposit, due day, room, bed, and sharing_type
         if (realTenantId != null && realTenantId.isNotEmpty) {
           try {
             await client.from('tenants').update({
@@ -943,6 +995,8 @@ class SupabaseService {
               'phone': phone,
               if (rent != null) 'monthly_rent': rent,
               if (deposit != null) 'security_deposit': deposit,
+              if (resolvedSharing != null && resolvedSharing.isNotEmpty)
+                'sharing_type': resolvedSharing,
               'rent_due_day': chosenDueDay,
               'status': 'Active',
             }).eq('id', realTenantId);
@@ -959,6 +1013,8 @@ class SupabaseService {
                 'phone': phone,
                 if (rent != null) 'monthly_rent': rent,
                 if (deposit != null) 'security_deposit': deposit,
+                if (resolvedSharing != null && resolvedSharing.isNotEmpty)
+                  'sharing_type': resolvedSharing,
                 'rent_due_day': chosenDueDay,
                 'status': 'Active',
               }).eq('id', realTenantId);
@@ -2720,6 +2776,97 @@ class SupabaseService {
     });
   }
 
+  /// 11. Housekeeping requests
+  Future<Map<String, dynamic>?> createHousekeepingRequest({
+    String? propertyId,
+    String? propertyName,
+    String? roomId,
+    String? roomNumber,
+    String? tenantId,
+    String? tenantName,
+    required String serviceType,
+    required String preferredSlot,
+  }) async {
+    return await _withLoading('Scheduling Housekeeping Request...', () async {
+      try {
+        final pName = (propertyName != null && propertyName.isNotEmpty)
+            ? propertyName
+            : (activePropertyName ?? '');
+        final pId = (propertyId != null && propertyId.isNotEmpty)
+            ? propertyId
+            : activePropertyId;
+
+        final payload = {
+          if (pId != null && pId.isNotEmpty) 'property_id': pId,
+          if (pName.isNotEmpty) 'property_name': pName,
+          if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
+          if (roomNumber != null && roomNumber.isNotEmpty) 'room_number': roomNumber,
+          if (tenantId != null && tenantId.isNotEmpty) 'tenant_id': tenantId,
+          if (tenantName != null && tenantName.isNotEmpty) 'tenant_name': tenantName,
+          'service_type': serviceType,
+          'preferred_slot': preferredSlot,
+          'status': 'SCHEDULED',
+        };
+
+        final res = await client
+            .from('housekeeping_requests')
+            .insert(payload)
+            .select()
+            .maybeSingle();
+        return res;
+      } catch (e) {
+        debugPrint('Error creating housekeeping request: $e');
+        return null;
+      }
+    });
+  }
+
+  Future<bool> cancelHousekeepingRequest(String requestId) async {
+    return await _withLoading('Cancelling Request...', () async {
+      try {
+        await client
+            .from('housekeeping_requests')
+            .update({'status': 'CANCELLED'})
+            .eq('id', requestId);
+        return true;
+      } catch (e) {
+        debugPrint('Error cancelling housekeeping request: $e');
+        return false;
+      }
+    });
+  }
+
+  Future<Map<String, dynamic>?> getActiveHousekeepingRequest({
+    String? roomNumber,
+    String? propertyId,
+    required String serviceType,
+  }) async {
+    try {
+      var filterBuilder = client
+          .from('housekeeping_requests')
+          .select()
+          .eq('service_type', serviceType)
+          .eq('status', 'SCHEDULED');
+
+      if (roomNumber != null && roomNumber.isNotEmpty) {
+        filterBuilder = filterBuilder.eq('room_number', roomNumber);
+      }
+      if (propertyId != null && propertyId.isNotEmpty) {
+        filterBuilder = filterBuilder.eq('property_id', propertyId);
+      }
+
+      final res = await filterBuilder
+          .order('created_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      return res;
+    } catch (e) {
+      debugPrint('Error fetching active housekeeping request: $e');
+      return null;
+    }
+  }
+
+
   /// 11. Fetch strongly-typed ExpenseModels
   Future<List<ExpenseModel>> getExpenseModels(String propertyId) async {
     try {
@@ -2956,16 +3103,113 @@ class SupabaseService {
     }
   }
 
-  /// 20. Update onboarding / check-in request status
+  /// 20. Update onboarding / check-in request status and sync tenant on approval
   Future<bool> updateCheckinStatus({
     required String checkinId,
     required String status,
+    String? roomNumber,
+    String? bedLabel,
+    String? sharingType,
+    double? rent,
+    double? deposit,
   }) async {
     return await _withLoading('Updating Check-in Status...', () async {
       try {
+        final isApproved = status.trim().toUpperCase() == 'APPROVED';
         await client.from('onboarding_requests').update({
           'status': status.toLowerCase(),
+          if (roomNumber != null && roomNumber.isNotEmpty)
+            'room_number': roomNumber,
+          if (sharingType != null && sharingType.isNotEmpty)
+            'sharing_type': sharingType,
+          if (rent != null) 'monthly_rent': rent,
+          if (deposit != null) 'deposit_amount': deposit,
         }).eq('id', checkinId);
+
+        // On Owner Approval: Ensure tenant is written into public.tenants table
+        if (isApproved) {
+          try {
+            final reqRes = await client
+                .from('onboarding_requests')
+                .select('*')
+                .eq('id', checkinId)
+                .maybeSingle();
+
+            if (reqRes != null) {
+              final tName = reqRes['tenant_name']?.toString() ??
+                  reqRes['name']?.toString() ??
+                  reqRes['full_name']?.toString() ??
+                  'Resident';
+              final tPhone = reqRes['phone']?.toString() ?? '';
+              final propId = reqRes['property_id']?.toString() ??
+                  activePropertyId ??
+                  '';
+              final propName = reqRes['property_name']?.toString() ??
+                  activePropertyName ??
+                  '';
+              final rNum = roomNumber ??
+                  reqRes['room_number']?.toString() ??
+                  reqRes['requested_room']?.toString() ??
+                  '';
+              final bLabel =
+                  bedLabel ?? reqRes['requested_bed']?.toString() ?? '';
+              final sType = sharingType ?? reqRes['sharing_type']?.toString();
+              final mRent = rent ??
+                  double.tryParse(reqRes['monthly_rent']?.toString() ?? '');
+              final sDeposit = deposit ??
+                  double.tryParse(reqRes['deposit_amount']?.toString() ?? '');
+
+              String? resolvedBedId;
+              String? resolvedRoomId;
+
+              // If property and room are known, look up bed and room UUIDs
+              if (propId.isNotEmpty && rNum.isNotEmpty) {
+                try {
+                  final bedQuery = await client
+                      .from('beds')
+                      .select('id, room_id, bed_label')
+                      .eq('property_id', propId)
+                      .ilike('room_number', rNum);
+                  if (bedQuery is List && bedQuery.isNotEmpty) {
+                    Map<String, dynamic>? match;
+                    if (bLabel.isNotEmpty) {
+                      match = bedQuery.firstWhere(
+                        (b) =>
+                            b['bed_label']
+                                ?.toString()
+                                .trim()
+                                .toLowerCase() ==
+                            bLabel.trim().toLowerCase(),
+                        orElse: () => bedQuery.first,
+                      );
+                    } else {
+                      match = bedQuery.first;
+                    }
+                    resolvedBedId = match['id']?.toString();
+                    resolvedRoomId = match['room_id']?.toString();
+                  }
+                } catch (_) {}
+              }
+
+              await ensureTenantExists(
+                propertyId: propId,
+                propertyName: propName,
+                tenantName: tName,
+                phone: tPhone,
+                bedId: resolvedBedId,
+                bedLabel: bLabel,
+                roomId: resolvedRoomId,
+                roomNumber: rNum,
+                rent: mRent,
+                deposit: sDeposit,
+                sharingType: sType,
+              );
+            }
+          } catch (e) {
+            debugPrint('Error syncing tenant on check-in approval: $e');
+          }
+        }
+
         return true;
       } catch (e) {
         debugPrint('Error updating checkin status: $e');

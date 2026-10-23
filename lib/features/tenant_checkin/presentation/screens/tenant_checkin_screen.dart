@@ -392,7 +392,17 @@ class _TenantCheckinScreenState extends State<TenantCheckinScreen> {
         );
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (context) => const TenantDashboardScreen(),
+            builder: (context) => TenantDashboardScreen(
+              tenantName: name,
+              roomNumber: room,
+              bedId: bed,
+              pgName: _propertyName ?? '',
+              propertyId: _propertyId,
+              monthlyRent: rent,
+              securityDeposit: deposit,
+              tenantPhone: phone,
+              sharingType: sharing,
+            ),
           ),
           (route) => false,
         );
