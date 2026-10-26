@@ -30,6 +30,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   String _destinationBankName = '';
   String _destinationUpiId = '';
   String _destinationMaskedAccount = '';
+  int _totalFloors = 0;
+  bool _groundFloorHasRooms = false;
 
   @override
   void initState() {
@@ -103,6 +105,10 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
           _destinationBankName = bankName;
           _destinationUpiId = upiId;
           _destinationMaskedAccount = maskedAcc;
+          if (propModel != null) {
+            _totalFloors = propModel.totalFloors;
+            _groundFloorHasRooms = propModel.groundFloorHasRooms;
+          }
         });
       }
 
@@ -155,10 +161,15 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   String _getFloor(String roomNumber) {
     if (roomNumber.isEmpty) return '1st';
     final firstChar = roomNumber.trim()[0].toUpperCase();
-    if (firstChar == 'G') return 'ground';
-    if (firstChar == '1') return '1st';
-    if (firstChar == '2') return '2nd';
-    if (firstChar == '3') return '3rd';
+    if (firstChar == 'G' || firstChar == '0') return 'ground';
+    final digit = int.tryParse(firstChar);
+    if (digit != null) {
+      String suffix = 'th';
+      if (digit == 1) suffix = 'st';
+      if (digit == 2) suffix = 'nd';
+      if (digit == 3) suffix = 'rd';
+      return '$digit$suffix';
+    }
     return '1st';
   }
 
@@ -185,11 +196,17 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ===========================================================================
   Future<void> _approvePayment(PaymentApprovalModel item) async {
     final submissionId = item.id;
+    final verifierName = _destinationAccountName.isNotEmpty
+        ? _destinationAccountName
+        : 'Owner';
+
     if (submissionId.isNotEmpty) {
       final success =
           await SupabaseService.instance.updatePaymentApprovalStatus(
         submissionId: submissionId,
+        ledgerId: item.ledgerId,
         status: 'APPROVED',
+        approvedBy: verifierName,
       );
       if (!success) {
         _showToast(
@@ -217,7 +234,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
           paymentApp: item.paymentApp,
           proofImageUrl: item.proofImageUrl,
           status: 'approved',
-          approvedBy: item.approvedBy,
+          approvedBy: verifierName,
+          collectedBy: item.collectedBy,
           createdAt: now,
         ),
       );
@@ -452,6 +470,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       final success =
           await SupabaseService.instance.updatePaymentApprovalStatus(
         submissionId: submissionId,
+        ledgerId: item.ledgerId,
         status: 'REJECTED',
       );
       if (!success) {
@@ -481,6 +500,7 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
           proofImageUrl: item.proofImageUrl,
           status: 'rejected',
           approvedBy: item.approvedBy,
+          collectedBy: item.collectedBy,
           createdAt: now,
         ),
       );
@@ -604,11 +624,13 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                           fontWeight: FontWeight.w700,
                           color: AppColors.ink),
                     ),
-                    if (_destinationBankName.isNotEmpty || _destinationMaskedAccount.isNotEmpty) ...[
+                    if (_destinationBankName.isNotEmpty ||
+                        _destinationMaskedAccount.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         [
-                          if (_destinationBankName.isNotEmpty) _destinationBankName,
+                          if (_destinationBankName.isNotEmpty)
+                            _destinationBankName,
                           if (_destinationMaskedAccount.isNotEmpty)
                             'Account ending in ${_destinationMaskedAccount.replaceAll('*', '')}',
                         ].join(' '),
@@ -636,7 +658,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                         border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
                       child: Text(
-                        'UPI Ref / UTR: ${item.utrNumber}',
+                        item.isCash
+                            ? 'Cash Handover to: ${item.collectedBy ?? "Staff / Warden"}'
+                            : 'UPI Ref / UTR: ${item.utrNumber}',
                         style: const TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 11,
@@ -888,7 +912,8 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // ===========================================================================
   Widget _buildPendingApprovalsView() {
     final filtered = _pendingApprovals.where((p) {
-      if (_selectedFloor != 'all' && _getFloor(p.roomNumber) != _selectedFloor) return false;
+      if (_selectedFloor != 'all' && _getFloor(p.roomNumber) != _selectedFloor)
+        return false;
       return true;
     }).toList();
 
@@ -903,9 +928,11 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Floor Filter Chips
-          _buildFloorTabsScroll(),
-          const SizedBox(height: 12),
+          // Floor Filter Chips (Only shown if building has multiple floors or ground floor)
+          if (!(_totalFloors <= 1 && !_groundFloorHasRooms)) ...[
+            _buildFloorTabsScroll(),
+            const SizedBox(height: 12),
+          ],
 
           // Trust Info Strip
           _buildTrustStrip(),
@@ -980,13 +1007,25 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
   // SUB-COMPONENTS: FLOOR TABS & TRUST STRIP
   // ===========================================================================
   Widget _buildFloorTabsScroll() {
-    final floors = [
+    if (_totalFloors <= 1 && !_groundFloorHasRooms) {
+      return const SizedBox.shrink();
+    }
+
+    final List<Map<String, String>> floors = [
       {'id': 'all', 'label': 'All Floors'},
-      {'id': '1st', 'label': '1st Floor'},
-      {'id': '2nd', 'label': '2nd Floor'},
-      {'id': '3rd', 'label': '3rd Floor'},
-      {'id': 'ground', 'label': 'Ground Floor'},
     ];
+
+    if (_groundFloorHasRooms) {
+      floors.add({'id': 'ground', 'label': 'Ground Floor'});
+    }
+
+    for (int i = 1; i <= _totalFloors; i++) {
+      String suffix = 'th';
+      if (i == 1) suffix = 'st';
+      if (i == 2) suffix = 'nd';
+      if (i == 3) suffix = 'rd';
+      floors.add({'id': '$i$suffix', 'label': '$i$suffix Floor'});
+    }
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -1072,12 +1111,15 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                 const SizedBox(height: 3),
                 Text(
                   [
-                    if (_destinationAccountName.isNotEmpty) _destinationAccountName,
+                    if (_destinationAccountName.isNotEmpty)
+                      _destinationAccountName,
                     if (_destinationBankName.isNotEmpty) _destinationBankName,
                   ].isNotEmpty
                       ? [
-                          if (_destinationAccountName.isNotEmpty) _destinationAccountName,
-                          if (_destinationBankName.isNotEmpty) _destinationBankName,
+                          if (_destinationAccountName.isNotEmpty)
+                            _destinationAccountName,
+                          if (_destinationBankName.isNotEmpty)
+                            _destinationBankName,
                         ].join(' • ')
                       : 'Destination Account',
                   style: GoogleFonts.outfit(
@@ -1086,12 +1128,15 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     color: AppColors.ink,
                   ),
                 ),
-                if (_destinationUpiId.isNotEmpty || _destinationMaskedAccount.isNotEmpty) ...[
+                if (_destinationUpiId.isNotEmpty ||
+                    _destinationMaskedAccount.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     [
-                      if (_destinationUpiId.isNotEmpty) 'UPI ID: $_destinationUpiId',
-                      if (_destinationMaskedAccount.isNotEmpty) 'A/C: $_destinationMaskedAccount',
+                      if (_destinationUpiId.isNotEmpty)
+                        'UPI ID: $_destinationUpiId',
+                      if (_destinationMaskedAccount.isNotEmpty)
+                        'A/C: $_destinationMaskedAccount',
                     ].join('  •  '),
                     style: GoogleFonts.outfit(
                       fontSize: 11.5,
@@ -1244,17 +1289,22 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                 const Divider(color: Color(0xFFE5E7EB), height: 1),
                 const SizedBox(height: 10),
 
-                // UPI Reference (UTR) Row
+                // UPI Reference (UTR) Row OR Handed Over To Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'UPI Reference (UTR)',
+                      item.isCash ? 'Handed Over To' : 'UPI Reference (UTR)',
                       style: GoogleFonts.outfit(
                           fontSize: 12, color: AppColors.muted),
                     ),
                     Text(
-                      item.utrNumber,
+                      item.isCash
+                          ? (item.collectedBy != null &&
+                                  item.collectedBy!.isNotEmpty
+                              ? item.collectedBy!
+                              : 'Staff / Warden')
+                          : item.utrNumber,
                       style: const TextStyle(
                         fontFamily: 'monospace',
                         fontSize: 12.5,
@@ -1267,62 +1317,113 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                 ),
                 const SizedBox(height: 10),
 
-                // Screenshot Proof Row with View Proof Trigger
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
+                // Proof Attachment / Desk Handover Badge
+                if (item.isCash)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEBF8EE),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFB8ECC8)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
                           children: [
-                            const Icon(Icons.description_outlined,
-                                size: 18, color: AppColors.muted),
+                            const Icon(Icons.payments_outlined,
+                                size: 18, color: AppColors.greenDark),
                             const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                (item.proofImageUrl != null && item.proofImageUrl!.isNotEmpty)
-                                    ? item.proofImageUrl!
-                                    : 'Screenshot_UPI_Payment.png',
-                                style: GoogleFonts.outfit(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.ink),
+                            Text(
+                              'Physical Cash Handover at Desk',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.greenDark,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      InkWell(
-                        onTap: () => _openProofModal(item),
-                        borderRadius: BorderRadius.circular(6),
-                        child: Container(
+                        Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF4F4F5),
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFFE5E7EB)),
+                            border: Border.all(color: const Color(0xFFB8ECC8)),
                           ),
                           child: Text(
-                            'View Proof',
+                            'Desk Audit',
                             style: GoogleFonts.outfit(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.ink),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.greenDark,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  )
+                else
+                  // Screenshot Proof Row with View Proof Trigger
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(Icons.description_outlined,
+                                  size: 18, color: AppColors.muted),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  (item.proofImageUrl != null &&
+                                          item.proofImageUrl!.isNotEmpty)
+                                      ? item.proofImageUrl!
+                                      : 'Screenshot_UPI_Payment.png',
+                                  style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.ink),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () => _openProofModal(item),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF4F4F5),
+                              borderRadius: BorderRadius.circular(6),
+                              border:
+                                  Border.all(color: const Color(0xFFE5E7EB)),
+                            ),
+                            child: Text(
+                              'View Proof',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1531,7 +1632,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item.tenantName.isNotEmpty ? item.tenantName : 'Resident',
+                        item.tenantName.isNotEmpty
+                            ? item.tenantName
+                            : 'Resident',
                         style: GoogleFonts.outfit(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w700,
@@ -1594,7 +1697,9 @@ class _OwnerApprovalsScreenState extends State<OwnerApprovalsScreen> {
                   ],
                 ),
                 Text(
-                  'UTR: ${item.utrNumber}',
+                  item.isCash
+                      ? 'Handed to: ${item.collectedBy ?? "Staff"}'
+                      : 'UTR: ${item.utrNumber}',
                   style: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 11,

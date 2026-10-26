@@ -15,6 +15,7 @@ import '../../../tenant_housekeeping/presentation/widgets/bedsheet_change_sheet.
 import '../../../tenant_notice/presentation/screens/move_out_notice_screen.dart';
 import '../../../tenant_food_menu/presentation/screens/tenant_food_menu_screen.dart';
 import '../../../tenant_notice_board/presentation/screens/tenant_notice_board_screen.dart';
+import '../../../../core/models/models.dart';
 import '../../../../core/services/supabase_service.dart';
 
 class TenantDashboardScreen extends StatefulWidget {
@@ -53,6 +54,11 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   String _submittedUtr = '';
   String _submittedPhone = '';
   String _submittedScreenshot = '';
+  String? _submittedPaymentMode; // 'UPI' | 'CASH'
+  bool get _isPendingCash =>
+      _paymentStatus == 'UNDER_REVIEW' &&
+      ((_submittedPaymentMode != null && _submittedPaymentMode == 'CASH') ||
+          _submittedUtr.startsWith('CASH-'));
   late String _currentCycleMonth;
   late String _currentCycleMonthUpper;
   late String _currentDueDate;
@@ -72,10 +78,12 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   String _tenantPhone = '';
   String _sharingType = '';
   String _ownerName = 'Owner';
+  String _ownerPhone = '';
   String _ownerUpiId = '';
   String _ownerBankName = '';
   String _propertyLocation = '';
-  Map<String, dynamic>? _activeTicket;
+  String? _activeLedgerId;
+  MaintenanceTicketModel? _activeTicket;
 
   @override
   void initState() {
@@ -168,6 +176,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                     ? bankHolder
                     : '');
 
+            _ownerPhone = propRes['owner_phone']?.toString() ??
+                propRes['crediting_phone']?.toString() ??
+                '';
             _ownerUpiId = propRes['upi_vpa']?.toString() ?? '';
             _ownerBankName =
                 propRes['bank_name']?.toString() ?? 'Direct Bank UPI';
@@ -252,73 +263,142 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                 tenantRecord!['sharing_type']?.toString() ??
                 _sharingType;
           });
+
+          // Fetch active ledger row for this tenant for the CURRENT cycle month
+          if (_tenantId != null && _tenantId!.isNotEmpty) {
+            try {
+              // 1. First look for current month's ledger
+              var ledgerRes = await SupabaseService.instance.client
+                  .from('rent_ledgers')
+                  .select('id, rent_amount, due_amount, status, billing_month')
+                  .eq('tenant_id', _tenantId!)
+                  .eq('billing_month', _currentCycleMonth)
+                  .maybeSingle();
+
+              // If new month started and no ledger exists yet, ensure current month ledgers exist
+              if (ledgerRes == null && pId != null) {
+                await SupabaseService.instance.ensureMonthlyRentLedgers(
+                  propertyId: pId,
+                  cycleMonth: _currentCycleMonth,
+                );
+                ledgerRes = await SupabaseService.instance.client
+                    .from('rent_ledgers')
+                    .select(
+                        'id, rent_amount, due_amount, status, billing_month')
+                    .eq('tenant_id', _tenantId!)
+                    .eq('billing_month', _currentCycleMonth)
+                    .maybeSingle();
+              }
+
+              if (ledgerRes != null && mounted) {
+                setState(() {
+                  _activeLedgerId = ledgerRes!['id']?.toString();
+                  final due = (ledgerRes['due_amount'] as num?)?.toDouble();
+                  final rent = (ledgerRes['rent_amount'] as num?)?.toDouble();
+                  if (due != null && due > 0) {
+                    _currentRentAmount = due;
+                  } else if (rent != null && rent > 0) {
+                    _currentRentAmount = rent;
+                  }
+                  final lStatus = ledgerRes['status']?.toString().toUpperCase();
+                  if (lStatus == 'PAID') {
+                    _paymentStatus = 'PAID';
+                  } else {
+                    _paymentStatus = 'DUE';
+                  }
+                });
+              } else if (mounted) {
+                // Brand new month cycle with no payment recorded yet
+                setState(() {
+                  _paymentStatus = 'DUE';
+                });
+              }
+            } catch (e) {
+              debugPrint('Error fetching active tenant ledger: $e');
+            }
+          }
         }
       }
 
-      // 3. Payment Status Check from payment_approvals
+      // 3. Payment Status Check from payment_approvals (scoped to current month's active ledger)
       if (pId != null) {
-        final approvals = await SupabaseService.instance.client
+        final approvalsRes = await SupabaseService.instance.client
             .from('payment_approvals')
             .select('*')
             .eq('property_id', pId)
             .order('created_at', ascending: false)
-            .limit(10);
+            .limit(15);
 
-        if (approvals.isNotEmpty && mounted) {
-          Map<String, dynamic>? matching;
+        if (approvalsRes.isNotEmpty && mounted) {
+          final approvals = (approvalsRes as List)
+              .map((e) =>
+                  PaymentApprovalModel.fromJson(Map<String, dynamic>.from(e)))
+              .toList();
+
+          PaymentApprovalModel? matching;
           for (final a in approvals) {
-            final aName = a['tenant_name']?.toString().toLowerCase() ?? '';
-            final aPhone = a['phone']?.toString() ?? '';
-            if ((_tenantName.isNotEmpty &&
-                    aName.contains(_tenantName.toLowerCase())) ||
-                (_tenantPhone.isNotEmpty && aPhone == _tenantPhone)) {
-              matching = Map<String, dynamic>.from(a);
-              break;
+            // Match strictly to this tenant's current month's ledger
+            if (_activeLedgerId != null && _activeLedgerId!.isNotEmpty) {
+              if (a.ledgerId == _activeLedgerId) {
+                matching = a;
+                break;
+              }
+            } else {
+              // Fallback match by tenant ID and pending status only
+              if ((_tenantId != null &&
+                      _tenantId!.isNotEmpty &&
+                      a.tenantId == _tenantId) ||
+                  (_tenantName.isNotEmpty &&
+                      a.tenantName
+                          .toLowerCase()
+                          .contains(_tenantName.toLowerCase())) ||
+                  (_tenantPhone.isNotEmpty && a.phone == _tenantPhone)) {
+                matching = a;
+                break;
+              }
             }
           }
 
           if (matching != null) {
-            final st = matching['status']?.toString().toLowerCase();
             setState(() {
-              if (st == 'approved') {
+              if (matching!.isApproved) {
                 _paymentStatus = 'PAID';
-              } else if (st == 'pending') {
+              } else if (matching!.isPending) {
                 _paymentStatus = 'UNDER_REVIEW';
-                _submittedUtr = matching!['utr_number']?.toString() ?? '';
-                _submittedPhone = matching['phone']?.toString() ?? _tenantPhone;
+                _submittedUtr = matching!.utrNumber;
+                _submittedPhone =
+                    (matching!.phone != null && matching!.phone!.isNotEmpty)
+                        ? matching!.phone!
+                        : _tenantPhone;
+                _submittedPaymentMode = matching!.isCash ? 'CASH' : 'UPI';
               }
             });
           }
         }
       }
 
-      // 4. Maintenance Tickets Check
+      // 4. Maintenance Tickets Check (Pillar 5: MaintenanceTicketModel)
       if (pId != null) {
-        final tickets = await SupabaseService.instance.client
+        var query = SupabaseService.instance.client
             .from('maintenance_tickets')
             .select('*')
             .eq('property_id', pId)
-            .order('created_at', ascending: false)
-            .limit(1);
+            .neq('status', 'resolved');
+        if (_tenantId != null && _tenantId!.isNotEmpty) {
+          query = query.eq('tenant_id', _tenantId!);
+        }
+        final tickets =
+            await query.order('created_at', ascending: false).limit(1);
 
         if (tickets.isNotEmpty && mounted) {
-          final t = tickets.first;
+          final model = MaintenanceTicketModel.fromJson(
+              Map<String, dynamic>.from(tickets.first));
           setState(() {
-            _activeTicket = {
-              'id': t['ticket_number']?.toString() ??
-                  t['id']?.toString() ??
-                  'TKT-1',
-              'category': t['category']?.toString() ?? 'Maintenance',
-              'room': 'Room ${t['room_number'] ?? _roomNumber}',
-              'bed': 'Bed ${t['bed_label'] ?? t['bed_id'] ?? _bedId}',
-              'floor': t['floor']?.toString() ?? '1st Floor',
-              'issue': t['description']?.toString() ??
-                  t['issue']?.toString() ??
-                  'Reported Issue',
-              'reportedDate': 'Recently',
-              'photoName': t['photo_url'] ?? '',
-              'status': t['status']?.toString() ?? 'pending',
-            };
+            _activeTicket = model;
+          });
+        } else if (mounted) {
+          setState(() {
+            _activeTicket = null;
           });
         }
       }
@@ -619,7 +699,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              'Under Review by $_ownerName',
+                              _isPendingCash
+                                  ? 'Cash Handover Recorded'
+                                  : 'Under Review by $_ownerName',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.outfit(
@@ -633,7 +715,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'UTR: $_submittedUtr • +91 $_submittedPhone',
+                        _isPendingCash
+                            ? 'Handed to ${_submittedUtr.replaceFirst('CASH-', '').replaceAll('_', ' ')} • Desk Cash'
+                            : 'UTR: $_submittedUtr • +91 $_submittedPhone',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.outfit(
@@ -698,7 +782,11 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
 
               // Right Column: Action Button
               GestureDetector(
-                onTap: isPaid ? _openPaymentLedger : _openRentPaymentSheet,
+                onTap: isPaid
+                    ? _openPaymentLedger
+                    : (_isPendingCash
+                        ? _openPaidViaCashScreen
+                        : _openRentPaymentSheet),
                 child: Container(
                   height: 42,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -797,7 +885,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             children: [
               Text(
                 isUnderReview
-                    ? 'Awaiting owner bank credit match'
+                    ? (_isPendingCash
+                        ? 'Cash handover awaiting owner audit'
+                        : 'Awaiting owner bank credit match')
                     : (isPaid
                         ? '0% direct bank settlement confirmed'
                         : 'All-inclusive monthly stay'),
@@ -884,8 +974,200 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     );
   }
 
+  void _showAlreadySettledDialog() {
+    HapticFeedback.mediumImpact();
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: AppColors.greenLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle_rounded,
+                  color: AppColors.greenDark,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Rent Already Settled ✓',
+                style: GoogleFonts.outfit(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Your rent for $_currentCycleMonth (₹${_currentRentAmount.toInt()}) is already fully paid and verified by the owner. No further payments are required.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.muted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openPaymentLedger();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.ink,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'View Receipt in Ledger',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Close',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<bool?> _showSwitchPaymentModal({
+    required String fromMode,
+    required String toMode,
+    String? currentRef,
+  }) {
+    HapticFeedback.mediumImpact();
+    final isFromUpi = fromMode == 'UPI';
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFEF3C7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.swap_horiz_rounded,
+                  color: Color(0xFFB45309),
+                  size: 30,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Switch to $toMode?',
+                style: GoogleFonts.outfit(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isFromUpi
+                    ? 'You previously submitted a UPI payment${(currentRef != null && currentRef.isNotEmpty) ? ' (Ref: $currentRef)' : ''}. Switching will cancel your pending UPI verification and replace it with Cash Handover.'
+                    : 'You previously recorded a physical Cash handover. Switching will cancel your cash report and replace it with direct bank UPI verification.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.muted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.green,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size.fromHeight(44),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+                child: Text(
+                  'Yes, Switch to $toMode',
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(
+                  'Keep Current $fromMode',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _openPaidViaCashScreen() async {
     HapticFeedback.lightImpact();
+    if (_paymentStatus == 'PAID') {
+      _showAlreadySettledDialog();
+      return;
+    }
+    if (_paymentStatus == 'UNDER_REVIEW' && !_isPendingCash) {
+      final shouldSwitch = await _showSwitchPaymentModal(
+        fromMode: 'UPI',
+        toMode: 'Cash Handover',
+        currentRef: _submittedUtr,
+      );
+      if (shouldSwitch != true) return;
+    }
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -897,6 +1179,10 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
           amount: _currentRentAmount,
           cycleMonth: _currentCycleMonth,
           ownerName: _ownerName,
+          tenantId: _tenantId,
+          propertyId: _propertyId,
+          phone: _tenantPhone,
+          ledgerId: _activeLedgerId,
         ),
       ),
     );
@@ -906,6 +1192,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     if (result is Map && result['status'] == 'UNDER_REVIEW') {
       setState(() {
         _paymentStatus = 'UNDER_REVIEW';
+        _submittedPaymentMode = 'CASH';
         _submittedUtr = 'CASH-${result['recipient']}';
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -928,6 +1215,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => PaymentLedgerScreen(
+          tenantId: _tenantId,
+          propertyId: _propertyId,
+          tenantName: _tenantName,
           roomNumber: _roomNumber,
           bedLabel: 'Bed $_bedId',
           propertyName: _pgName,
@@ -952,6 +1242,19 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
 
   /// 🚀 Navigate to Full-Page Rent Payment Screen (Full Page Checkout)
   Future<void> _openRentPaymentSheet() async {
+    HapticFeedback.lightImpact();
+    if (_paymentStatus == 'PAID') {
+      _showAlreadySettledDialog();
+      return;
+    }
+    if (_paymentStatus == 'UNDER_REVIEW' && _isPendingCash) {
+      final shouldSwitch = await _showSwitchPaymentModal(
+        fromMode: 'Cash Handover',
+        toMode: 'Online UPI',
+        currentRef: _submittedUtr.replaceFirst('CASH-', ''),
+      );
+      if (shouldSwitch != true) return;
+    }
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -960,20 +1263,25 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
           bedId: _bedId,
           pgName: _pgName,
           ownerName: _ownerName,
+          ownerPhone: _ownerPhone,
           tenantPhone: _tenantPhone,
           ownerUpiId: _ownerUpiId,
           ownerBankName:
               _ownerBankName.isNotEmpty ? _ownerBankName : 'Direct Bank UPI',
           amount: _currentRentAmount,
           cycleMonth: _currentCycleMonth,
+          tenantId: _tenantId,
+          tenantName: _tenantName,
+          propertyId: _propertyId,
+          ledgerId: _activeLedgerId,
           initialIsSubmitted: _paymentStatus == 'UNDER_REVIEW',
           initialUtr: _submittedUtr,
           initialPhone: _submittedPhone,
           initialScreenshot: _submittedScreenshot,
-          onOwnerApproved: () => setState(() => _paymentStatus = 'PAID'),
           onUtrSubmitted: (utr) {
             setState(() {
               _paymentStatus = 'UNDER_REVIEW';
+              _submittedPaymentMode = 'UPI';
               _submittedUtr = utr;
             });
           },
@@ -985,6 +1293,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       if (result['status'] == 'UNDER_REVIEW') {
         setState(() {
           _paymentStatus = 'UNDER_REVIEW';
+          _submittedPaymentMode = 'UPI';
           if (result['utr'] != null && (result['utr'] as String).isNotEmpty) {
             _submittedUtr = result['utr'];
           }
@@ -997,8 +1306,6 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
             _submittedScreenshot = result['screenshot'];
           }
         });
-      } else if (result['status'] == 'APPROVED') {
-        setState(() => _paymentStatus = 'PAID');
       }
     }
   }
@@ -1090,7 +1397,8 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => TicketStatusScreen(
-          ticketData: _activeTicket!,
+          ticket: _activeTicket!,
+          bedLabel: _bedId,
           pgName: _pgName,
         ),
       ),
@@ -1103,18 +1411,23 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => RaiseTicketScreen(
+          propertyId: _propertyId,
+          tenantId: _tenantId,
           residentName: _tenantName,
           roomNumber: _roomNumber,
           bedId: _bedId,
+          phone: _tenantPhone,
+          pgName: _pgName,
+          sharingType: _sharingType,
         ),
       ),
     );
 
     if (!mounted) return;
 
-    if (result is Map && result.containsKey('id')) {
+    if (result is MaintenanceTicketModel) {
       setState(() {
-        _activeTicket = Map<String, dynamic>.from(result);
+        _activeTicket = result.isResolved ? null : result;
       });
     }
   }

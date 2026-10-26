@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/services/supabase_service.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// 💵 Dedicated Standalone Widget: Paid Via Cash at Reception Card
 /// Allows tenants to record physical currency note handovers to the owner, warden,
@@ -16,18 +18,26 @@ class PaidViaCashCard extends StatefulWidget {
   final double amount;
   final String cycleMonth;
   final String defaultOwnerName;
+  final String? tenantId;
+  final String? propertyId;
+  final String? phone;
+  final String? ledgerId;
   final ValueChanged<Map<String, dynamic>> onCashSubmitted;
 
   const PaidViaCashCard({
     super.key,
-    this.residentName = 'Bhargav Kulkarni',
+    required this.residentName,
     required this.roomNumber,
-    this.floor = '1st Floor',
+    this.floor = '',
     required this.bedId,
     required this.pgName,
     required this.amount,
     required this.cycleMonth,
-    this.defaultOwnerName = 'Arun Kumar',
+    required this.defaultOwnerName,
+    this.tenantId,
+    this.propertyId,
+    this.phone,
+    this.ledgerId,
     this.initiallyExpanded = false,
     required this.onCashSubmitted,
   });
@@ -44,16 +54,78 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
   final TextEditingController _customRecipientController =
       TextEditingController();
   final TextEditingController _remarksController = TextEditingController();
-  DateTime _selectedDate = DateTime(2026, 9, 13);
+  DateTime _selectedDate = DateTime.now();
   late String _selectedRentMonth;
+  List<String> _recipientsList = [];
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _isExpanded = widget.initiallyExpanded;
-    _selectedRecipient = '${widget.defaultOwnerName} (Owner)';
+    final ownerLabel = widget.defaultOwnerName.isNotEmpty
+        ? '${widget.defaultOwnerName} (Owner)'
+        : 'PG Owner';
+    _selectedRecipient = ownerLabel;
+    _recipientsList = [
+      ownerLabel,
+      'Other / Custom Person...',
+    ];
     final parts = widget.cycleMonth.split(' ');
-    _selectedRentMonth = parts.isNotEmpty ? parts.first : 'September';
+    _selectedRentMonth = (parts.isNotEmpty && parts.first.isNotEmpty)
+        ? parts.first
+        : _currentMonthName();
+    _fetchPropertyTeam();
+  }
+
+  Future<void> _fetchPropertyTeam() async {
+    final pId = widget.propertyId;
+    if (pId == null || pId.isEmpty) return;
+    try {
+      final team = await SupabaseService.instance.getPropertyTeamMembers(pId);
+      if (mounted && team.isNotEmpty) {
+        setState(() {
+          final ownerLabel = widget.defaultOwnerName.isNotEmpty
+              ? '${widget.defaultOwnerName} (Owner)'
+              : 'PG Owner';
+          final List<String> list = [ownerLabel];
+          for (final m in team) {
+            final roleCapitalized = m.role.isNotEmpty
+                ? '${m.role[0].toUpperCase()}${m.role.substring(1)}'
+                : 'Team';
+            final label = '${m.name} ($roleCapitalized)';
+            if (!list.contains(label)) {
+              list.add(label);
+            }
+          }
+          list.add('Other / Custom Person...');
+          _recipientsList = list;
+          if (!_recipientsList.contains(_selectedRecipient)) {
+            _selectedRecipient = list.first;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching property team for cash dropdown: $e');
+    }
+  }
+
+  String _currentMonthName() {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    return months[DateTime.now().month - 1];
   }
 
   @override
@@ -211,7 +283,7 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
     );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     String recipient = _selectedRecipient;
     if (recipient == 'Other / Custom Person...') {
       final custom = _customRecipientController.text.trim();
@@ -222,19 +294,100 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
     }
 
     HapticFeedback.heavyImpact();
+    setState(() => _isSubmitting = true);
+    UrbanLoadingService.show('Recording Cash Handover in Database...');
 
-    final payload = {
-      'paymentMode': 'CASH',
-      'amount': widget.amount,
-      'recipient': recipient,
-      'date': _formatDate(_selectedDate),
-      'cycleMonth': _selectedRentMonth,
-      'remarks': _remarksController.text.trim(),
-      'residentName': widget.residentName,
-      'room': widget.roomNumber,
-    };
+    try {
+      final client = SupabaseService.instance.client;
+      final remarks = _remarksController.text.trim();
 
-    widget.onCashSubmitted(payload);
+      final generatedUtr =
+          'CASH-${recipient.trim().replaceAll(RegExp(r'\s+'), '_')}-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+      final payload = {
+        'amount': widget.amount,
+        'collected_by': recipient,
+        'utr_number': generatedUtr,
+        'payment_app': 'Cash Handover',
+        'status': 'pending',
+        if (widget.pgName.isNotEmpty) 'property_name': widget.pgName,
+        if (widget.tenantId != null && widget.tenantId!.isNotEmpty)
+          'tenant_id': widget.tenantId,
+        if (widget.propertyId != null && widget.propertyId!.isNotEmpty)
+          'property_id': widget.propertyId,
+        if (widget.residentName.isNotEmpty) 'tenant_name': widget.residentName,
+        if (widget.roomNumber.isNotEmpty) 'room_number': widget.roomNumber,
+        if (widget.ledgerId != null && widget.ledgerId!.isNotEmpty)
+          'ledger_id': widget.ledgerId,
+      };
+
+      // If switching from another mode, clean up previous pending approvals for this resident & ledger
+      if (widget.tenantId != null && widget.tenantId!.isNotEmpty) {
+        try {
+          var delQuery = client
+              .from('payment_approvals')
+              .delete()
+              .eq('tenant_id', widget.tenantId!)
+              .eq('status', 'pending');
+          if (widget.ledgerId != null &&
+              widget.ledgerId!.isNotEmpty &&
+              !widget.ledgerId!.startsWith('bed_')) {
+            delQuery = delQuery.eq('ledger_id', widget.ledgerId!);
+          } else if (widget.propertyId != null &&
+              widget.propertyId!.isNotEmpty) {
+            delQuery = delQuery.eq('property_id', widget.propertyId!);
+          }
+          await delQuery;
+        } catch (_) {}
+      }
+
+      await client.from('payment_approvals').insert(payload);
+
+      // Also ensure rent_ledgers has property_name updated if it was empty
+      if (widget.ledgerId != null &&
+          widget.ledgerId!.isNotEmpty &&
+          widget.pgName.isNotEmpty &&
+          !widget.ledgerId!.startsWith('bed_')) {
+        try {
+          await client.from('rent_ledgers').update({
+            'property_name': widget.pgName,
+          }).eq('id', widget.ledgerId!);
+        } catch (_) {}
+      }
+
+      if (!mounted) return;
+
+      final resultPayload = {
+        'paymentMode': 'CASH',
+        'amount': widget.amount,
+        'recipient': recipient,
+        'date': _formatDate(_selectedDate),
+        'cycleMonth': _selectedRentMonth,
+        'remarks': remarks,
+        'residentName': widget.residentName,
+        'room': widget.roomNumber,
+      };
+
+      widget.onCashSubmitted(resultPayload);
+    } catch (e) {
+      debugPrint('Error saving cash handover to payment_approvals: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not save cash payment: $e',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+            ),
+            backgroundColor: const Color(0xFFDC2626),
+          ),
+        );
+      }
+    } finally {
+      UrbanLoadingService.hide();
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -391,24 +544,12 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
                     color: AppColors.ink,
                     fontWeight: FontWeight.w600,
                   ),
-                  items: [
-                    DropdownMenuItem(
-                      value: '${widget.defaultOwnerName} (Owner)',
-                      child: Text('${widget.defaultOwnerName} (Owner)'),
-                    ),
-                    const DropdownMenuItem(
-                      value: 'Ramesh Gowda (Warden)',
-                      child: Text('Ramesh Gowda (Warden)'),
-                    ),
-                    const DropdownMenuItem(
-                      value: 'Suresh (Reception Supervisor)',
-                      child: Text('Suresh (Reception Supervisor)'),
-                    ),
-                    const DropdownMenuItem(
-                      value: 'Other / Custom Person...',
-                      child: Text('Other / Custom Person...'),
-                    ),
-                  ],
+                  items: _recipientsList.map((item) {
+                    return DropdownMenuItem<String>(
+                      value: item,
+                      child: Text(item),
+                    );
+                  }).toList(),
                   onChanged: (val) {
                     if (val != null) {
                       setState(() => _selectedRecipient = val);
@@ -516,7 +657,7 @@ class _PaidViaCashCardState extends State<PaidViaCashCard> {
                 maxLines: 2,
                 style: GoogleFonts.outfit(fontSize: 12.5),
                 decoration: const InputDecoration(
-                  hintText: 'e.g. Handed 17 notes of ₹500 at reception counter',
+                  hintText: 'e.g. Handed cash at reception desk',
                   hintStyle: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
                   border: InputBorder.none,
                 ),

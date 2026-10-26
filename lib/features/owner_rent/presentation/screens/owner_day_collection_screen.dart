@@ -85,7 +85,38 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   // Master Tenant List & Audit History
   final List<RentLedgerModel> _tenants = [];
   final List<WardenCashModel> _historyLogs = [];
+  final List<PaymentApprovalModel> _pendingApprovals = [];
   bool _isLoading = false;
+
+  PaymentApprovalModel? _getPendingApprovalForTenant(RentLedgerModel tenant) {
+    if (_pendingApprovals.isEmpty) return null;
+    if (tenant.id.isNotEmpty) {
+      final byLedger = _pendingApprovals
+          .where((p) => p.isPending && p.ledgerId == tenant.id)
+          .firstOrNull;
+      if (byLedger != null) return byLedger;
+    }
+    if (tenant.tenantId.isNotEmpty) {
+      final byTenantId = _pendingApprovals
+          .where((p) => p.isPending && p.tenantId == tenant.tenantId)
+          .firstOrNull;
+      if (byTenantId != null) return byTenantId;
+    }
+    final tName = tenant.tenantName.trim().toLowerCase();
+    final tRoom = tenant.roomNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (tName.isNotEmpty) {
+      return _pendingApprovals.where((p) {
+        if (!p.isPending) return false;
+        final pName = p.tenantName.trim().toLowerCase();
+        final pRoom = p.roomNumber.replaceAll(RegExp(r'[^0-9]'), '');
+        if (pName == tName) {
+          if (tRoom.isEmpty || pRoom.isEmpty || tRoom == pRoom) return true;
+        }
+        return false;
+      }).firstOrNull;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -127,6 +158,16 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           });
         }
 
+        // Load Payment Approvals (UPI & Cash)
+        final liveApprovals =
+            await SupabaseService.instance.getPaymentApprovalModels(propId);
+        if (mounted) {
+          setState(() {
+            _pendingApprovals.clear();
+            _pendingApprovals.addAll(liveApprovals);
+          });
+        }
+
         // Load Warden Cash Collections Audit History
         final cashModels =
             await SupabaseService.instance.getWardenCashModels(propId);
@@ -155,6 +196,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
         final currentCycle = '${months[now.month - 1]} ${now.year}';
         await SupabaseService.instance.ensureMonthlyRentLedgers(
           propertyId: propId,
+          propertyName: _propertyName,
           cycleMonth: currentCycle,
         );
 
@@ -807,6 +849,13 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
         tenant.tenantName.isNotEmpty ? tenant.tenantName : 'Resident';
     final initials = _getInitials(tenantName);
     final phone = tenant.phone ?? '';
+    final pendingApproval = _getPendingApprovalForTenant(tenant);
+    final isUnderReview =
+        tenant.status.toLowerCase() == 'under_review' || pendingApproval != null;
+    final isCash = pendingApproval?.isCash ?? false;
+    final staffCollector = pendingApproval?.collectedBy?.isNotEmpty == true
+        ? pendingApproval!.collectedBy!
+        : 'Staff';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -817,9 +866,11 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
         border: Border.all(
           color: isPaid
               ? AppColors.green.withValues(alpha: 0.3)
-              : isOverdue
-                  ? const Color(0xFFFCA5A5)
-                  : const Color(0xFFE5E7EB),
+              : isUnderReview
+                  ? const Color(0xFFFDE68A)
+                  : isOverdue
+                      ? const Color(0xFFFCA5A5)
+                      : const Color(0xFFE5E7EB),
           width: 1.2,
         ),
         boxShadow: const [
@@ -847,7 +898,9 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       decoration: BoxDecoration(
                         color: isPaid
                             ? AppColors.greenLight
-                            : const Color(0xFFF3F4F6),
+                            : isUnderReview
+                                ? const Color(0xFFFFFBEB)
+                                : const Color(0xFFF3F4F6),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Center(
@@ -856,7 +909,11 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                           style: GoogleFonts.outfit(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
-                            color: isPaid ? AppColors.greenDark : AppColors.ink,
+                            color: isPaid
+                                ? AppColors.greenDark
+                                : isUnderReview
+                                    ? const Color(0xFF92400E)
+                                    : AppColors.ink,
                           ),
                         ),
                       ),
@@ -908,40 +965,75 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
           const SizedBox(height: 10),
 
           // Verification / Status Pill
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF9FAFB),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFEEF0F2)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isPaid
-                      ? Icons.verified_user_outlined
-                      : Icons.schedule_rounded,
-                  size: 13,
-                  color: isPaid ? AppColors.greenDark : AppColors.muted,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    isPaid
-                        ? 'Verified by $approvedBy • Paid on ${tenant.paidDate != null ? "${tenant.paidDate!.day} Aug" : "1 Aug"}'
-                        : isOverdue
-                            ? 'Agreed Date: ${_selectedDay}th • Overdue'
-                            : 'Agreed Salary Date: ${_selectedDay}th • Due Today (No Late Fine)',
-                    style: GoogleFonts.outfit(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: isPaid ? AppColors.greenDark : AppColors.muted,
+          if (isUnderReview)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFD97706),
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      isCash
+                          ? 'Cash Handover • $staffCollector'
+                          : 'Under Review • UPI',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF92400E),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF9FAFB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFEEF0F2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isPaid
+                        ? Icons.verified_user_outlined
+                        : Icons.schedule_rounded,
+                    size: 13,
+                    color: isPaid ? AppColors.greenDark : AppColors.muted,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      isPaid
+                          ? 'Verified by $approvedBy • Paid on ${tenant.paidDate != null ? "${tenant.paidDate!.day} Aug" : "1 Aug"}'
+                          : isOverdue
+                              ? 'Agreed Date: ${_selectedDay}th • Overdue'
+                              : 'Agreed Salary Date: ${_selectedDay}th • Due Today (No Late Fine)',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: isPaid ? AppColors.greenDark : AppColors.muted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
           const SizedBox(height: 12),
 
           // ROW 1: Call & WhatsApp Side-by-Side (Clean Outlined Neutral, NOT Dark Green!)
@@ -1276,89 +1368,44 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      'Paid on ${tenant.paidDate != null ? "${tenant.paidDate!.day} Aug 2026" : "1 Aug 2026"}',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final rawVerifier = tenant.approvedBy ?? '';
+                        final cleanVerifier = rawVerifier
+                            .replaceAll(RegExp(r'\s*\([^)]*\)'), '')
+                            .trim();
+                        final verifierText = cleanVerifier.isNotEmpty
+                            ? ' • Verified by $cleanVerifier'
+                            : '';
+                        const months = [
+                          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                        ];
+                        final dateStr = tenant.paidDate != null
+                            ? "${tenant.paidDate!.day} ${months[tenant.paidDate!.month - 1]} ${tenant.paidDate!.year}"
+                            : "Today";
+                        return Text(
+                          'Paid on $dateStr$verifierText',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
               ),
             )
-          else if (tenant.status.toLowerCase() == 'under_review') ...[
+          else if (isUnderReview) ...[
             // Tenant uploaded payment proof -> View Proof, Reject, Accept
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16)),
-                          title: Text('Payment Proof',
-                              style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.ink)),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Tenant: $tenantName',
-                                  style: GoogleFonts.outfit(
-                                      fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 6),
-                              Text(
-                                  'Room: ${tenant.roomNumber} (${tenant.bedNumber ?? ""})',
-                                  style: GoogleFonts.outfit(
-                                      color: AppColors.muted)),
-                              const SizedBox(height: 6),
-                              Text('Amount: ₹${tenant.rentAmount.toInt()}',
-                                  style: GoogleFonts.outfit(
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.greenDark)),
-                              const SizedBox(height: 12),
-                              Container(
-                                width: double.infinity,
-                                height: 160,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF3F4F6),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                      color: const Color(0xFFE5E7EB)),
-                                ),
-                                child: Center(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.receipt_long_rounded,
-                                          size: 40, color: AppColors.muted),
-                                      const SizedBox(height: 8),
-                                      Text('UPI Screenshot Attached',
-                                          style: GoogleFonts.outfit(
-                                              fontSize: 12,
-                                              color: AppColors.muted)),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: Text('Close',
-                                  style: GoogleFonts.outfit(
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.ink)),
-                            ),
-                          ],
-                        ),
-                      );
+                      _showRealProofDialog(tenant, pendingApproval);
                     },
                     icon: const Icon(Icons.remove_red_eye_outlined,
                         size: 14, color: AppColors.ink),
@@ -1383,6 +1430,7 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     onPressed: () async {
                       final success = await SupabaseService.instance
                           .updatePaymentApprovalStatus(
+                        submissionId: pendingApproval?.id,
                         ledgerId: tenant.id,
                         status: 'rejected',
                       );
@@ -1413,8 +1461,10 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
                     onPressed: () async {
                       final success = await SupabaseService.instance
                           .updatePaymentApprovalStatus(
+                        submissionId: pendingApproval?.id,
                         ledgerId: tenant.id,
                         status: 'approved',
+                        approvedBy: _selectedStaffActor,
                       );
                       if (success) {
                         await _loadDayCollectionData();
@@ -1529,7 +1579,247 @@ class _OwnerDayCollectionScreenState extends State<OwnerDayCollectionScreen> {
   }
 
   // ===========================================================================
-  // 5. HISTORY & AUDIT LOG CONTENT VIEW
+  // REAL PAYMENT PROOF DIALOG (Cash vs UPI from payment_approvals)
+  // ===========================================================================
+  void _showRealProofDialog(
+      RentLedgerModel tenant, PaymentApprovalModel? approval) {
+    final isCash = approval?.isCash ?? false;
+    final staffCollector = approval?.collectedBy?.isNotEmpty == true
+        ? approval!.collectedBy!
+        : 'Staff';
+    final tenantName =
+        tenant.tenantName.isNotEmpty ? tenant.tenantName : 'Resident';
+    final amount = tenant.rentAmount.toInt();
+    final utr = approval?.utrNumber ?? 'Pending UTR';
+    final proofImg = approval?.proofImageUrl;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+        contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        title: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: isCash ? const Color(0xFFEBF8EE) : const Color(0xFFFEF3C7),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isCash ? Icons.payments_outlined : Icons.account_balance_outlined,
+                size: 17,
+                color: isCash ? AppColors.greenDark : const Color(0xFFD97706),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                isCash ? 'Cash Payment Proof' : 'UPI Payment Proof',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.ink,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9FAFB),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE5E7EB)),
+                ),
+                child: Column(
+                  children: [
+                    _buildProofRow('Resident:', tenantName, isBold: true),
+                    const SizedBox(height: 6),
+                    _buildProofRow(
+                        'Room / Bed:', '${tenant.roomNumber} (${tenant.bedNumber ?? ""})'),
+                    const SizedBox(height: 6),
+                    _buildProofRow('Amount Claimed:', '₹$amount',
+                        isBold: true, valueColor: AppColors.greenDark),
+                    const SizedBox(height: 6),
+                    _buildProofRow('Payment Mode:',
+                        isCash ? 'Physical Cash Handover' : (approval?.paymentApp ?? 'Direct Bank UPI')),
+                    const SizedBox(height: 6),
+                    if (isCash)
+                      _buildProofRow('Handed Over To:', '$staffCollector (Desk Staff)',
+                          isBold: true, valueColor: const Color(0xFFB45309))
+                    else
+                      _buildProofRow('UPI Reference (UTR):', utr,
+                          isMonospace: true),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Screenshot Preview (if UPI screenshot uploaded)
+              if (!isCash && proofImg != null && proofImg.isNotEmpty) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    proofImg,
+                    width: double.infinity,
+                    height: 160,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text('Proof Screenshot Attached',
+                          style: GoogleFonts.outfit(fontSize: 12, color: AppColors.muted)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Ground Truth Notice
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isCash ? const Color(0xFFEBF8EE) : const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isCash ? AppColors.green.withValues(alpha: 0.3) : const Color(0xFFFDE68A),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      isCash ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
+                      size: 15,
+                      color: isCash ? AppColors.greenDark : const Color(0xFFB45309),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isCash
+                            ? 'Cash of ₹$amount collected by $staffCollector at the desk. Accepting will mark rent as paid and log this in the Warden Cash Ledger.'
+                            : 'Please verify ₹$amount is credited in your bank account via UTR $utr before accepting.',
+                        style: GoogleFonts.outfit(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: isCash ? AppColors.greenDark : const Color(0xFF92400E),
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Close',
+              style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w700, color: AppColors.muted),
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final success = await SupabaseService.instance
+                  .updatePaymentApprovalStatus(
+                submissionId: approval?.id,
+                ledgerId: tenant.id,
+                status: 'rejected',
+              );
+              if (success) {
+                await _loadDayCollectionData();
+                _showToast('Payment Proof Rejected');
+              }
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFDC2626),
+              side: const BorderSide(color: Color(0xFFFCA5A5)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Reject',
+                style: GoogleFonts.outfit(
+                    fontSize: 12, fontWeight: FontWeight.w700, color: const Color(0xFFDC2626))),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final success = await SupabaseService.instance
+                  .updatePaymentApprovalStatus(
+                submissionId: approval?.id,
+                ledgerId: tenant.id,
+                status: 'approved',
+                approvedBy: _selectedStaffActor,
+              );
+              if (success) {
+                await _loadDayCollectionData();
+                _showToast('Payment Approved for $tenantName ✓');
+              } else {
+                _showToast('Failed to approve payment');
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              elevation: 0,
+            ),
+            child: Text('Accept',
+                style: GoogleFonts.outfit(
+                    fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProofRow(String label, String value,
+      {bool isBold = false, bool isMonospace = false, Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label,
+            style: GoogleFonts.outfit(fontSize: 11.5, color: AppColors.muted)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: isMonospace
+                ? const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink)
+                : GoogleFonts.outfit(
+                    fontSize: 11.5,
+                    fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+                    color: valueColor ?? AppColors.ink,
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
   // ===========================================================================
   Widget _buildHistoryContent() {
     final filtered = _historyLogs.where((log) {

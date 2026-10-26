@@ -20,6 +20,7 @@ class PaymentApprovalModel {
   final String? proofImageUrl;
   final String status;
   final String? approvedBy;
+  final String? collectedBy;
   final DateTime? createdAt;
 
   PaymentApprovalModel({
@@ -37,12 +38,17 @@ class PaymentApprovalModel {
     this.proofImageUrl,
     this.status = 'pending',
     this.approvedBy,
+    this.collectedBy,
     this.createdAt,
   });
 
   bool get isPending => status.toLowerCase() == 'pending';
   bool get isApproved => status.toLowerCase() == 'approved';
   bool get isRejected => status.toLowerCase() == 'rejected';
+  bool get isCash =>
+      paymentApp.toLowerCase().contains('cash') ||
+      (collectedBy != null && collectedBy!.isNotEmpty) ||
+      utrNumber.startsWith('CASH-');
 
   factory PaymentApprovalModel.fromJson(Map<String, dynamic> json) {
     final rawAmount = json['amount'];
@@ -68,6 +74,13 @@ class PaymentApprovalModel {
           json['screenshot_url']?.toString(),
       status: (json['status']?.toString() ?? 'pending').toLowerCase(),
       approvedBy: json['approved_by']?.toString(),
+      collectedBy: json['collected_by']?.toString() ??
+          (json['utr_number']?.toString().startsWith('CASH-') == true
+              ? json['utr_number']
+                  .toString()
+                  .replaceFirst('CASH-', '')
+                  .replaceAll('_', ' ')
+              : null),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -90,6 +103,7 @@ class PaymentApprovalModel {
       if (proofImageUrl != null) 'proof_image_url': proofImageUrl,
       'status': status,
       if (approvedBy != null) 'approved_by': approvedBy,
+      if (collectedBy != null) 'collected_by': collectedBy,
     };
   }
 }

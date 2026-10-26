@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/models/models.dart';
 import '../widgets/raise_ticket_card.dart';
 import 'ticket_status_screen.dart';
 
@@ -11,6 +12,8 @@ import 'ticket_status_screen.dart';
 /// - Clean executive AppBar with hairline divider
 /// - ZERO emojis anywhere
 class RaiseTicketScreen extends StatelessWidget {
+  final String? propertyId;
+  final String? tenantId;
   final String residentName;
   final String roomNumber;
   final String bedId;
@@ -21,17 +24,23 @@ class RaiseTicketScreen extends StatelessWidget {
 
   const RaiseTicketScreen({
     super.key,
-    this.residentName = 'Bhargav Kulkarni',
+    this.propertyId,
+    this.tenantId,
+    this.residentName = '',
     required this.roomNumber,
     required this.bedId,
-    this.floor = '1st Floor',
-    this.sharingType = '2-Sharing',
-    this.phone = '8618818322',
-    this.pgName = 'Greenview PG',
+    this.floor = '',
+    this.sharingType = '',
+    this.phone = '',
+    this.pgName = '',
   });
 
   @override
   Widget build(BuildContext context) {
+    final cleanRoomTitle = roomNumber.isNotEmpty
+        ? (roomNumber.startsWith('Room') ? roomNumber : 'Room $roomNumber')
+        : '';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -56,14 +65,15 @@ class RaiseTicketScreen extends StatelessWidget {
                 letterSpacing: -0.3,
               ),
             ),
-            Text(
-              'Room $roomNumber',
-              style: GoogleFonts.outfit(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
-                color: AppColors.muted,
+            if (cleanRoomTitle.isNotEmpty)
+              Text(
+                cleanRoomTitle,
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.muted,
+                ),
               ),
-            ),
           ],
         ),
         bottom: PreferredSize(
@@ -78,6 +88,8 @@ class RaiseTicketScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             children: [
               RaiseTicketCard(
+                propertyId: propertyId,
+                tenantId: tenantId,
                 residentName: residentName,
                 roomNumber: roomNumber,
                 bedId: bedId,
@@ -85,13 +97,14 @@ class RaiseTicketScreen extends StatelessWidget {
                 sharingType: sharingType,
                 phone: phone,
                 pgName: pgName,
-                onTicketSubmitted: (ticketData) {
+                onTicketSubmitted: (ticket) {
                   HapticFeedback.heavyImpact();
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
                       builder: (ctx) => TicketStatusScreen(
-                        ticketData: ticketData,
+                        ticket: ticket,
+                        bedLabel: bedId,
                         pgName: pgName,
                       ),
                     ),

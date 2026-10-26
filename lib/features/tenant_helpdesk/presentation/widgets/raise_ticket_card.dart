@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/models/models.dart';
+import '../../../../core/services/supabase_service.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// Authentic UrbanStay Facility Helpdesk Request Card
 /// Designed strictly to match UrbanStay's production card architecture:
@@ -10,6 +13,8 @@ import '../../../../core/theme/app_colors.dart';
 /// - Authentic placeholder styling matching `paid_via_cash_card.dart` & `tenant_checkin.html`
 /// - ZERO emojis anywhere (100% native vector icons & Outfit typography)
 class RaiseTicketCard extends StatefulWidget {
+  final String? propertyId;
+  final String? tenantId;
   final String residentName;
   final String roomNumber;
   final String bedId;
@@ -17,17 +22,19 @@ class RaiseTicketCard extends StatefulWidget {
   final String sharingType;
   final String phone;
   final String pgName;
-  final ValueChanged<Map<String, dynamic>> onTicketSubmitted;
+  final ValueChanged<MaintenanceTicketModel> onTicketSubmitted;
 
   const RaiseTicketCard({
     super.key,
-    this.residentName = 'Bhargav Kulkarni',
+    this.propertyId,
+    this.tenantId,
+    this.residentName = '',
     required this.roomNumber,
     required this.bedId,
-    this.floor = '1st Floor',
-    this.sharingType = '2-Sharing',
-    this.phone = '8618818322',
-    this.pgName = 'Greenview PG',
+    this.floor = '',
+    this.sharingType = '',
+    this.phone = '',
+    this.pgName = '',
     required this.onTicketSubmitted,
   });
 
@@ -104,7 +111,8 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
                 ),
                 const SizedBox(height: 16),
                 ListTile(
-                  leading: const Icon(Icons.photo_camera_outlined, color: AppColors.ink),
+                  leading: const Icon(Icons.photo_camera_outlined,
+                      color: AppColors.ink),
                   title: Text(
                     'Take Photo',
                     style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
@@ -112,12 +120,14 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
                   onTap: () {
                     Navigator.pop(ctx);
                     setState(() {
-                      _attachedPhotoName = '${_selectedCategory.toLowerCase()}_photo.jpg';
+                      _attachedPhotoName =
+                          '${_selectedCategory.toLowerCase()}_photo.jpg';
                     });
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.photo_library_outlined, color: AppColors.ink),
+                  leading: const Icon(Icons.photo_library_outlined,
+                      color: AppColors.ink),
                   title: Text(
                     'Choose from Gallery',
                     style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
@@ -125,7 +135,8 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
                   onTap: () {
                     Navigator.pop(ctx);
                     setState(() {
-                      _attachedPhotoName = '${_selectedCategory.toLowerCase()}_photo.jpg';
+                      _attachedPhotoName =
+                          '${_selectedCategory.toLowerCase()}_photo.jpg';
                     });
                   },
                 ),
@@ -137,7 +148,7 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
     );
   }
 
-  void _handleSubmit() {
+  Future<void> _handleSubmit() async {
     final text = _issueController.text.trim();
     if (_isOtherSelected && _customTitleController.text.trim().isEmpty) {
       HapticFeedback.mediumImpact();
@@ -149,7 +160,8 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
           ),
           backgroundColor: AppColors.ink,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       _customTitleFocusNode.requestFocus();
@@ -166,7 +178,8 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
           ),
           backgroundColor: AppColors.ink,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       _issueFocusNode.requestFocus();
@@ -176,32 +189,88 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
     setState(() => _isSubmitting = true);
     HapticFeedback.heavyImpact();
 
-    final now = DateTime.now();
-    final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-    final dateStr = '${now.day} Sep ${now.year}, $timeStr';
+    UrbanLoadingService.show('Submitting maintenance request...');
 
-    final ticketData = {
-      'id': 'TKT-${100 + (now.millisecondsSinceEpoch % 900)}',
-      'residentName': widget.residentName,
-      'initials': widget.residentName.isNotEmpty
-          ? widget.residentName.split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join()
-          : 'BK',
-      'phone': widget.phone,
-      'room': 'Room ${widget.roomNumber}',
-      'sharingType': widget.sharingType,
-      'bed': 'Bed ${widget.bedId}',
-      'floor': widget.floor,
-      'category': _resolvedCategoryTitle,
-      'issue': text,
-      'reportedTime': 'Just now',
-      'reportedDate': dateStr,
-      'photoName': _attachedPhotoName ?? '',
-      'hasPhoto': _attachedPhotoName != null,
-      'status': 'pending',
-    };
+    try {
+      final client = SupabaseService.instance.client;
+      String? resolvedPropId = widget.propertyId;
+      String? resolvedTenantId = widget.tenantId;
 
-    widget.onTicketSubmitted(ticketData);
+      if (resolvedTenantId == null || resolvedTenantId.isEmpty) {
+        final phone = SupabaseService.instance.currentUser?.phone ??
+            SupabaseService.instance.currentUserPhone;
+        if (phone != null && phone.isNotEmpty) {
+          final tRes = await client
+              .from('tenants')
+              .select('id, property_id')
+              .eq('phone', phone)
+              .maybeSingle();
+          if (tRes != null) {
+            resolvedTenantId = tRes['id']?.toString();
+            resolvedPropId ??= tRes['property_id']?.toString();
+          }
+        }
+      }
+
+      final String safePropId =
+          (resolvedPropId != null && resolvedPropId.isNotEmpty)
+              ? resolvedPropId
+              : (SupabaseService.instance.activePropertyId ?? '');
+
+      final MaintenanceTicketModel? createdTicket =
+          await SupabaseService.instance.createMaintenanceTicket(
+        propertyId: safePropId,
+        propertyName: widget.pgName,
+        tenantId: resolvedTenantId ?? '',
+        tenantName: widget.residentName,
+        roomNumber: widget.roomNumber,
+        category: _resolvedCategoryTitle,
+        issue: text,
+        photoUrl: _attachedPhotoName,
+      );
+
+      if (createdTicket != null) {
+        if (mounted) {
+          widget.onTicketSubmitted(createdTicket);
+        }
+      } else {
+        final fallbackTicket = MaintenanceTicketModel(
+          id: 'TKT-${DateTime.now().millisecondsSinceEpoch}',
+          propertyId: safePropId,
+          propertyName: widget.pgName,
+          tenantId: resolvedTenantId,
+          tenantName: widget.residentName,
+          roomNumber: widget.roomNumber,
+          category: _resolvedCategoryTitle,
+          issue: text,
+          photoUrl: _attachedPhotoName,
+          status: 'pending',
+          createdAt: DateTime.now(),
+        );
+        if (mounted) {
+          widget.onTicketSubmitted(fallbackTicket);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error creating maintenance ticket model: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not submit request. Please try again.',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      UrbanLoadingService.hide();
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -236,45 +305,65 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      widget.residentName,
-                      style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.green,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        widget.pgName,
+                    if (widget.residentName.trim().isNotEmpty)
+                      Text(
+                        widget.residentName.trim(),
                         style: GoogleFonts.outfit(
-                          fontSize: 11,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                          color: AppColors.ink,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Room ${widget.roomNumber}',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.muted,
+                    if (widget.pgName.trim().isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.green,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          widget.pgName.trim(),
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
+                if (widget.roomNumber.isNotEmpty ||
+                    widget.bedId.isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (widget.roomNumber.isNotEmpty)
+                        Text(
+                          widget.roomNumber.startsWith('Room')
+                              ? widget.roomNumber
+                              : 'Room ${widget.roomNumber}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                      if (widget.bedId.isNotEmpty)
+                        Text(
+                          widget.bedId.startsWith('Bed')
+                              ? widget.bedId
+                              : 'Bed ${widget.bedId}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.inkSecondary,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -396,7 +485,8 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
                 height: 1.4,
               ),
               decoration: const InputDecoration(
-                hintText: 'Describe what needs repair or attention in your room...',
+                hintText:
+                    'Describe what needs repair or attention in your room...',
                 hintStyle: TextStyle(
                   fontSize: 12,
                   color: Color(0xFF9CA3AF),
@@ -458,7 +548,8 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
                     borderRadius: BorderRadius.circular(99),
                     child: const Padding(
                       padding: EdgeInsets.all(4),
-                      child: Icon(Icons.close_rounded, size: 16, color: AppColors.muted),
+                      child: Icon(Icons.close_rounded,
+                          size: 16, color: AppColors.muted),
                     ),
                   ),
                 ],
@@ -568,9 +659,7 @@ class _RaiseTicketCardState extends State<RaiseTicketCard> {
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.green
-                : Colors.white,
+            color: isSelected ? AppColors.green : Colors.white,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: isSelected ? AppColors.green : const Color(0xFFE5E7EB),

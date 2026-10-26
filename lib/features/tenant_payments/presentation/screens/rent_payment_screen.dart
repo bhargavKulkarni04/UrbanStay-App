@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
+import '../../../../core/widgets/urban_loading.dart';
 import '../widgets/official_payment_icons.dart';
 
 /// 💳 Production-Grade Indian Foodtech/Fintech Checkout Screen (Swiggy / Zomato standard)
@@ -17,33 +19,39 @@ class RentPaymentScreen extends StatefulWidget {
   final String ownerBankName;
   final double amount;
   final String cycleMonth;
+  final String? tenantId;
+  final String? tenantName;
+  final String? propertyId;
+  final String? ledgerId;
   final ValueChanged<String>? onUtrSubmitted;
   final ValueChanged<String>? onPaymentCompleted;
   final bool initialIsSubmitted;
   final String? initialUtr;
   final String? initialPhone;
   final String? initialScreenshot;
-  final VoidCallback? onOwnerApproved;
 
   const RentPaymentScreen({
     super.key,
     required this.roomNumber,
     required this.bedId,
     required this.pgName,
-    this.tenantPhone = '8618818322',
-    this.ownerName = 'Arun Kumar',
-    this.ownerPhone = '98450 12345',
-    this.ownerUpiId = 'arun.kumar@oksbi',
-    this.ownerBankName = 'State Bank of India (SBI)',
-    this.amount = 8500.0,
-    this.cycleMonth = 'September 2026',
+    required this.tenantPhone,
+    required this.ownerName,
+    this.ownerPhone = '',
+    required this.ownerUpiId,
+    required this.ownerBankName,
+    required this.amount,
+    required this.cycleMonth,
+    this.tenantId,
+    this.tenantName,
+    this.propertyId,
+    this.ledgerId,
     this.onUtrSubmitted,
     this.onPaymentCompleted,
     this.initialIsSubmitted = false,
     this.initialUtr,
     this.initialPhone,
     this.initialScreenshot,
-    this.onOwnerApproved,
   });
 
   @override
@@ -99,7 +107,7 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
         )}';
   }
 
-  void _submitUtr() {
+  Future<void> _submitUtr() async {
     final utr = _utrController.text.trim();
     final phone = _phoneController.text.trim();
 
@@ -128,16 +136,98 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
       _phoneError = null;
       _isProcessing = true;
     });
+    UrbanLoadingService.show('Submitting UPI Reference to Database...');
 
-    Future.delayed(const Duration(milliseconds: 500), () {
+    try {
+      final appName = _selectedApp == 'gpay'
+          ? 'Google Pay'
+          : (_selectedApp == 'phonepe'
+              ? 'PhonePe'
+              : (_selectedApp == 'paytm' ? 'Paytm' : 'Direct UPI'));
+
+      final payload = <String, dynamic>{
+        'amount': widget.amount,
+        'utr_number': utr,
+        'payment_app': appName,
+        'status': 'pending',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      if (widget.propertyId != null && widget.propertyId!.isNotEmpty) {
+        payload['property_id'] = widget.propertyId;
+      }
+      if (widget.pgName.isNotEmpty) {
+        payload['property_name'] = widget.pgName;
+      }
+      if (widget.tenantId != null && widget.tenantId!.isNotEmpty) {
+        payload['tenant_id'] = widget.tenantId;
+      }
+      if (widget.tenantName != null && widget.tenantName!.isNotEmpty) {
+        payload['tenant_name'] = widget.tenantName;
+      }
+      if (widget.roomNumber.isNotEmpty) {
+        payload['room_number'] = widget.roomNumber;
+      }
+      if (widget.ledgerId != null && widget.ledgerId!.isNotEmpty) {
+        payload['ledger_id'] = widget.ledgerId;
+      }
+      if (_hasScreenshot &&
+          _screenshotName != null &&
+          _screenshotName!.isNotEmpty) {
+        payload['proof_image_url'] = _screenshotName;
+      }
+
+      // If switching from another mode (e.g. Cash), clean up previous pending approvals for this resident & ledger
+      if (widget.tenantId != null && widget.tenantId!.isNotEmpty) {
+        try {
+          var delQuery = SupabaseService.instance.client
+              .from('payment_approvals')
+              .delete()
+              .eq('tenant_id', widget.tenantId!)
+              .eq('status', 'pending');
+          if (widget.ledgerId != null &&
+              widget.ledgerId!.isNotEmpty &&
+              !widget.ledgerId!.startsWith('bed_')) {
+            delQuery = delQuery.eq('ledger_id', widget.ledgerId!);
+          } else if (widget.propertyId != null &&
+              widget.propertyId!.isNotEmpty) {
+            delQuery = delQuery.eq('property_id', widget.propertyId!);
+          }
+          await delQuery;
+        } catch (_) {}
+      }
+
+      await SupabaseService.instance.client
+          .from('payment_approvals')
+          .insert(payload);
+
       if (!mounted) return;
       setState(() {
         _isProcessing = false;
         _isSubmitted = true;
       });
       widget.onUtrSubmitted?.call(utr);
-      HapticFeedback.lightImpact();
-    });
+      HapticFeedback.heavyImpact();
+    } catch (e) {
+      debugPrint('Error inserting payment approval: $e');
+      if (!mounted) return;
+      setState(() {
+        _isProcessing = false;
+        _utrError = 'Failed to submit payment. Please verify connection.';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to record payment proof: $e',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      UrbanLoadingService.hide();
+    }
   }
 
   void _showConfirmPaymentPopup() {
@@ -779,56 +869,7 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 12),
 
-                // 4. Test Demo Simulation: Owner Approves
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF9FAFB),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.admin_panel_settings_outlined,
-                          size: 18, color: Color(0xFF4B5563)),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Test Demo: Simulate owner confirming this UTR',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF4B5563),
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          HapticFeedback.mediumImpact();
-                          widget.onOwnerApproved?.call();
-                          Navigator.pop(context, {'status': 'APPROVED'});
-                        },
-                        style: TextButton.styleFrom(
-                          backgroundColor: AppColors.greenDark,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                        ),
-                        child: Text(
-                          'Approve',
-                          style: GoogleFonts.outfit(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
 
                 const SizedBox(height: 20),
 
@@ -1187,80 +1228,80 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Owner Phone Number',
-                          style: GoogleFonts.outfit(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                        Text(
-                          '+91 ${widget.ownerPhone}',
-                          style: GoogleFonts.outfit(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.greenDark,
-                          ),
-                        ),
-                      ],
-                    ),
-                    InkWell(
-                      onTap: () {
-                        Clipboard.setData(
-                            ClipboardData(text: widget.ownerPhone));
-                        HapticFeedback.lightImpact();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Copied "${widget.ownerPhone}" to clipboard!',
-                              style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.w500),
+                if (widget.ownerPhone.isNotEmpty) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Owner Phone Number',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.muted,
                             ),
-                            backgroundColor: AppColors.ink,
-                            duration: const Duration(seconds: 2),
                           ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(6),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xFFD1D5DB)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.copy_rounded,
-                                size: 12, color: AppColors.ink),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Copy',
-                              style: GoogleFonts.outfit(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.ink,
+                          Text(
+                            '+91 ${widget.ownerPhone}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.greenDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                      InkWell(
+                        onTap: () {
+                          Clipboard.setData(
+                              ClipboardData(text: widget.ownerPhone));
+                          HapticFeedback.lightImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Copied "${widget.ownerPhone}" to clipboard!',
+                                style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.w500),
                               ),
+                              backgroundColor: AppColors.ink,
+                              duration: const Duration(seconds: 2),
                             ),
-                          ],
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFFD1D5DB)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.copy_rounded,
+                                  size: 12, color: AppColors.ink),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Copy',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.ink,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                const SizedBox(height: 8),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1476,7 +1517,7 @@ class _RentPaymentScreenState extends State<RentPaymentScreen> {
                     ),
                     decoration: InputDecoration(
                       border: InputBorder.none,
-                      hintText: 'e.g. 8618818322',
+                      hintText: '10-digit mobile number',
                       hintStyle: GoogleFonts.outfit(
                         fontSize: 13,
                         fontWeight: FontWeight.w400,

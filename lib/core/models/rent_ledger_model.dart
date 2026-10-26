@@ -20,6 +20,7 @@ class RentLedgerModel {
   final String status;
   final DateTime? paidDate;
   final String paymentMode;
+  final String? approvedBy;
   final DateTime? createdAt;
 
   RentLedgerModel({
@@ -37,6 +38,7 @@ class RentLedgerModel {
     this.status = 'PENDING',
     this.paidDate,
     this.paymentMode = 'UPI',
+    this.approvedBy,
     this.createdAt,
   });
 
@@ -102,6 +104,7 @@ class RentLedgerModel {
           ? DateTime.tryParse(json['paid_date'].toString())
           : null,
       paymentMode: json['payment_mode']?.toString() ?? 'UPI',
+      approvedBy: json['approved_by']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -124,6 +127,7 @@ class RentLedgerModel {
       if (paidDate != null)
         'paid_date': paidDate!.toIso8601String(),
       'payment_mode': paymentMode,
+      if (approvedBy != null) 'approved_by': approvedBy,
     };
   }
 }

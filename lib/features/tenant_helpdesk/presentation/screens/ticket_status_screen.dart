@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/models/models.dart';
+import '../../../../core/services/supabase_service.dart';
 
 /// 📋 Post-Submission Screen: Ticket Status with 3 Vertical Tracking Steps
 /// 1. Top Card: "Sent to PG Owner" (No technician claims)
@@ -15,15 +17,17 @@ import '../../../../core/theme/app_colors.dart';
 /// 4. WhatsApp Button: Authentic official WhatsApp logo
 /// 5. Return to Dashboard Button: Pure Green background (#08A63F) with White text
 class TicketStatusScreen extends StatefulWidget {
-  final Map<String, dynamic> ticketData;
+  final MaintenanceTicketModel ticket;
+  final String bedLabel;
   final String pgName;
   final String ownerName;
 
   const TicketStatusScreen({
     super.key,
-    required this.ticketData,
-    this.pgName = 'Greenview PG',
-    this.ownerName = 'Arun Kumar',
+    required this.ticket,
+    this.bedLabel = '',
+    this.pgName = '',
+    this.ownerName = '',
   });
 
   @override
@@ -32,48 +36,95 @@ class TicketStatusScreen extends StatefulWidget {
 
 class _TicketStatusScreenState extends State<TicketStatusScreen> {
   late bool _isResolved;
+  late MaintenanceTicketModel _currentTicket;
 
   @override
   void initState() {
     super.initState();
-    _isResolved = widget.ticketData['status'] == 'resolved';
+    _currentTicket = widget.ticket;
+    _isResolved = _currentTicket.isResolved;
   }
 
-  void _toggleResolved() {
+  Future<void> _toggleResolved() async {
     HapticFeedback.mediumImpact();
+    final newStatus = !_isResolved;
+
     setState(() {
-      _isResolved = !_isResolved;
-      widget.ticketData['status'] = _isResolved ? 'resolved' : 'pending';
+      _isResolved = newStatus;
+      _currentTicket = MaintenanceTicketModel(
+        id: _currentTicket.id,
+        propertyId: _currentTicket.propertyId,
+        propertyName: _currentTicket.propertyName,
+        tenantId: _currentTicket.tenantId,
+        tenantName: _currentTicket.tenantName,
+        roomNumber: _currentTicket.roomNumber,
+        category: _currentTicket.category,
+        issue: _currentTicket.issue,
+        photoUrl: _currentTicket.photoUrl,
+        status: newStatus ? 'resolved' : 'pending',
+        assignedStaff: _currentTicket.assignedStaff,
+        progressNote: newStatus
+            ? 'Resolved directly by resident'
+            : 'Reopened by resident',
+        createdAt: _currentTicket.createdAt,
+      );
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isResolved
-              ? 'Issue marked as resolved by you ✓'
-              : 'Ticket reopened and marked pending',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+    if (_currentTicket.id.isNotEmpty) {
+      await SupabaseService.instance.updateComplaintStatus(
+        complaintId: _currentTicket.id,
+        status: newStatus ? 'resolved' : 'pending',
+        resolutionNotes: newStatus
+            ? 'Resolved directly by resident'
+            : 'Reopened by resident',
+      );
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _isResolved
+                ? 'Issue marked as resolved by you ✓'
+                : 'Ticket reopened and marked pending',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor:
+              _isResolved ? const Color(0xFF065F46) : const Color(0xFF111111),
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
         ),
-        backgroundColor:
-            _isResolved ? const Color(0xFF065F46) : const Color(0xFF111111),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final ticketId = widget.ticketData['id'] ?? 'TKT-104';
-    final category = widget.ticketData['category'] ?? 'General';
-    final room = widget.ticketData['room'] ?? 'Room 104';
-    final bed = widget.ticketData['bed'] ?? 'Bed B';
-    final issue = widget.ticketData['issue'] ?? 'Maintenance request reported.';
-    final photoName = widget.ticketData['photoName'] as String?;
+    final ticketId = _currentTicket.id;
+    final category = _currentTicket.category;
+    final room = _currentTicket.roomNumber.isNotEmpty
+        ? (_currentTicket.roomNumber.startsWith('Room')
+            ? _currentTicket.roomNumber
+            : 'Room ${_currentTicket.roomNumber}')
+        : '';
+    final bed = widget.bedLabel.isNotEmpty
+        ? (widget.bedLabel.startsWith('Bed')
+            ? widget.bedLabel
+            : 'Bed ${widget.bedLabel}')
+        : '';
+    final issue = _currentTicket.issue;
+    final photoName = _currentTicket.photoUrl;
+    final ownerNameText = widget.ownerName.trim();
+
+    final appBarSubtitle = [
+      if (ticketId.isNotEmpty) ticketId,
+      if (room.isNotEmpty) room,
+    ].join(' • ');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F9),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -81,7 +132,7 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               size: 18, color: AppColors.ink),
-          onPressed: () => Navigator.pop(context, widget.ticketData),
+          onPressed: () => Navigator.pop(context, _currentTicket),
         ),
         titleSpacing: 0,
         title: Column(
@@ -96,14 +147,15 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
                 letterSpacing: -0.3,
               ),
             ),
-            Text(
-              '$ticketId • $room',
-              style: GoogleFonts.outfit(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
-                color: AppColors.muted,
+            if (appBarSubtitle.isNotEmpty)
+              Text(
+                appBarSubtitle,
+                style: GoogleFonts.outfit(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.muted,
+                ),
               ),
-            ),
           ],
         ),
         bottom: PreferredSize(
@@ -159,7 +211,7 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      _isResolved ? 'Issue Resolved' : 'Sent to PG Owner',
+                      _isResolved ? 'Issue Resolved' : 'Sent to Property Owner',
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -171,7 +223,9 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
                     Text(
                       _isResolved
                           ? 'Marked as resolved directly by resident.'
-                          : 'Your issue has been delivered to ${widget.ownerName} (PG Owner).',
+                          : (ownerNameText.isNotEmpty
+                              ? 'Your issue has been delivered to $ownerNameText.'
+                              : 'Your issue has been delivered to the property team.'),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.outfit(
                         fontSize: 12.8,
@@ -213,7 +267,9 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
                     _buildStepRow(
                       stepNumber: 1,
                       title: 'Sent to Owner',
-                      subtitle: 'Delivered to ${widget.ownerName} & warden',
+                      subtitle: ownerNameText.isNotEmpty
+                          ? 'Delivered to $ownerNameText & team'
+                          : 'Delivered to management & warden',
                       tagText: 'Delivered',
                       tagColor: AppColors.greenDark,
                       tagBg: AppColors.greenLight,
@@ -226,7 +282,9 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
                     _buildStepRow(
                       stepNumber: 2,
                       title: 'Assigned',
-                      subtitle: 'Owner is arranging repair for $room',
+                      subtitle: room.isNotEmpty
+                          ? 'Arranging inspection for $room'
+                          : 'Arranging inspection & repair',
                       tagText: 'In Review',
                       tagColor: const Color(0xFFD97706),
                       tagBg: const Color(0xFFFFFBEB),
@@ -374,39 +432,50 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    _buildInfoRow('Ticket ID', ticketId, isHighlight: true),
-                    _buildDivider(),
-                    _buildInfoRow('Category', category),
-                    _buildDivider(),
-                    _buildInfoRow('Room & Bed', '$room • $bed'),
-                    _buildDivider(),
-                    Text(
-                      'Problem Details',
-                      style: GoogleFonts.outfit(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.muted,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF9FAFB),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: Text(
-                        issue,
+                    if (ticketId.isNotEmpty) ...[
+                      _buildInfoRow('Ticket ID', ticketId, isHighlight: true),
+                      _buildDivider(),
+                    ],
+                    if (category.isNotEmpty) ...[
+                      _buildInfoRow('Category', category),
+                      _buildDivider(),
+                    ],
+                    if (room.isNotEmpty || bed.isNotEmpty) ...[
+                      _buildInfoRow(
+                          'Room & Bed',
+                          [if (room.isNotEmpty) room, if (bed.isNotEmpty) bed]
+                              .join(' • ')),
+                      _buildDivider(),
+                    ],
+                    if (issue.isNotEmpty) ...[
+                      Text(
+                        'Problem Details',
                         style: GoogleFonts.outfit(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.ink,
-                          height: 1.45,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.muted,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF9FAFB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Text(
+                          issue,
+                          style: GoogleFonts.outfit(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.ink,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ],
                     if (photoName != null && photoName.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       Container(
@@ -461,7 +530,9 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          'Opening WhatsApp chat with ${widget.ownerName}...',
+                          ownerNameText.isNotEmpty
+                              ? 'Opening WhatsApp chat with $ownerNameText...'
+                              : 'Opening WhatsApp chat with management...',
                           style:
                               GoogleFonts.outfit(fontWeight: FontWeight.w500),
                         ),
@@ -490,7 +561,9 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Ping ${widget.ownerName} on WhatsApp',
+                        ownerNameText.isNotEmpty
+                            ? 'Ping $ownerNameText on WhatsApp'
+                            : 'Message Management on WhatsApp',
                         style: GoogleFonts.outfit(
                           fontSize: 13.5,
                           fontWeight: FontWeight.w600,
@@ -508,7 +581,7 @@ class _TicketStatusScreenState extends State<TicketStatusScreen> {
               SizedBox(
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context, widget.ticketData),
+                  onPressed: () => Navigator.pop(context, _currentTicket),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.green,
                     foregroundColor: Colors.white,

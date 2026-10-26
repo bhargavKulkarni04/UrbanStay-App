@@ -16,17 +16,25 @@ class PaidViaCashScreen extends StatelessWidget {
   final double amount;
   final String cycleMonth;
   final String ownerName;
+  final String? tenantId;
+  final String? propertyId;
+  final String? phone;
+  final String? ledgerId;
 
   const PaidViaCashScreen({
     super.key,
-    this.residentName = 'Bhargav Kulkarni',
+    required this.residentName,
     required this.roomNumber,
-    this.floor = '1st Floor',
+    this.floor = '',
     required this.bedId,
     required this.pgName,
     required this.amount,
     required this.cycleMonth,
-    this.ownerName = 'Arun Kumar',
+    required this.ownerName,
+    this.tenantId,
+    this.propertyId,
+    this.phone,
+    this.ledgerId,
   });
 
   @override
@@ -129,6 +137,10 @@ class PaidViaCashScreen extends StatelessWidget {
                 amount: amount,
                 cycleMonth: cycleMonth,
                 defaultOwnerName: ownerName,
+                tenantId: tenantId,
+                propertyId: propertyId,
+                phone: phone,
+                ledgerId: ledgerId,
                 initiallyExpanded: true,
                 onCashSubmitted: (cashData) {
                   HapticFeedback.mediumImpact();

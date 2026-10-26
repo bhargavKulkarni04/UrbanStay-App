@@ -38,6 +38,9 @@ class SupabaseService {
   /// Current user unique ID
   String? get currentUserId => client.auth.currentUser?.id;
 
+  /// Current user registered phone number
+  String? get currentUserPhone => client.auth.currentUser?.phone;
+
   /// Whether a session is active
   bool get isAuthenticated => currentUser != null;
 
@@ -774,8 +777,7 @@ class SupabaseService {
               'room_number': roomNumber,
             if (bedId != null && bedId.isNotEmpty && bedId.length == 36)
               'bed_id': bedId,
-            if (bedLabel != null && bedLabel.isNotEmpty)
-              'bed_label': bedLabel,
+            if (bedLabel != null && bedLabel.isNotEmpty) 'bed_label': bedLabel,
             if (cleanPhone.isNotEmpty) 'phone': cleanPhone,
             if (rent != null) 'monthly_rent': rent,
             if (deposit != null) 'security_deposit': deposit,
@@ -813,8 +815,7 @@ class SupabaseService {
           'room_number': roomNumber,
         if (bedId != null && bedId.isNotEmpty && bedId.length == 36)
           'bed_id': bedId,
-        if (bedLabel != null && bedLabel.isNotEmpty)
-          'bed_label': bedLabel,
+        if (bedLabel != null && bedLabel.isNotEmpty) 'bed_label': bedLabel,
         'name': cleanName.isNotEmpty ? cleanName : 'Resident',
         'phone': newPhone,
         if (rent != null) 'monthly_rent': rent,
@@ -852,8 +853,7 @@ class SupabaseService {
           if (pName.isNotEmpty) 'property_name': pName,
           if (roomNumber != null && roomNumber.isNotEmpty)
             'room_number': roomNumber,
-          if (bedLabel != null && bedLabel.isNotEmpty)
-            'bed_label': bedLabel,
+          if (bedLabel != null && bedLabel.isNotEmpty) 'bed_label': bedLabel,
           'name': cleanName.isNotEmpty ? cleanName : 'Resident',
           'phone': newPhone,
           if (rent != null) 'monthly_rent': rent,
@@ -2067,8 +2067,13 @@ class SupabaseService {
     String? ledgerId,
     required String status,
     String? reason,
+    String? rejectionReason,
+    String? approvedBy,
   }) async {
     final targetId = submissionId ?? approvalId ?? '';
+    final actualReason = (rejectionReason != null && rejectionReason.isNotEmpty)
+        ? rejectionReason
+        : reason;
     return await _withLoading('Updating Approval...', () async {
       try {
         final normalizedStatus = status.toLowerCase();
@@ -2078,7 +2083,10 @@ class SupabaseService {
           try {
             await client.from('payment_approvals').update({
               'status': normalizedStatus,
-              if (reason != null && reason.isNotEmpty) 'reject_reason': reason,
+              if (actualReason != null && actualReason.isNotEmpty)
+                'reject_reason': actualReason,
+              if (approvedBy != null && approvedBy.isNotEmpty)
+                'approved_by': approvedBy,
             }).eq('id', targetId);
           } catch (_) {
             try {
@@ -2098,6 +2106,8 @@ class SupabaseService {
               'status': 'PAID',
               'due_amount': 0.0,
               'paid_date': DateTime.now().toIso8601String(),
+              if (approvedBy != null && approvedBy.isNotEmpty)
+                'approved_by': approvedBy,
             }).eq('id', ledgerId);
           } else if (targetId.isNotEmpty) {
             final approvalRes = await client
@@ -2116,12 +2126,16 @@ class SupabaseService {
                 'status': 'PAID',
                 'due_amount': 0.0,
                 'paid_date': DateTime.now().toIso8601String(),
+                if (approvedBy != null && approvedBy.isNotEmpty)
+                  'approved_by': approvedBy,
               }).eq('id', lId);
             } else if (propId != null && propId.isNotEmpty) {
               var ledgerQuery = client.from('rent_ledgers').update({
                 'status': 'PAID',
                 'due_amount': 0.0,
                 'paid_date': DateTime.now().toIso8601String(),
+                if (approvedBy != null && approvedBy.isNotEmpty)
+                  'approved_by': approvedBy,
               }).eq('property_id', propId);
 
               if (rNum.isNotEmpty) {
@@ -2130,6 +2144,78 @@ class SupabaseService {
                 ledgerQuery = ledgerQuery.eq('tenant_name', tName);
               }
               await ledgerQuery;
+            }
+          }
+
+          // Auto-cleanup any remaining dangling pending slips for this ledger
+          String? activeLedgerTarget = ledgerId;
+          if ((activeLedgerTarget == null || activeLedgerTarget.isEmpty) && targetId.isNotEmpty) {
+            try {
+              final row = await client
+                  .from('payment_approvals')
+                  .select('ledger_id')
+                  .eq('id', targetId)
+                  .maybeSingle();
+              activeLedgerTarget = row?['ledger_id']?.toString();
+            } catch (_) {}
+          }
+
+          if (activeLedgerTarget != null && activeLedgerTarget.isNotEmpty) {
+            try {
+              await client
+                  .from('payment_approvals')
+                  .delete()
+                  .eq('ledger_id', activeLedgerTarget)
+                  .eq('status', 'pending');
+            } catch (_) {}
+          }
+
+          // 3. If Cash handover, log into warden_cash_collections for warden cash audit
+          if (targetId.isNotEmpty) {
+            try {
+              final approvalRes = await client
+                  .from('payment_approvals')
+                  .select(
+                      'payment_app, utr_number, collected_by, amount, property_id, property_name, tenant_id, tenant_name, room_number')
+                  .eq('id', targetId)
+                  .maybeSingle();
+
+              final paymentApp = approvalRes?['payment_app']?.toString() ?? '';
+              final utr = approvalRes?['utr_number']?.toString() ?? '';
+              final collectedBy =
+                  approvalRes?['collected_by']?.toString() ?? '';
+              if (paymentApp == 'Cash Handover' ||
+                  utr.startsWith('CASH-') ||
+                  collectedBy.isNotEmpty) {
+                String wardenName = collectedBy.isNotEmpty
+                    ? collectedBy
+                    : utr.replaceFirst('CASH-', '').replaceAll('_', ' ');
+                if (wardenName.isEmpty) wardenName = 'Staff / Warden';
+                final amt = (approvalRes?['amount'] as num?)?.toDouble() ?? 0.0;
+                final pId = approvalRes?['property_id']?.toString() ?? '';
+                final pName = approvalRes?['property_name']?.toString() ?? '';
+                final tId = approvalRes?['tenant_id']?.toString();
+                final tName = approvalRes?['tenant_name']?.toString() ?? '';
+                final rNum = approvalRes?['room_number']?.toString() ?? '';
+
+                final bool isOwner =
+                    wardenName.toLowerCase().contains('(owner)');
+
+                await client.from('warden_cash_collections').insert({
+                  'property_id': pId,
+                  if (pName.isNotEmpty) 'property_name': pName,
+                  if (tId != null && tId.isNotEmpty) 'tenant_id': tId,
+                  'tenant_name': tName,
+                  'room_number': rNum,
+                  'warden_name': wardenName,
+                  'amount': amt,
+                  'is_deposited_to_owner': isOwner,
+                  'notes': 'Cash handover verified & approved',
+                });
+              }
+            } catch (e) {
+              debugPrint(
+                  'Notice logging to warden_cash_collections upon approval: $e');
             }
           }
         }
@@ -2185,6 +2271,7 @@ class SupabaseService {
                   'due_amount': 0.0,
                   'paid_date': DateTime.now().toIso8601String(),
                   'payment_mode': 'CASH',
+                  'approved_by': collectedBy,
                 })
                 .eq('id', ledgerId)
                 .select('id');
@@ -2203,6 +2290,7 @@ class SupabaseService {
               'due_amount': 0.0,
               'paid_date': DateTime.now().toIso8601String(),
               'payment_mode': 'CASH',
+              'approved_by': collectedBy,
             }).eq('property_id', propertyId);
 
             if (tenantName.isNotEmpty && tenantName != 'Resident') {
@@ -2234,6 +2322,7 @@ class SupabaseService {
                       'due_amount': 0.0,
                       'paid_date': DateTime.now().toIso8601String(),
                       'payment_mode': 'CASH',
+                      'approved_by': collectedBy,
                     })
                     .eq('property_id', propertyId)
                     .eq('room_number', cleanRoom)
@@ -2276,6 +2365,7 @@ class SupabaseService {
               'status': 'PAID',
               'paid_date': DateTime.now().toIso8601String(),
               'payment_mode': 'CASH',
+              'approved_by': collectedBy,
               'due_date':
                   '${now.year}-${now.month.toString().padLeft(2, '0')}-05',
               'rent_due_day': 5,
@@ -2283,7 +2373,23 @@ class SupabaseService {
           }
         }
 
-        // 2. Safely log to warden_cash_collections (matches exact table schema)
+        // 2. Also mark any existing pending payment_approval for this ledger/room as approved
+        try {
+          if (ledgerId != null &&
+              ledgerId.isNotEmpty &&
+              !ledgerId.startsWith('bed_')) {
+            await client
+                .from('payment_approvals')
+                .update({
+                  'status': 'approved',
+                  'approved_by': collectedBy,
+                })
+                .eq('ledger_id', ledgerId)
+                .eq('status', 'pending');
+          }
+        } catch (_) {}
+
+        // 3. Safely log to warden_cash_collections (matches exact table schema)
         try {
           String? resolvedTenantId;
           if (ledgerId != null &&
@@ -2313,6 +2419,8 @@ class SupabaseService {
           final cashNote = (notes != null && notes.trim().isNotEmpty)
               ? notes.trim()
               : 'Cash received by $collectedBy';
+          final bool isOwner = collectedBy.toLowerCase().contains('(owner)') ||
+              collectedBy.toLowerCase() == 'owner';
 
           await client.from('warden_cash_collections').insert({
             'property_id': propertyId,
@@ -2323,7 +2431,7 @@ class SupabaseService {
             'room_number': roomNumber,
             'warden_name': collectedBy,
             'amount': amount,
-            'is_deposited_to_owner': false,
+            'is_deposited_to_owner': isOwner,
             'notes': cashNote,
           });
         } catch (e) {
@@ -2463,8 +2571,29 @@ class SupabaseService {
   Future<void> ensureMonthlyRentLedgers({
     required String propertyId,
     required String cycleMonth,
+    String? propertyName,
   }) async {
     try {
+      String resolvedPropName = (propertyName != null && propertyName.isNotEmpty)
+          ? propertyName
+          : (activePropertyName != null && activePropertyName!.isNotEmpty
+              ? activePropertyName!
+              : '');
+      if (resolvedPropName.isEmpty && propertyId.isNotEmpty) {
+        try {
+          final pRes = await client
+              .from('properties')
+              .select('property_name, name')
+              .eq('id', propertyId)
+              .maybeSingle();
+          resolvedPropName = pRes?['property_name']?.toString() ??
+              pRes?['name']?.toString() ??
+              '';
+          if (resolvedPropName.isNotEmpty) {
+            activePropertyName = resolvedPropName;
+          }
+        } catch (_) {}
+      }
       final existing = await client
           .from('rent_ledgers')
           .select(
@@ -2592,7 +2721,7 @@ class SupabaseService {
             if (!tenantAlreadyBilled && !anonymousBedAlreadyCovered) {
               toInsert.add({
                 'property_id': propertyId,
-                'property_name': activePropertyName ?? '',
+                'property_name': resolvedPropName,
                 if (validTenantId != null) 'tenant_id': validTenantId,
                 'tenant_name': tName,
                 'room_number': cleanRoom.isNotEmpty ? cleanRoom : rNum,
@@ -2662,33 +2791,58 @@ class SupabaseService {
     String? resolutionNotes,
   }) async {
     return await _withLoading('Updating Ticket Status...', () async {
+      final normalizedStatus = status.toLowerCase().trim();
+      final note = resolutionNotes?.trim();
+
+      // 1. Primary: maintenance_tickets table with progress_note (schema column name)
       try {
         final Map<String, dynamic> updateData = {
-          'status': status.toLowerCase()
+          'status': normalizedStatus,
+          if (note != null && note.isNotEmpty) 'progress_note': note,
         };
-        if (resolutionNotes != null) {
-          updateData['resolution_notes'] = resolutionNotes;
-        }
         await client
             .from('maintenance_tickets')
+            .update(updateData)
+            .eq('id', complaintId);
+        debugPrint(
+            'Successfully updated maintenance_tickets ($complaintId) to $normalizedStatus');
+        return true;
+      } catch (e1) {
+        debugPrint('Notice updating maintenance_tickets with progress_note: $e1');
+        // 2. Try maintenance_tickets with ONLY status
+        try {
+          await client
+              .from('maintenance_tickets')
+              .update({'status': normalizedStatus})
+              .eq('id', complaintId);
+          debugPrint(
+              'Successfully updated maintenance_tickets ($complaintId) status only to $normalizedStatus');
+          return true;
+        } catch (e2) {
+          debugPrint('Notice updating maintenance_tickets status only: $e2');
+        }
+      }
+
+      // 3. Fallback to complaints table if legacy schema is present
+      try {
+        final Map<String, dynamic> updateData = {
+          'status': normalizedStatus,
+          if (note != null && note.isNotEmpty) 'resolution_notes': note,
+        };
+        await client
+            .from('complaints')
             .update(updateData)
             .eq('id', complaintId);
         return true;
       } catch (_) {
         try {
-          final Map<String, dynamic> updateData = {
-            'status': status.toLowerCase()
-          };
-          if (resolutionNotes != null) {
-            updateData['resolution_notes'] = resolutionNotes;
-          }
           await client
               .from('complaints')
-              .update(updateData)
+              .update({'status': normalizedStatus})
               .eq('id', complaintId);
           return true;
-        } catch (e) {
-          debugPrint('Error updating complaint status: $e');
+        } catch (e3) {
+          debugPrint('Error updating complaint status in all tables: $e3');
           return false;
         }
       }
@@ -2703,8 +2857,8 @@ class SupabaseService {
     );
   }
 
-  /// 9. Create maintenance ticket / complaint (with property, tenant, room snapshots)
-  Future<bool> createMaintenanceTicket({
+  /// 9. Create strongly-typed MaintenanceTicketModel
+  Future<MaintenanceTicketModel?> createMaintenanceTicket({
     required String propertyId,
     String? propertyName,
     required String tenantId,
@@ -2722,7 +2876,7 @@ class SupabaseService {
         final payload = {
           'property_id': propertyId,
           if (pName.isNotEmpty) 'property_name': pName,
-          'tenant_id': tenantId,
+          if (tenantId.isNotEmpty) 'tenant_id': tenantId,
           if (tenantName != null && tenantName.isNotEmpty)
             'tenant_name': tenantName,
           if (roomNumber != null && roomNumber.isNotEmpty)
@@ -2733,15 +2887,25 @@ class SupabaseService {
           'status': 'pending',
         };
         try {
-          await client.from('maintenance_tickets').insert(payload);
-          return true;
+          final res = await client
+              .from('maintenance_tickets')
+              .insert(payload)
+              .select()
+              .single();
+          return MaintenanceTicketModel.fromJson(
+              Map<String, dynamic>.from(res));
         } catch (_) {
-          await client.from('complaints').insert(payload);
-          return true;
+          final res = await client
+              .from('complaints')
+              .insert(payload)
+              .select()
+              .single();
+          return MaintenanceTicketModel.fromJson(
+              Map<String, dynamic>.from(res));
         }
       } catch (e) {
-        debugPrint('Error creating maintenance ticket: $e');
-        return false;
+        debugPrint('Error creating maintenance ticket model: $e');
+        return null;
       }
     });
   }
@@ -2800,9 +2964,11 @@ class SupabaseService {
           if (pId != null && pId.isNotEmpty) 'property_id': pId,
           if (pName.isNotEmpty) 'property_name': pName,
           if (roomId != null && roomId.isNotEmpty) 'room_id': roomId,
-          if (roomNumber != null && roomNumber.isNotEmpty) 'room_number': roomNumber,
+          if (roomNumber != null && roomNumber.isNotEmpty)
+            'room_number': roomNumber,
           if (tenantId != null && tenantId.isNotEmpty) 'tenant_id': tenantId,
-          if (tenantName != null && tenantName.isNotEmpty) 'tenant_name': tenantName,
+          if (tenantName != null && tenantName.isNotEmpty)
+            'tenant_name': tenantName,
           'service_type': serviceType,
           'preferred_slot': preferredSlot,
           'status': 'SCHEDULED',
@@ -2826,8 +2992,7 @@ class SupabaseService {
       try {
         await client
             .from('housekeeping_requests')
-            .update({'status': 'CANCELLED'})
-            .eq('id', requestId);
+            .update({'status': 'CANCELLED'}).eq('id', requestId);
         return true;
       } catch (e) {
         debugPrint('Error cancelling housekeeping request: $e');
@@ -2865,7 +3030,6 @@ class SupabaseService {
       return null;
     }
   }
-
 
   /// 11. Fetch strongly-typed ExpenseModels
   Future<List<ExpenseModel>> getExpenseModels(String propertyId) async {
@@ -3141,9 +3305,8 @@ class SupabaseService {
                   reqRes['full_name']?.toString() ??
                   'Resident';
               final tPhone = reqRes['phone']?.toString() ?? '';
-              final propId = reqRes['property_id']?.toString() ??
-                  activePropertyId ??
-                  '';
+              final propId =
+                  reqRes['property_id']?.toString() ?? activePropertyId ?? '';
               final propName = reqRes['property_name']?.toString() ??
                   activePropertyName ??
                   '';
@@ -3175,10 +3338,7 @@ class SupabaseService {
                     if (bLabel.isNotEmpty) {
                       match = bedQuery.firstWhere(
                         (b) =>
-                            b['bed_label']
-                                ?.toString()
-                                .trim()
-                                .toLowerCase() ==
+                            b['bed_label']?.toString().trim().toLowerCase() ==
                             bLabel.trim().toLowerCase(),
                         orElse: () => bedQuery.first,
                       );
