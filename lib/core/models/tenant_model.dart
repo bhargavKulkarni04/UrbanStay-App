@@ -23,6 +23,12 @@ class TenantModel {
   final bool isAadhaarVerified;
   final String? refundUpiId;
   final String? emergencyContact;
+  final String? permanentAddress;
+  final String? aadhaarMasked;
+  final String? aadhaarFrontUrl;
+  final String? aadhaarBackUrl;
+  final String? guardianName;
+  final String? workIdCardUrl;
   final String? sharingType;
   final String status;
   final DateTime? createdAt;
@@ -45,6 +51,12 @@ class TenantModel {
     this.isAadhaarVerified = false,
     this.refundUpiId,
     this.emergencyContact,
+    this.permanentAddress,
+    this.aadhaarMasked,
+    this.aadhaarFrontUrl,
+    this.aadhaarBackUrl,
+    this.guardianName,
+    this.workIdCardUrl,
     this.sharingType,
     this.status = 'Active',
     this.createdAt,
@@ -94,6 +106,12 @@ class TenantModel {
       isAadhaarVerified: json['is_aadhaar_verified'] == true,
       refundUpiId: json['refund_upi_id']?.toString(),
       emergencyContact: json['emergency_contact']?.toString(),
+      permanentAddress: json['permanent_address']?.toString(),
+      aadhaarMasked: json['aadhaar_masked']?.toString(),
+      aadhaarFrontUrl: json['aadhaar_front_url']?.toString(),
+      aadhaarBackUrl: json['aadhaar_back_url']?.toString(),
+      guardianName: json['guardian_name']?.toString(),
+      workIdCardUrl: json['work_id_card_url']?.toString(),
       sharingType: json['sharing_type']?.toString(),
       status: json['status']?.toString() ?? 'Active',
       createdAt: json['created_at'] != null
@@ -122,6 +140,12 @@ class TenantModel {
       'is_aadhaar_verified': isAadhaarVerified,
       if (refundUpiId != null) 'refund_upi_id': refundUpiId,
       if (emergencyContact != null) 'emergency_contact': emergencyContact,
+      if (permanentAddress != null) 'permanent_address': permanentAddress,
+      if (aadhaarMasked != null) 'aadhaar_masked': aadhaarMasked,
+      if (aadhaarFrontUrl != null) 'aadhaar_front_url': aadhaarFrontUrl,
+      if (aadhaarBackUrl != null) 'aadhaar_back_url': aadhaarBackUrl,
+      if (guardianName != null) 'guardian_name': guardianName,
+      if (workIdCardUrl != null) 'work_id_card_url': workIdCardUrl,
       if (sharingType != null) 'sharing_type': sharingType,
       'status': status,
     };

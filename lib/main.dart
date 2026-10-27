@@ -138,16 +138,20 @@ class UrbanStayApp extends StatelessWidget {
           },
         );
       },
-      // 🚀 Tenant Dashboard Web Release with Dynamic Property ID
+      // 🚀 Tenant Dashboard Web Release
       home: TenantDashboardScreen(
         propertyId: Uri.base.queryParameters['propertyId'] ??
             Uri.base.queryParameters['id'] ??
-            '94e3f186-d80f-4b37-b8ad-dc099c5f54ee',
+            'fff9b852-ea2c-44c2-82ca-09f7723cb303',
+        tenantId: Uri.base.queryParameters['tenantId'] ??
+            Uri.base.queryParameters['tenant_id'] ??
+            Uri.base.queryParameters['tid'],
         roomNumber: Uri.base.queryParameters['room'] ?? '',
         bedId: Uri.base.queryParameters['bed'] ?? '',
         tenantName: Uri.base.queryParameters['name'] ?? '',
         tenantPhone: Uri.base.queryParameters['phone'] ??
-            Uri.base.queryParameters['mobile'],
+            Uri.base.queryParameters['mobile'] ??
+            '5851022581',
       ),
     );
   }

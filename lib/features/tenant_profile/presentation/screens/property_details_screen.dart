@@ -115,43 +115,21 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                             'Property Address', widget.propertyAddress),
                         const SizedBox(height: 24),
 
-                        // ─── Room & Bed Details (Editable) with ✎ at section header ───
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Room & Bed Details (Editable)',
-                              style: GoogleFonts.outfit(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.ink,
-                              ),
-                            ),
-                            Text(
-                              '✎',
-                              style: GoogleFonts.outfit(
-                                fontSize: 16,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ],
+                        // ─── Room & Bed Details (View Only) ───
+                        Text(
+                          'Room & Bed Details',
+                          style: GoogleFonts.outfit(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ink,
+                          ),
                         ),
                         const SizedBox(height: 14),
 
-                        _buildEditableField(
-                          label: 'Floor',
-                          controller: _floorController,
-                          hint: 'e.g. Floor 1',
-                        ),
-                        const SizedBox(height: 12),
-
-                        _buildEditableField(
-                          label: 'Room Number',
-                          controller: _roomController,
-                          hint: 'e.g. Room 104',
-                        ),
-                        const SizedBox(height: 12),
-
+                        _buildInfoTile('Floor', widget.initialFloor),
+                        const SizedBox(height: 10),
+                        _buildInfoTile('Room Number', widget.initialRoom),
+                        const SizedBox(height: 10),
                         _buildInfoTile('Sharing Type', widget.sharingType),
                         const SizedBox(height: 24),
 
@@ -170,9 +148,9 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                         const SizedBox(height: 10),
                         _buildInfoTile(
                             'Security Deposit', widget.depositAmount),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 18),
 
-                        // Small Note
+                        // Note
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
@@ -183,7 +161,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                             border: Border.all(color: const Color(0xFFE5E7EB)),
                           ),
                           child: Text(
-                            'Note: To change rent amount or deposit amount, contact PG owner or manager.',
+                            'Note: Room assignments, floor changes, and rent tariffs are managed exclusively by property management.',
                             style: GoogleFonts.outfit(
                               fontSize: 13,
                               fontWeight: FontWeight.w400,
@@ -192,46 +170,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 36),
-
-                        // Save Room Details Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Room details saved successfully',
-                                    style: GoogleFonts.outfit(),
-                                  ),
-                                  backgroundColor: AppColors.greenDark,
-                                ),
-                              );
-                              Navigator.of(context).maybePop({
-                                'floor': _floorController.text.trim(),
-                                'room': _roomController.text.trim(),
-                              });
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.green,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Text(
-                              'Save Changes',
-                              style: GoogleFonts.outfit(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 28),
                       ],
                     ),
                   ),

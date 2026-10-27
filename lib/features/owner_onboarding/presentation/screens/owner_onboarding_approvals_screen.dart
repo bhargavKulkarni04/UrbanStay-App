@@ -114,6 +114,81 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
     );
   }
 
+  void _showImagePreview(BuildContext context, String title, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 180,
+                    color: const Color(0xFFF3F4F6),
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.broken_image_outlined,
+                              size: 36, color: AppColors.muted),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Unable to load preview',
+                            style: GoogleFonts.outfit(
+                                color: AppColors.muted, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.ink,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text('Close',
+                    style: GoogleFonts.outfit(
+                        color: Colors.white, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ===========================================================================
   // ACCEPT ONBOARDING FLOW WITH INLINE EDIT CAPABILITY
   // ===========================================================================
@@ -345,7 +420,111 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                       ),
                     ),
                   ],
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+
+                  // 2.5 Aadhaar KYC Verification Section
+                  if ((req.aadhaarMasked != null && req.aadhaarMasked!.isNotEmpty) ||
+                      (req.aadhaarFrontUrl != null && req.aadhaarFrontUrl!.isNotEmpty) ||
+                      (req.aadhaarBackUrl != null && req.aadhaarBackUrl!.isNotEmpty)) ...[
+                    _buildSectionHeader('KYC Aadhaar Documents'),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (req.aadhaarMasked != null && req.aadhaarMasked!.isNotEmpty) ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Aadhaar Number',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    color: AppColors.muted,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  req.aadhaarMasked!,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.ink,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          Row(
+                            children: [
+                              if (req.aadhaarFrontUrl != null && req.aadhaarFrontUrl!.isNotEmpty)
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => _showImagePreview(context, 'Aadhaar Front', req.aadhaarFrontUrl!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.badge_outlined, size: 14, color: AppColors.greenDark),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'View Front',
+                                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              if (req.aadhaarFrontUrl != null && req.aadhaarBackUrl != null)
+                                const SizedBox(width: 8),
+                              if (req.aadhaarBackUrl != null && req.aadhaarBackUrl!.isNotEmpty)
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () => _showImagePreview(context, 'Aadhaar Back', req.aadhaarBackUrl!),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: AppColors.green.withValues(alpha: 0.4)),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.flip_to_back_rounded, size: 14, color: AppColors.greenDark),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'View Back',
+                                            style: GoogleFonts.outfit(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.greenDark),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   // 3. Confirm Onboarding Action Button (Concise text, smoothly reachable)
                   ElevatedButton(
@@ -382,6 +561,7 @@ class _OwnerOnboardingApprovalsScreenState extends State<OwnerOnboardingApproval
                           depositAmount: finalDeposit.toDouble(),
                           aadhaarMasked: req.aadhaarMasked,
                           aadhaarFrontUrl: req.aadhaarFrontUrl,
+                          aadhaarBackUrl: req.aadhaarBackUrl,
                           selfieUrl: req.selfieUrl,
                           status: 'APPROVED',
                           createdAt: DateTime.now(),

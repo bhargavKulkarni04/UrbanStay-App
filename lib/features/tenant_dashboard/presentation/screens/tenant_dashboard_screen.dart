@@ -15,6 +15,7 @@ import '../../../tenant_housekeeping/presentation/widgets/bedsheet_change_sheet.
 import '../../../tenant_notice/presentation/screens/move_out_notice_screen.dart';
 import '../../../tenant_food_menu/presentation/screens/tenant_food_menu_screen.dart';
 import '../../../tenant_notice_board/presentation/screens/tenant_notice_board_screen.dart';
+import '../../../tenant_profile/presentation/screens/profile_settings_screen.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/services/supabase_service.dart';
 
@@ -84,6 +85,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
   String _propertyLocation = '';
   String? _activeLedgerId;
   MaintenanceTicketModel? _activeTicket;
+  double _totalOutstandingDues = 0.0;
+  int _unpaidMonthsCount = 0;
+  List<String> _unpaidMonthsNames = [];
 
   @override
   void initState() {
@@ -140,7 +144,7 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
     _loadLiveTenantAndPropertyData();
   }
 
-  Future<void> _loadLiveTenantAndPropertyData() async {
+  Future<void> _loadLiveTenantAndPropertyData({bool force = false}) async {
     try {
       // 1. Property Details
       String? pId = _propertyId ?? SupabaseService.instance.activePropertyId;
@@ -194,8 +198,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
         }
       }
 
-      // 2. Tenant & Bed details from tenants table if rent, name, or sharing missing
-      if (_currentRentAmount == 0.0 ||
+      // 2. Tenant & Bed details from tenants table if rent, name, or sharing missing (or force refresh)
+      if (force ||
+          _currentRentAmount == 0.0 ||
           _tenantName.isEmpty ||
           _sharingType.isEmpty ||
           _tenantId == null) {
@@ -245,7 +250,10 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                   (tenantRecord!['security_deposit'] as num?)?.toDouble() ??
                       0.0;
             }
-            if (_tenantName.isEmpty) {
+            if (force && tenantRecord!['name'] != null) {
+              final newName = tenantRecord!['name'].toString().trim();
+              if (newName.isNotEmpty) _tenantName = newName;
+            } else if (_tenantName.isEmpty) {
               _tenantName = tenantRecord!['name']?.toString() ?? '';
             }
             if (_tenantPhone.isEmpty) {
@@ -290,26 +298,74 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                     .maybeSingle();
               }
 
+              // 2. Query ALL tenant ledgers to accumulate any past unpaid dues (e.g. Oct + Nov)
+              final allLedgersRes = await SupabaseService.instance.client
+                  .from('rent_ledgers')
+                  .select('id, rent_amount, due_amount, status, billing_month')
+                  .eq('tenant_id', _tenantId!)
+                  .order('created_at', ascending: false);
+
+              double accumulatedDues = 0.0;
+              final List<String> unpaidMonths = [];
+              for (final raw in (allLedgersRes as List? ?? [])) {
+                final row = Map<String, dynamic>.from(raw);
+                final status =
+                    (row['status']?.toString() ?? 'PENDING').toUpperCase();
+                if (status != 'PAID') {
+                  final due = double.tryParse(
+                          row['due_amount']?.toString() ?? '') ??
+                      double.tryParse(row['rent_amount']?.toString() ?? '') ??
+                      0.0;
+                  if (due > 0) {
+                    accumulatedDues += due;
+                    final m = row['billing_month']?.toString() ?? '';
+                    if (m.isNotEmpty && !unpaidMonths.contains(m)) {
+                      unpaidMonths.add(m);
+                    }
+                  }
+                }
+              }
+
               if (ledgerRes != null && mounted) {
                 setState(() {
                   _activeLedgerId = ledgerRes!['id']?.toString();
-                  final due = (ledgerRes['due_amount'] as num?)?.toDouble();
-                  final rent = (ledgerRes['rent_amount'] as num?)?.toDouble();
-                  if (due != null && due > 0) {
-                    _currentRentAmount = due;
-                  } else if (rent != null && rent > 0) {
-                    _currentRentAmount = rent;
-                  }
-                  final lStatus = ledgerRes['status']?.toString().toUpperCase();
-                  if (lStatus == 'PAID') {
-                    _paymentStatus = 'PAID';
-                  } else {
+                  final due = double.tryParse(
+                      ledgerRes['due_amount']?.toString() ?? '');
+                  final rent = double.tryParse(
+                      ledgerRes['rent_amount']?.toString() ?? '');
+
+                  if (accumulatedDues > 0) {
+                    _currentRentAmount = accumulatedDues;
+                    _totalOutstandingDues = accumulatedDues;
+                    _unpaidMonthsCount = unpaidMonths.length;
+                    _unpaidMonthsNames = unpaidMonths;
                     _paymentStatus = 'DUE';
+                  } else {
+                    if (due != null && due > 0) {
+                      _currentRentAmount = due;
+                    } else if (rent != null && rent > 0) {
+                      _currentRentAmount = rent;
+                    }
+                    final lStatus =
+                        ledgerRes['status']?.toString().toUpperCase();
+                    if (lStatus == 'PAID') {
+                      _paymentStatus = 'PAID';
+                    } else {
+                      _paymentStatus = 'DUE';
+                    }
+                    _totalOutstandingDues = 0.0;
+                    _unpaidMonthsCount = 0;
+                    _unpaidMonthsNames = [];
                   }
                 });
               } else if (mounted) {
-                // Brand new month cycle with no payment recorded yet
                 setState(() {
+                  if (accumulatedDues > 0) {
+                    _currentRentAmount = accumulatedDues;
+                    _totalOutstandingDues = accumulatedDues;
+                    _unpaidMonthsCount = unpaidMonths.length;
+                    _unpaidMonthsNames = unpaidMonths;
+                  }
                   _paymentStatus = 'DUE';
                 });
               }
@@ -623,7 +679,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                     ? '$_currentCycleMonthUpper RENT SUBMITTED'
                     : (isPaid
                         ? '$_currentCycleMonthUpper RENT SETTLED'
-                        : '$_currentCycleMonthUpper RENT'),
+                        : (_unpaidMonthsCount > 1
+                            ? 'TOTAL OUTSTANDING DUES ($_unpaidMonthsCount MONTHS)'
+                            : '$_currentCycleMonthUpper RENT')),
                 style: GoogleFonts.outfit(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -632,7 +690,9 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                       ? AppColors.greenDark
                       : (isUnderReview
                           ? const Color(0xFFD97706)
-                          : AppColors.muted),
+                          : (_unpaidMonthsCount > 1
+                              ? const Color(0xFFDC2626)
+                              : AppColors.muted)),
                 ),
               ),
 
@@ -755,23 +815,19 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
                         ),
                       ),
                     ] else ...[
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.access_time_rounded,
-                            size: 13,
-                            color: Color(0xFFD97706),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Due by $_currentDueDate',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFFD97706),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        _unpaidMonthsCount > 1
+                            ? 'Includes ${_unpaidMonthsNames.reversed.join(" + ")}'
+                            : 'Due by $_currentDueDate',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _unpaidMonthsCount > 1
+                              ? const Color(0xFFDC2626)
+                              : const Color(0xFFD97706),
+                        ),
                       ),
                     ],
                   ],
@@ -1786,29 +1842,60 @@ class _TenantDashboardScreenState extends State<TenantDashboardScreen> {
 
                     const SizedBox(width: 14),
 
-                    // Clean Circular Avatar
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 8,
-                            offset: Offset(0, 3),
+                    // Clean Circular Avatar (Tappable -> Profile Settings)
+                    GestureDetector(
+                      onTap: () async {
+                        HapticFeedback.lightImpact();
+                        final res = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProfileSettingsScreen(
+                              tenantName: _tenantName,
+                              pgName: _pgName,
+                              roomNumber: _roomNumber,
+                              sharingType: _sharingType,
+                              floor: 'Floor 1',
+                              tenantId: _tenantId,
+                              propertyId: _propertyId,
+                              tenantPhone: _tenantPhone,
+                              monthlyRent: _currentRentAmount,
+                              securityDeposit: _currentSecurityDeposit,
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          initials,
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.greenDark,
-                            letterSpacing: -0.2,
+                        );
+                        if (res != null && res is Map<String, dynamic>) {
+                          if (res['name'] != null &&
+                              (res['name'] as String).trim().isNotEmpty) {
+                            setState(() {
+                              _tenantName = (res['name'] as String).trim();
+                            });
+                          }
+                        }
+                        _loadLiveTenantAndPropertyData(force: true);
+                      },
+                      child: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 8,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            initials,
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.greenDark,
+                              letterSpacing: -0.2,
+                            ),
                           ),
                         ),
                       ),

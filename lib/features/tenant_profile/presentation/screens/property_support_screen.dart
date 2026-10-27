@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class PropertySupportScreen extends StatelessWidget {
+  final String? propertyId;
+  final String? pgName;
   final String managerName;
   final String roleTitle;
   final String phoneNumber;
@@ -12,11 +14,13 @@ class PropertySupportScreen extends StatelessWidget {
 
   const PropertySupportScreen({
     super.key,
-    this.managerName = 'Arun Kumar',
+    this.propertyId,
+    this.pgName,
+    this.managerName = 'Property Caretaker',
     this.roleTitle = 'PG Owner & Manager',
     this.phoneNumber = '+91 98450 12345',
     this.whatsappNumber = '+91 98450 12345',
-    this.emailId = 'arun.pg@urbanstay.living',
+    this.emailId = 'support@urbanstay.living',
   });
 
   @override

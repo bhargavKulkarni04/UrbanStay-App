@@ -721,6 +721,11 @@ class SupabaseService {
     double? deposit,
     int? rentDueDay,
     String? sharingType,
+    String? aadhaarMasked,
+    String? aadhaarFrontUrl,
+    String? aadhaarBackUrl,
+    String? email,
+    String? workplace,
   }) async {
     try {
       final pId = propertyId.isNotEmpty ? propertyId : (activePropertyId ?? '');
@@ -766,7 +771,7 @@ class SupabaseService {
 
       if (tRow != null && tRow['id'] != null) {
         final existingId = tRow['id'].toString();
-        // Update active location
+        // Update active location and documents
         try {
           await client.from('tenants').update({
             if (cleanName.isNotEmpty) 'name': cleanName,
@@ -783,6 +788,17 @@ class SupabaseService {
             if (deposit != null) 'security_deposit': deposit,
             if (resolvedSharing != null && resolvedSharing.isNotEmpty)
               'sharing_type': resolvedSharing,
+            if (aadhaarMasked != null && aadhaarMasked.isNotEmpty)
+              'aadhaar_masked': aadhaarMasked,
+            if (aadhaarFrontUrl != null && aadhaarFrontUrl.isNotEmpty)
+              'aadhaar_front_url': aadhaarFrontUrl,
+            if (aadhaarBackUrl != null && aadhaarBackUrl.isNotEmpty)
+              'aadhaar_back_url': aadhaarBackUrl,
+            if (email != null && email.isNotEmpty) 'email': email,
+            if (workplace != null && workplace.isNotEmpty)
+              'workplace': workplace,
+            if (aadhaarFrontUrl != null && aadhaarFrontUrl.isNotEmpty)
+              'is_aadhaar_verified': true,
             'rent_due_day': dueDay,
             'status': 'Active',
           }).eq('id', existingId);
@@ -822,6 +838,16 @@ class SupabaseService {
         if (deposit != null) 'security_deposit': deposit,
         if (resolvedSharing != null && resolvedSharing.isNotEmpty)
           'sharing_type': resolvedSharing,
+        if (aadhaarMasked != null && aadhaarMasked.isNotEmpty)
+          'aadhaar_masked': aadhaarMasked,
+        if (aadhaarFrontUrl != null && aadhaarFrontUrl.isNotEmpty)
+          'aadhaar_front_url': aadhaarFrontUrl,
+        if (aadhaarBackUrl != null && aadhaarBackUrl.isNotEmpty)
+          'aadhaar_back_url': aadhaarBackUrl,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (workplace != null && workplace.isNotEmpty) 'workplace': workplace,
+        if (aadhaarFrontUrl != null && aadhaarFrontUrl.isNotEmpty)
+          'is_aadhaar_verified': true,
         'rent_due_day': dueDay,
         'status': 'Active',
       };
@@ -860,6 +886,14 @@ class SupabaseService {
           if (deposit != null) 'security_deposit': deposit,
           if (resolvedSharing != null && resolvedSharing.isNotEmpty)
             'sharing_type': resolvedSharing,
+          if (aadhaarMasked != null && aadhaarMasked.isNotEmpty)
+            'aadhaar_masked': aadhaarMasked,
+          if (aadhaarFrontUrl != null && aadhaarFrontUrl.isNotEmpty)
+            'aadhaar_front_url': aadhaarFrontUrl,
+          if (aadhaarBackUrl != null && aadhaarBackUrl.isNotEmpty)
+            'aadhaar_back_url': aadhaarBackUrl,
+          if (email != null && email.isNotEmpty) 'email': email,
+          if (workplace != null && workplace.isNotEmpty) 'workplace': workplace,
           'rent_due_day': dueDay,
           'status': 'Active',
         };
@@ -2149,7 +2183,8 @@ class SupabaseService {
 
           // Auto-cleanup any remaining dangling pending slips for this ledger
           String? activeLedgerTarget = ledgerId;
-          if ((activeLedgerTarget == null || activeLedgerTarget.isEmpty) && targetId.isNotEmpty) {
+          if ((activeLedgerTarget == null || activeLedgerTarget.isEmpty) &&
+              targetId.isNotEmpty) {
             try {
               final row = await client
                   .from('payment_approvals')
@@ -2574,11 +2609,12 @@ class SupabaseService {
     String? propertyName,
   }) async {
     try {
-      String resolvedPropName = (propertyName != null && propertyName.isNotEmpty)
-          ? propertyName
-          : (activePropertyName != null && activePropertyName!.isNotEmpty
-              ? activePropertyName!
-              : '');
+      String resolvedPropName =
+          (propertyName != null && propertyName.isNotEmpty)
+              ? propertyName
+              : (activePropertyName != null && activePropertyName!.isNotEmpty
+                  ? activePropertyName!
+                  : '');
       if (resolvedPropName.isEmpty && propertyId.isNotEmpty) {
         try {
           final pRes = await client
@@ -2808,13 +2844,13 @@ class SupabaseService {
             'Successfully updated maintenance_tickets ($complaintId) to $normalizedStatus');
         return true;
       } catch (e1) {
-        debugPrint('Notice updating maintenance_tickets with progress_note: $e1');
+        debugPrint(
+            'Notice updating maintenance_tickets with progress_note: $e1');
         // 2. Try maintenance_tickets with ONLY status
         try {
           await client
               .from('maintenance_tickets')
-              .update({'status': normalizedStatus})
-              .eq('id', complaintId);
+              .update({'status': normalizedStatus}).eq('id', complaintId);
           debugPrint(
               'Successfully updated maintenance_tickets ($complaintId) status only to $normalizedStatus');
           return true;
@@ -2838,8 +2874,7 @@ class SupabaseService {
         try {
           await client
               .from('complaints')
-              .update({'status': normalizedStatus})
-              .eq('id', complaintId);
+              .update({'status': normalizedStatus}).eq('id', complaintId);
           return true;
         } catch (e3) {
           debugPrint('Error updating complaint status in all tables: $e3');
@@ -2895,11 +2930,8 @@ class SupabaseService {
           return MaintenanceTicketModel.fromJson(
               Map<String, dynamic>.from(res));
         } catch (_) {
-          final res = await client
-              .from('complaints')
-              .insert(payload)
-              .select()
-              .single();
+          final res =
+              await client.from('complaints').insert(payload).select().single();
           return MaintenanceTicketModel.fromJson(
               Map<String, dynamic>.from(res));
         }
@@ -3351,6 +3383,13 @@ class SupabaseService {
                 } catch (_) {}
               }
 
+              final aadhaarMasked = reqRes['aadhaar_masked']?.toString();
+              final aadhaarFront = reqRes['aadhaar_front_url']?.toString();
+              final aadhaarBack = reqRes['aadhaar_back_url']?.toString();
+              final tEmail = reqRes['email']?.toString();
+              final tWorkplace = reqRes['company']?.toString() ??
+                  reqRes['workplace']?.toString();
+
               await ensureTenantExists(
                 propertyId: propId,
                 propertyName: propName,
@@ -3363,6 +3402,11 @@ class SupabaseService {
                 rent: mRent,
                 deposit: sDeposit,
                 sharingType: sType,
+                aadhaarMasked: aadhaarMasked,
+                aadhaarFrontUrl: aadhaarFront,
+                aadhaarBackUrl: aadhaarBack,
+                email: tEmail,
+                workplace: tWorkplace,
               );
             }
           } catch (e) {

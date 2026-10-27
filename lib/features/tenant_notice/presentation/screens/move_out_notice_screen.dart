@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/widgets/urban_loading.dart';
 
 /// Screen: Move-Out Notice (Digital Settlement Pass - Option 2 Final)
 /// Features:
@@ -424,6 +425,7 @@ class _MoveOutNoticeScreenState extends State<MoveOutNoticeScreen> {
     setState(() {
       _isSubmitting = true;
     });
+    UrbanLoadingService.show('Submitting 30-day move-out notice...');
 
     try {
       final isoVacateDate =
@@ -478,6 +480,8 @@ class _MoveOutNoticeScreenState extends State<MoveOutNoticeScreen> {
           ),
         );
       }
+    } finally {
+      UrbanLoadingService.hide();
     }
   }
 

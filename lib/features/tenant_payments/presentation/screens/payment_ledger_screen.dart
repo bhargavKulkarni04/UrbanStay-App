@@ -134,34 +134,39 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
           .toList();
 
       // 2. Fetch payment approvals (Pillar 4: PaymentApprovalModel)
-      final approvalsRes = await client
-          .from('payment_approvals')
-          .select('*')
-          .eq('tenant_id', resolvedTenantId)
-          .order('created_at', ascending: false);
+      List<PaymentApprovalModel> approvalModels = [];
+      try {
+        final approvalsRes = await client
+            .from('payment_approvals')
+            .select('*')
+            .eq('tenant_id', resolvedTenantId)
+            .order('created_at', ascending: false);
 
-      final List approvalsList = (approvalsRes as List?) ?? [];
-
-      // Map into strongly-typed Pillar 4 PaymentApprovalModel
-      final List<PaymentApprovalModel> approvalModels = approvalsList
-          .map((e) =>
-              PaymentApprovalModel.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
+        final List approvalsList = (approvalsRes as List?) ?? [];
+        approvalModels = approvalsList
+            .map((e) =>
+                PaymentApprovalModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      } catch (e) {
+        debugPrint('Notice loading payment approvals: $e');
+      }
 
       // 3. Fetch move-in security deposit details from tenants table (Pillar 3: TenantModel)
-      final tenantProfile = await client
-          .from('tenants')
-          .select(
-              'id, name, full_name, room_number, security_deposit, deposit_status, move_in_date, created_at')
-          .eq('id', resolvedTenantId)
-          .maybeSingle();
-
+      Map<String, dynamic>? tenantProfile;
       TenantModel? tenantModel;
-      if (tenantProfile != null) {
-        try {
+      try {
+        tenantProfile = await client
+            .from('tenants')
+            .select('id, name, room_number, security_deposit, status, created_at')
+            .eq('id', resolvedTenantId)
+            .maybeSingle();
+
+        if (tenantProfile != null) {
           tenantModel =
               TenantModel.fromJson(Map<String, dynamic>.from(tenantProfile));
-        } catch (_) {}
+        }
+      } catch (e) {
+        debugPrint('Notice loading tenant profile: $e');
       }
 
       final List<LedgerRecord> records = [];
@@ -246,24 +251,21 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
       }
 
       // Add Move-in Security Deposit if recorded in tenant profile (Pillar 3)
-      if (tenantModel != null && tenantModel.securityDeposit > 0) {
-        final double deposit = tenantModel.securityDeposit;
-        final String depositStatusStr =
-            tenantProfile?['deposit_status']?.toString().toUpperCase() ??
-                'PAID';
-        final isDepPaid = depositStatusStr == 'PAID';
-        final DateTime? depDate = (tenantProfile?['move_in_date'] != null)
-            ? DateTime.tryParse(tenantProfile!['move_in_date'].toString())
-            : tenantModel.createdAt;
-        final rawRoom = (tenantModel.roomNumber != null &&
-                tenantModel.roomNumber!.isNotEmpty)
-            ? tenantModel.roomNumber!
+      final double deposit = (tenantModel != null && tenantModel.securityDeposit > 0)
+          ? tenantModel.securityDeposit
+          : (double.tryParse(tenantProfile?['security_deposit']?.toString() ?? '') ?? 0.0);
+
+      if (deposit > 0) {
+        final DateTime? depDate = tenantModel?.createdAt ??
+            DateTime.tryParse(tenantProfile?['created_at']?.toString() ?? '');
+        final rawRoom = (tenantProfile?['room_number']?.toString().isNotEmpty == true)
+            ? tenantProfile!['room_number'].toString()
             : widget.roomNumber;
         final depCleanRoom = rawRoom.replaceAll(RegExp(r'[^0-9]'), '');
 
         records.add(
           LedgerRecord(
-            id: 'DEP-${tenantModel.id}',
+            id: 'DEP-${resolvedTenantId}',
             title: 'Security Deposit (Move-In)',
             category: 'Security Deposit',
             amount: deposit,
@@ -273,7 +275,7 @@ class _PaymentLedgerScreenState extends State<PaymentLedgerScreen> {
                 'DEP-${depCleanRoom.isNotEmpty ? depCleanRoom : '01'}-SEC',
             recipient: null,
             approvedBy: 'PG Owner',
-            status: isDepPaid ? LedgerStatus.verified : LedgerStatus.pending,
+            status: LedgerStatus.verified,
             receiptNumber:
                 'DEP-${depCleanRoom.isNotEmpty ? depCleanRoom : '01'}',
             hasProofScreenshot: false,

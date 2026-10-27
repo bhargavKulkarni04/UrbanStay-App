@@ -20,6 +20,7 @@ class OnboardingRequestModel {
   final double depositAmount;
   final String? aadhaarMasked;
   final String? aadhaarFrontUrl;
+  final String? aadhaarBackUrl;
   final String? selfieUrl;
   final String status;
   final DateTime? createdAt;
@@ -39,6 +40,7 @@ class OnboardingRequestModel {
     this.depositAmount = 0.0,
     this.aadhaarMasked,
     this.aadhaarFrontUrl,
+    this.aadhaarBackUrl,
     this.selfieUrl,
     this.status = 'PENDING_APPROVAL',
     this.createdAt,
@@ -76,6 +78,7 @@ class OnboardingRequestModel {
       depositAmount: deposit,
       aadhaarMasked: json['aadhaar_masked']?.toString(),
       aadhaarFrontUrl: json['aadhaar_front_url']?.toString(),
+      aadhaarBackUrl: json['aadhaar_back_url']?.toString(),
       selfieUrl: json['selfie_url']?.toString(),
       status: json['status']?.toString() ?? 'PENDING_APPROVAL',
       createdAt: json['created_at'] != null
@@ -101,6 +104,7 @@ class OnboardingRequestModel {
       'deposit_amount': depositAmount,
       if (aadhaarMasked != null) 'aadhaar_masked': aadhaarMasked,
       if (aadhaarFrontUrl != null) 'aadhaar_front_url': aadhaarFrontUrl,
+      if (aadhaarBackUrl != null) 'aadhaar_back_url': aadhaarBackUrl,
       if (selfieUrl != null) 'selfie_url': selfieUrl,
       'status': status,
     };
