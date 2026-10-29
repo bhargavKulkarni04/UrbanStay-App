@@ -28,7 +28,8 @@ class HousekeepingModel {
     this.createdAt,
   });
 
-  bool get isPending => status.toUpperCase() == 'PENDING';
+  bool get isPending =>
+      status.toUpperCase() == 'PENDING' || status.toUpperCase() == 'SCHEDULED';
   bool get isCompleted => status.toUpperCase() == 'COMPLETED';
 
   factory HousekeepingModel.fromJson(Map<String, dynamic> json) {
@@ -39,8 +40,10 @@ class HousekeepingModel {
       roomNumber: json['room_number']?.toString() ?? '',
       tenantName: json['tenant_name']?.toString() ?? '',
       serviceType: json['service_type']?.toString() ?? 'Room Cleaning',
-      timeSlot: json['time_slot']?.toString() ?? 'Morning (9 AM - 12 PM)',
-      status: json['status']?.toString() ?? 'PENDING',
+      timeSlot: json['preferred_slot']?.toString() ??
+          json['time_slot']?.toString() ??
+          '',
+      status: json['status']?.toString() ?? 'SCHEDULED',
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,

@@ -3063,6 +3063,40 @@ class SupabaseService {
     }
   }
 
+  /// Fetch strongly-typed HousekeepingModels for Owner
+  Future<List<HousekeepingModel>> getHousekeepingModels(
+      String propertyId) async {
+    try {
+      final res = await client
+          .from('housekeeping_requests')
+          .select(
+              'id, property_id, property_name, room_number, tenant_id, tenant_name, service_type, preferred_slot, status, created_at')
+          .eq('property_id', propertyId)
+          .order('created_at', ascending: false);
+
+      final list = (res as List?) ?? [];
+      return list
+          .map((e) => HousekeepingModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching housekeeping models: $e');
+      return [];
+    }
+  }
+
+  /// Mark Housekeeping Request as COMPLETED
+  Future<bool> completeHousekeepingRequest(String requestId) async {
+    try {
+      await client
+          .from('housekeeping_requests')
+          .update({'status': 'COMPLETED'}).eq('id', requestId);
+      return true;
+    } catch (e) {
+      debugPrint('Error completing housekeeping request: $e');
+      return false;
+    }
+  }
+
   /// 11. Fetch strongly-typed ExpenseModels
   Future<List<ExpenseModel>> getExpenseModels(String propertyId) async {
     try {
@@ -3943,6 +3977,57 @@ class SupabaseService {
         return true;
       } catch (e) {
         debugPrint('Error removing team member from DB: $e');
+        return false;
+      }
+    });
+  }
+
+  /// 31. Fetch Tenant Feature Controls (Resident App Controls)
+  Future<TenantControlsModel> getTenantControls(String propertyId) async {
+    try {
+      if (propertyId.isEmpty) {
+        return TenantControlsModel.defaultControls(propertyId);
+      }
+      final res = await client
+          .from('tenant_controls')
+          .select('*')
+          .eq('property_id', propertyId)
+          .maybeSingle();
+
+      if (res != null) {
+        return TenantControlsModel.fromJson(Map<String, dynamic>.from(res));
+      }
+      return TenantControlsModel.defaultControls(propertyId);
+    } catch (e) {
+      debugPrint('Error fetching tenant controls from Supabase: $e');
+      return TenantControlsModel.defaultControls(propertyId);
+    }
+  }
+
+  /// 32. Upsert Tenant Feature Controls (Owner modifies resident toggles)
+  Future<bool> updateTenantControls({
+    required String propertyId,
+    required TenantControlsModel controls,
+  }) async {
+    return await _withLoading('Updating Feature Controls...', () async {
+      try {
+        if (propertyId.isEmpty) return false;
+        final data = {
+          'property_id': propertyId,
+          'pay_via_upi': controls.payViaUpi,
+          'paid_via_cash': controls.paidViaCash,
+          'raise_ticket': controls.raiseTicket,
+          'ticket_status': controls.ticketStatus,
+          'bedsheet_change': controls.bedsheetChange,
+          'rent_agreement': controls.rentAgreement,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        await client
+            .from('tenant_controls')
+            .upsert(data, onConflict: 'property_id');
+        return true;
+      } catch (e) {
+        debugPrint('Error updating tenant controls: $e');
         return false;
       }
     });

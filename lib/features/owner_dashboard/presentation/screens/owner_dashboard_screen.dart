@@ -19,6 +19,7 @@ import '../../../owner_billing/presentation/screens/owner_saas_billing_screen.da
 import '../../../owner_rent/presentation/screens/owner_day_collection_screen.dart';
 import '../../../owner_food_menu/presentation/screens/owner_food_menu_screen.dart';
 import '../../../owner_tenant_controls/presentation/screens/owner_tenant_controls_screen.dart';
+import '../../../owner_housekeeping/presentation/screens/owner_housekeeping_screen.dart';
 import '../../../owner_setup/presentation/screens/owner_setup_screen.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
@@ -511,6 +512,19 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               )
             else if (_activeSubScreen == 'tenant_controls')
               OwnerTenantControlsScreen(
+                propertyId: _currentPropertyId,
+                onBack: () {
+                  setState(() => _activeSubScreen = 'dashboard');
+                  _loadPropertiesFromSupabase();
+                },
+              )
+            else if (_activeSubScreen == 'housekeeping')
+              OwnerHousekeepingScreen(
+                propertyId: _currentPropertyId,
+                propertyName: _currentPropertyName ??
+                    (activeProp['property_name'] ?? activeProp['name'])
+                        ?.toString() ??
+                    '',
                 onBack: () {
                   setState(() => _activeSubScreen = 'dashboard');
                   _loadPropertiesFromSupabase();
@@ -2746,6 +2760,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         'title': 'Move-In KYC',
         'icon': Icons.how_to_reg_outlined,
         'onTap': () => setState(() => _activeSubScreen = 'onboarding')
+      },
+      {
+        'title': 'Housekeeping',
+        'icon': Icons.cleaning_services_outlined,
+        'onTap': () => setState(() => _activeSubScreen = 'housekeeping')
       },
       {
         'title': 'Staff & Warden',

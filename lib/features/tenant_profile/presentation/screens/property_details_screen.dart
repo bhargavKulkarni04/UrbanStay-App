@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/supabase_service.dart';
 
 class PropertyDetailsScreen extends StatefulWidget {
   final String propertyName;
@@ -10,16 +11,26 @@ class PropertyDetailsScreen extends StatefulWidget {
   final String sharingType;
   final String rentAmount;
   final String depositAmount;
+  final String bedLabel;
+  final String propertyStructure;
+  final String? tenantId;
+  final String? propertyId;
+  final String? tenantPhone;
 
   const PropertyDetailsScreen({
     super.key,
-    this.propertyName = 'UrbanStay Premium PG',
-    this.propertyAddress = '#14, 7th Main, BTM 2nd Stage, Bengaluru - 560076',
-    this.initialFloor = 'Floor 1',
-    this.initialRoom = 'Room 104',
-    this.sharingType = '2-Sharing',
-    this.rentAmount = '₹8,500',
-    this.depositAmount = '₹17,000',
+    this.propertyName = '',
+    this.propertyAddress = '',
+    this.initialFloor = '',
+    this.initialRoom = '',
+    this.sharingType = '',
+    this.rentAmount = '',
+    this.depositAmount = '',
+    this.bedLabel = '',
+    this.propertyStructure = '',
+    this.tenantId,
+    this.propertyId,
+    this.tenantPhone,
   });
 
   @override
@@ -27,25 +38,167 @@ class PropertyDetailsScreen extends StatefulWidget {
 }
 
 class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
-  late TextEditingController _floorController;
-  late TextEditingController _roomController;
+  late String _propertyName;
+  late String _propertyAddress;
+  late String _floor;
+  late String _roomNumber;
+  late String _sharingType;
+  late String _rentAmount;
+  late String _depositAmount;
+  late String _bedLabel;
+  late String _propertyStructure;
+
+  bool get _isApartment =>
+      _propertyStructure.toLowerCase().contains('apartment');
+
+  String _extractSpaceFromBed(String bedLabel) {
+    final match = RegExp(r'\((.*?)\)').firstMatch(bedLabel);
+    if (match != null && match.group(1) != null) {
+      final inside = match.group(1)!.trim();
+      if (inside.isNotEmpty) return inside;
+    }
+    final lower = bedLabel.toLowerCase();
+    if (lower.contains('hall')) return 'Hall';
+    if (lower.contains('master')) return 'Master Bedroom';
+    if (lower.contains('bedroom')) return 'Bedroom';
+    return '';
+  }
+
+  String _extractCleanBed(String bedLabel) {
+    final cleaned = bedLabel.replaceAll(RegExp(r'\(.*?\)'), '').trim();
+    return cleaned.isNotEmpty ? cleaned : bedLabel;
+  }
 
   @override
   void initState() {
     super.initState();
-    _floorController = TextEditingController(text: widget.initialFloor);
-    _roomController = TextEditingController(text: widget.initialRoom);
+    _propertyName = widget.propertyName.trim();
+    _propertyAddress = widget.propertyAddress.trim();
+    _floor = widget.initialFloor.trim();
+    _roomNumber = widget.initialRoom.trim();
+    _sharingType = widget.sharingType.trim();
+    _rentAmount = widget.rentAmount.trim();
+    _depositAmount = widget.depositAmount.trim();
+    _bedLabel = widget.bedLabel.trim();
+    _propertyStructure = widget.propertyStructure.trim();
+
+    _hydrateMissingData();
   }
 
-  @override
-  void dispose() {
-    _floorController.dispose();
-    _roomController.dispose();
-    super.dispose();
+  Future<void> _hydrateMissingData() async {
+    try {
+      final pId =
+          widget.propertyId ?? SupabaseService.instance.activePropertyId;
+      if (pId != null && pId.isNotEmpty) {
+        if (_propertyAddress.isEmpty ||
+            _propertyStructure.isEmpty ||
+            _propertyName.isEmpty) {
+          final prop = await SupabaseService.instance.client
+              .from('properties')
+              .select(
+                  'property_name, street_address, area_locality, city, pincode, property_structure')
+              .eq('id', pId)
+              .maybeSingle();
+
+          if (prop != null && mounted) {
+            setState(() {
+              if (_propertyName.isEmpty) {
+                _propertyName = prop['property_name']?.toString() ?? '';
+              }
+              if (_propertyAddress.isEmpty) {
+                final street = prop['street_address']?.toString() ?? '';
+                final area = prop['area_locality']?.toString() ?? '';
+                final city = prop['city']?.toString() ?? '';
+                final pin = prop['pincode']?.toString() ?? '';
+                final full = [street, area, city, pin]
+                    .where((s) => s.trim().isNotEmpty)
+                    .join(', ');
+                if (full.isNotEmpty) _propertyAddress = full;
+              }
+              if (_propertyStructure.isEmpty) {
+                _propertyStructure =
+                    prop['property_structure']?.toString() ?? '';
+              }
+            });
+          }
+        }
+      }
+
+      // If tenant room/bed/floor/financials missing, query tenants table
+      final hasTenantId =
+          widget.tenantId != null && widget.tenantId!.isNotEmpty;
+      final hasTenantPhone =
+          widget.tenantPhone != null && widget.tenantPhone!.isNotEmpty;
+
+      if ((_floor.isEmpty ||
+              _floor == '--' ||
+              _bedLabel.isEmpty ||
+              _roomNumber.isEmpty ||
+              _roomNumber == '--' ||
+              _rentAmount.isEmpty ||
+              _depositAmount.isEmpty) &&
+          (hasTenantId || hasTenantPhone)) {
+        var query = SupabaseService.instance.client.from('tenants').select('''
+          id, room_id, room_number, bed_id, sharing_type, monthly_rent, security_deposit,
+          beds!bed_id(bed_label),
+          rooms!room_id(floor_label, sharing_type)
+        ''');
+
+        Map<String, dynamic>? tenantData;
+        if (hasTenantPhone) {
+          tenantData =
+              await query.eq('phone', widget.tenantPhone!.trim()).maybeSingle();
+        } else if (hasTenantId) {
+          tenantData = await query.eq('id', widget.tenantId!).maybeSingle();
+        }
+
+        if (tenantData != null && mounted) {
+          final bedsData = tenantData['beds'];
+          final roomsData = tenantData['rooms'];
+          final resolvedBed =
+              (bedsData is Map) ? bedsData['bed_label']?.toString() : null;
+          final resolvedFloor =
+              (roomsData is Map) ? roomsData['floor_label']?.toString() : null;
+          final resolvedSharing =
+              (roomsData is Map) ? roomsData['sharing_type']?.toString() : null;
+
+          setState(() {
+            if (_roomNumber.isEmpty || _roomNumber == '--') {
+              _roomNumber = tenantData!['room_number']?.toString() ?? '';
+            }
+            if (_bedLabel.isEmpty && resolvedBed != null) {
+              _bedLabel = resolvedBed;
+            }
+            if ((_floor.isEmpty || _floor == '--') && resolvedFloor != null) {
+              _floor = resolvedFloor;
+            }
+            if ((_sharingType.isEmpty || _sharingType == '--') &&
+                resolvedSharing != null) {
+              _sharingType = resolvedSharing;
+            }
+            if (_rentAmount.isEmpty && tenantData!['monthly_rent'] != null) {
+              final rent = (tenantData!['monthly_rent'] as num).round();
+              if (rent > 0) _rentAmount = '₹$rent';
+            }
+            if (_depositAmount.isEmpty &&
+                tenantData!['security_deposit'] != null) {
+              final dep = (tenantData!['security_deposit'] as num).round();
+              if (dep > 0) _depositAmount = '₹$dep';
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error hydrating property details: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final space = _extractSpaceFromBed(_bedLabel);
+    final cleanBed = _extractCleanBed(_bedLabel);
+    final displayBed = _isApartment && space.isNotEmpty ? cleanBed : _bedLabel;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -109,15 +262,21 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        _buildInfoTile('Property Name', widget.propertyName),
+                        _buildInfoTile('Property Name', _propertyName),
                         const SizedBox(height: 10),
-                        _buildInfoTile(
-                            'Property Address', widget.propertyAddress),
+                        _buildInfoTile('Property Address', _propertyAddress),
+                        if (_propertyStructure.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _buildInfoTile(
+                              'Property Structure', _propertyStructure),
+                        ],
                         const SizedBox(height: 24),
 
-                        // ─── Room & Bed Details (View Only) ───
+                        // ─── Room / Apartment & Bed Details (View Only) ───
                         Text(
-                          'Room & Bed Details',
+                          _isApartment
+                              ? 'Apartment & Bed Details'
+                              : 'Room & Bed Details',
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -126,11 +285,22 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                         ),
                         const SizedBox(height: 14),
 
-                        _buildInfoTile('Floor', widget.initialFloor),
+                        _buildInfoTile('Floor', _floor),
                         const SizedBox(height: 10),
-                        _buildInfoTile('Room Number', widget.initialRoom),
+                        _buildInfoTile(
+                          _isApartment ? 'Flat Number' : 'Room Number',
+                          _roomNumber,
+                        ),
+                        if (_isApartment && space.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _buildInfoTile('Flat Space', space),
+                        ],
+                        if (displayBed.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          _buildInfoTile('Allocated Bed', displayBed),
+                        ],
                         const SizedBox(height: 10),
-                        _buildInfoTile('Sharing Type', widget.sharingType),
+                        _buildInfoTile('Sharing Type', _sharingType),
                         const SizedBox(height: 24),
 
                         // ─── Financial Overview (View Only) ───
@@ -144,10 +314,9 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        _buildInfoTile('Monthly Rent', widget.rentAmount),
+                        _buildInfoTile('Monthly Rent', _rentAmount),
                         const SizedBox(height: 10),
-                        _buildInfoTile(
-                            'Security Deposit', widget.depositAmount),
+                        _buildInfoTile('Security Deposit', _depositAmount),
                         const SizedBox(height: 18),
 
                         // Note
@@ -204,7 +373,7 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
           ),
           const SizedBox(height: 3),
           Text(
-            value,
+            value.trim().isNotEmpty ? value.trim() : '--',
             style: GoogleFonts.outfit(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -213,53 +382,6 @@ class _PropertyDetailsScreenState extends State<PropertyDetailsScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildEditableField({
-    required String label,
-    required TextEditingController controller,
-    required String hint,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: AppColors.ink,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controller,
-          style: GoogleFonts.outfit(
-            fontSize: 14,
-            color: AppColors.ink,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: GoogleFonts.outfit(
-              fontSize: 14,
-              color: const Color(0xFF9CA3AF),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            filled: true,
-            fillColor: Colors.white,
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: AppColors.green, width: 1.5),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

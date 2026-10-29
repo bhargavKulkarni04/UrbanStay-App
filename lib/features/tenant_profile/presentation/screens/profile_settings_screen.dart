@@ -22,11 +22,14 @@ class ProfileSettingsScreen extends StatefulWidget {
   final String? tenantPhone;
   final double? monthlyRent;
   final double? securityDeposit;
+  final String? bedLabel;
+  final String? propertyAddress;
+  final String? propertyStructure;
 
   const ProfileSettingsScreen({
     super.key,
     this.tenantName = 'Resident',
-    this.floor = 'Floor 1',
+    this.floor = '',
     this.roomNumber = '',
     this.avatarUrl,
     this.pgName,
@@ -36,6 +39,9 @@ class ProfileSettingsScreen extends StatefulWidget {
     this.tenantPhone,
     this.monthlyRent,
     this.securityDeposit,
+    this.bedLabel,
+    this.propertyAddress,
+    this.propertyStructure,
   });
 
   @override
@@ -48,6 +54,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
   late String _roomNumber;
   late String _pgName;
   late String _sharingType;
+  late String _bedLabel;
+  late String _propertyAddress;
+  late String _propertyStructure;
 
   @override
   void initState() {
@@ -55,7 +64,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     _tenantName = widget.tenantName.trim().isNotEmpty
         ? widget.tenantName.trim()
         : 'Resident';
-    _floor = widget.floor.trim().isNotEmpty ? widget.floor.trim() : 'Floor 1';
+    _floor = widget.floor.trim();
     _roomNumber = widget.roomNumber.trim();
     _pgName = (widget.pgName != null && widget.pgName!.trim().isNotEmpty)
         ? widget.pgName!.trim()
@@ -64,6 +73,9 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         (widget.sharingType != null && widget.sharingType!.trim().isNotEmpty)
             ? widget.sharingType!.trim()
             : 'Standard Sharing';
+    _bedLabel = widget.bedLabel?.trim() ?? '';
+    _propertyAddress = widget.propertyAddress?.trim() ?? '';
+    _propertyStructure = widget.propertyStructure?.trim() ?? '';
   }
 
   String _getInitial(String name) {
@@ -139,8 +151,14 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
     ];
 
     final initial = _getInitial(_tenantName);
-    final stayText =
-        '$_floor • $_sharingType • Room ${_roomNumber.isNotEmpty ? _roomNumber : '--'}';
+    final isApt = _propertyStructure.toLowerCase().contains('apartment');
+    final roomPrefix = isApt ? 'Flat' : 'Room';
+    final stayParts = [
+      if (_floor.isNotEmpty) _floor,
+      if (_sharingType.isNotEmpty) _sharingType,
+      '$roomPrefix ${_roomNumber.isNotEmpty ? _roomNumber : '--'}',
+    ];
+    final stayText = stayParts.join(' • ');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -551,16 +569,22 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
           MaterialPageRoute(
             builder: (_) => PropertyDetailsScreen(
               propertyName: _pgName,
+              propertyAddress: _propertyAddress,
               initialFloor: _floor,
               initialRoom: _roomNumber.isNotEmpty ? _roomNumber : '--',
               sharingType: _sharingType,
               rentAmount: widget.monthlyRent != null && widget.monthlyRent! > 0
                   ? '₹${widget.monthlyRent!.round()}'
-                  : '₹8,500',
+                  : '',
               depositAmount:
                   widget.securityDeposit != null && widget.securityDeposit! > 0
                       ? '₹${widget.securityDeposit!.round()}'
-                      : '₹17,000',
+                      : '',
+              bedLabel: _bedLabel,
+              propertyStructure: _propertyStructure,
+              tenantId: widget.tenantId,
+              propertyId: widget.propertyId,
+              tenantPhone: widget.tenantPhone,
             ),
           ),
         );

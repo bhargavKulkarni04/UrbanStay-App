@@ -38,5 +38,6 @@ export 'expense_model.dart';
 
 // Pillar 7: Settings & B2B SaaS Licensing
 export 'property_settings_model.dart';
+export 'tenant_controls_model.dart';
 export 'saas_subscription_model.dart';
 export 'saas_invoice_model.dart';

@@ -12,8 +12,13 @@ import '../../../../core/models/models.dart';
 ///   "Edit Features" -> in edit mode becomes "Save Changes"
 class OwnerTenantControlsScreen extends StatefulWidget {
   final VoidCallback? onBack;
+  final String? propertyId;
 
-  const OwnerTenantControlsScreen({super.key, this.onBack});
+  const OwnerTenantControlsScreen({
+    super.key,
+    this.onBack,
+    this.propertyId,
+  });
 
   @override
   State<OwnerTenantControlsScreen> createState() =>
@@ -49,20 +54,24 @@ class _OwnerTenantControlsScreenState extends State<OwnerTenantControlsScreen> {
 
   Future<void> _loadControlsFromSupabase() async {
     try {
-      final prop = await SupabaseService.instance.getPropertyModel();
-      if (prop != null) {
-        _propertyId = prop.id;
-        final settings =
-            await SupabaseService.instance.getPropertySettingsModel(prop.id);
-        final tc = settings?.tenantControls;
-        if (tc != null && mounted) {
+      String? pId = widget.propertyId ?? SupabaseService.instance.activePropertyId;
+      if (pId == null || pId.isEmpty) {
+        final prop = await SupabaseService.instance.getPropertyModel();
+        pId = prop?.id;
+      }
+
+      if (pId != null && pId.isNotEmpty) {
+        _propertyId = pId;
+        final controls =
+            await SupabaseService.instance.getTenantControls(pId);
+        if (mounted) {
           setState(() {
-            _payViaUpi = tc['pay_via_upi'] ?? _payViaUpi;
-            _paidViaCash = tc['paid_via_cash'] ?? _paidViaCash;
-            _raiseTicket = tc['raise_ticket'] ?? _raiseTicket;
-            _ticketStatus = tc['ticket_status'] ?? _ticketStatus;
-            _bedsheetChange = tc['bedsheet_change'] ?? _bedsheetChange;
-            _rentAgreement = tc['rent_agreement'] ?? _rentAgreement;
+            _payViaUpi = controls.payViaUpi;
+            _paidViaCash = controls.paidViaCash;
+            _raiseTicket = controls.raiseTicket;
+            _ticketStatus = controls.ticketStatus;
+            _bedsheetChange = controls.bedsheetChange;
+            _rentAgreement = controls.rentAgreement;
             _resetStaged();
           });
         }
@@ -81,7 +90,17 @@ class _OwnerTenantControlsScreenState extends State<OwnerTenantControlsScreen> {
     _stagedRentAgreement = _rentAgreement;
   }
 
-  void _saveChanges() {
+  Future<void> _saveChanges() async {
+    final updatedControls = TenantControlsModel(
+      propertyId: _propertyId ?? '',
+      payViaUpi: _stagedPayViaUpi,
+      paidViaCash: _stagedPaidViaCash,
+      raiseTicket: _stagedRaiseTicket,
+      ticketStatus: _stagedTicketStatus,
+      bedsheetChange: _stagedBedsheetChange,
+      rentAgreement: _stagedRentAgreement,
+    );
+
     setState(() {
       _payViaUpi = _stagedPayViaUpi;
       _paidViaCash = _stagedPaidViaCash;
@@ -92,32 +111,27 @@ class _OwnerTenantControlsScreenState extends State<OwnerTenantControlsScreen> {
       _isEditing = false;
     });
 
-    if (_propertyId != null) {
-      SupabaseService.instance.updatePropertySettings(
+    if (_propertyId != null && _propertyId!.isNotEmpty) {
+      final success = await SupabaseService.instance.updateTenantControls(
         propertyId: _propertyId!,
-        settings: {
-          'tenant_controls': {
-            'pay_via_upi': _payViaUpi,
-            'paid_via_cash': _paidViaCash,
-            'raise_ticket': _raiseTicket,
-            'ticket_status': _ticketStatus,
-            'bedsheet_change': _bedsheetChange,
-            'rent_agreement': _rentAgreement,
-          }
-        },
+        controls: updatedControls,
       );
-    }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Feature controls saved & applied ✓',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
-        ),
-        backgroundColor: AppColors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              success
+                  ? 'Feature controls saved & applied ✓'
+                  : 'Failed to save feature controls',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: success ? AppColors.green : Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override

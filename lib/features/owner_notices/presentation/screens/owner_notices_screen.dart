@@ -77,10 +77,10 @@ class _OwnerNoticesScreenState extends State<OwnerNoticesScreen> {
         }
       }
 
-      // 3. Fetch beds for base_price (rent) and occupant details
+      // 3. Fetch beds for rent and occupant details
       final bedsRes = await SupabaseService.instance.client
           .from('beds')
-          .select('room_number, name, base_price, tenant_name, tenant_phone')
+          .select('room_number, bed_label, rent, tenant_name, tenant_phone')
           .eq('property_id', propId);
 
       final Map<String, int> bedRentLookup = {};
@@ -89,8 +89,9 @@ class _OwnerNoticesScreenState extends State<OwnerNoticesScreen> {
       if (bedsRes is List) {
         for (var b in bedsRes) {
           if (b is Map) {
-            final key = '${b['room_number']?.toString().trim()}-${b['name']?.toString().trim()}';
-            final price = int.tryParse(b['base_price']?.toString() ?? '0') ?? 0;
+            final key =
+                '${b['room_number']?.toString().trim()}-${b['bed_label']?.toString().trim()}';
+            final price = int.tryParse(b['rent']?.toString() ?? '0') ?? 0;
             bedRentLookup[key] = price;
             final tName = b['tenant_name']?.toString().trim() ?? '';
             if (tName.isNotEmpty) {
@@ -107,7 +108,8 @@ class _OwnerNoticesScreenState extends State<OwnerNoticesScreen> {
       // 4. Fetch tenants for security_deposit, phone and fallback rent
       final tenantsRes = await SupabaseService.instance.client
           .from('tenants')
-          .select('id, name, room_number, bed_name, monthly_rent, security_deposit, phone')
+          .select(
+              'id, name, room_number, monthly_rent, security_deposit, phone')
           .eq('property_id', propId);
 
       final Map<String, Map<String, dynamic>> tenantLookup = {};
@@ -115,15 +117,16 @@ class _OwnerNoticesScreenState extends State<OwnerNoticesScreen> {
         for (var t in tenantsRes) {
           if (t is Map) {
             final tId = t['id']?.toString().trim() ?? '';
-            final keyByBed = '${t['room_number']?.toString().trim()}-${t['bed_name']?.toString().trim()}';
+            final keyByRoom = t['room_number']?.toString().trim() ?? '';
             final data = <String, dynamic>{
               'name': t['name']?.toString().trim() ?? '',
               'phone': t['phone']?.toString().trim() ?? '',
               'rent': int.tryParse(t['monthly_rent']?.toString() ?? '0') ?? 0,
-              'deposit': int.tryParse(t['security_deposit']?.toString() ?? '0') ?? 0,
+              'deposit':
+                  int.tryParse(t['security_deposit']?.toString() ?? '0') ?? 0,
             };
             if (tId.isNotEmpty) tenantLookup[tId] = data;
-            tenantLookup[keyByBed] = data;
+            if (keyByRoom.isNotEmpty) tenantLookup[keyByRoom] = data;
           }
         }
       }

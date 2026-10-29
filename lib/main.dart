@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/app_colors.dart';
+import 'core/models/models.dart';
 import 'features/owner_setup/presentation/screens/owner_setup_screen.dart';
 import 'features/tenant_checkin/presentation/screens/tenant_checkin_screen.dart';
 import 'features/tenant_dashboard/presentation/screens/tenant_dashboard_screen.dart';
@@ -138,7 +139,7 @@ class UrbanStayApp extends StatelessWidget {
           },
         );
       },
-      // 🚀 Tenant Dashboard Web Release
+      // 🚀 Tenant Dashboard Web Release (ALL TOGGLES OFF FOR TESTING SPOTLIGHT)
       home: TenantDashboardScreen(
         propertyId: Uri.base.queryParameters['propertyId'] ??
             Uri.base.queryParameters['id'] ??
@@ -152,6 +153,15 @@ class UrbanStayApp extends StatelessWidget {
         tenantPhone: Uri.base.queryParameters['phone'] ??
             Uri.base.queryParameters['mobile'] ??
             '5851022581',
+        initialTenantControls: const TenantControlsModel(
+          propertyId: 'fff9b852-ea2c-44c2-82ca-09f7723cb303',
+          payViaUpi: false,
+          paidViaCash: false,
+          raiseTicket: false,
+          ticketStatus: false,
+          bedsheetChange: false,
+          rentAgreement: false,
+        ),
       ),
     );
   }
