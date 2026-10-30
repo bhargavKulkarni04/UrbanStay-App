@@ -542,7 +542,7 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                               : Icons.event_note_outlined,
                           isNotice
                               ? 'Cancel Notice (Revert to Active)'
-                              : 'Give Move-Out Notice ($_noticePeriod)',
+                              : 'Initiate Move-Out Notice ($_noticePeriod)',
                           textColor: isNotice ? AppColors.greenDark : null,
                           bgColor: isNotice ? AppColors.greenLight : null,
                           borderColor: isNotice
@@ -2906,11 +2906,17 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
 
     final Set<String> addedFloorIds = {};
     for (final r in _rooms) {
-      final fId = r['floor']?.toString() ?? '1st';
-      final fLabel = r['floorLabel']?.toString() ?? '${r['floor']} Floor';
-      if (!addedFloorIds.contains(fId)) {
-        addedFloorIds.add(fId);
-        floors.add({'id': fId, 'label': fLabel});
+      final rawFloor = r['floor']?.toString().trim() ?? '';
+      if (rawFloor.isEmpty) continue;
+      final fLabel = (r['floorLabel'] != null &&
+              r['floorLabel'].toString().trim().isNotEmpty)
+          ? r['floorLabel'].toString().trim()
+          : (rawFloor.toLowerCase().contains('floor')
+              ? rawFloor
+              : '$rawFloor Floor');
+      if (!addedFloorIds.contains(rawFloor)) {
+        addedFloorIds.add(rawFloor);
+        floors.add({'id': rawFloor, 'label': fLabel});
       }
     }
 
@@ -3217,25 +3223,30 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       [String? floorLabel, String? roomType]) {
     final isNotice = tenant['status'] == 'Notice';
 
-    // 1. Resolve Floor String
-    final rawFloor = (floorLabel != null && floorLabel.isNotEmpty)
-        ? floorLabel
-        : (tenant['floorLabel']?.toString() ?? '1st Floor');
-    final displayFloor =
-        rawFloor.toLowerCase().contains('floor') ? rawFloor : '$rawFloor Floor';
+    // 1. Resolve Floor String (no hardcoded defaults)
+    final rawFloor = (floorLabel != null && floorLabel.trim().isNotEmpty)
+        ? floorLabel.trim()
+        : (tenant['floorLabel']?.toString().trim() ?? '');
+    final displayFloor = rawFloor.isEmpty
+        ? ''
+        : (rawFloor.toLowerCase().contains('floor')
+            ? rawFloor
+            : '$rawFloor Floor');
 
-    // 2. Resolve Room String
-    final rawRoom = (roomName.isNotEmpty)
-        ? roomName
-        : (tenant['room_number']?.toString() ??
-            tenant['room']?.toString() ??
-            'Room');
-    final displayRoom = (rawRoom.toLowerCase().startsWith('room') ||
-            rawRoom.toLowerCase().startsWith('flat'))
-        ? rawRoom
-        : 'Room $rawRoom';
+    // 2. Resolve Room String (no hardcoded defaults)
+    final rawRoom = (roomName.trim().isNotEmpty)
+        ? roomName.trim()
+        : (tenant['room_number']?.toString().trim() ??
+            tenant['room']?.toString().trim() ??
+            '');
+    final displayRoom = rawRoom.isEmpty
+        ? ''
+        : ((rawRoom.toLowerCase().startsWith('room') ||
+                rawRoom.toLowerCase().startsWith('flat'))
+            ? rawRoom
+            : 'Room $rawRoom');
 
-    // 3. Resolve Sharing Type (Studio PG vs Apartment Unit)
+    // 3. Resolve Sharing Type (Studio PG vs Apartment Unit - no hardcoded defaults)
     final bedLabel = (tenant['label'] ?? tenant['bed'] ?? '').toString();
     String displaySharing = '';
     if (bedLabel.contains('(Hall)')) {
@@ -3249,8 +3260,9 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
       displaySharing = tenant['sharing_type'].toString().trim();
     } else if (roomType != null && roomType.trim().isNotEmpty) {
       displaySharing = roomType.trim();
-    } else {
-      displaySharing = tenant['type']?.toString().trim() ?? '2-Sharing';
+    } else if (tenant['type'] != null &&
+        tenant['type'].toString().trim().isNotEmpty) {
+      displaySharing = tenant['type'].toString().trim();
     }
 
     return Container(
@@ -3480,23 +3492,23 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
           ),
           const SizedBox(height: 4),
 
-          // Clean & Visible Stay Line: Floor • Room • Sharing Type (No box, medium & breathable)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
-            child: Center(
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                alignment: WrapAlignment.center,
-                children: [
-                  Text(
-                    displayFloor,
-                    style: GoogleFonts.outfit(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.muted,
-                    ),
+          // Clean & Visible Stay Line: Floor • Room • Sharing Type (Only non-empty parts, no broken bullets)
+          Builder(
+            builder: (context) {
+              final stayParts = <Widget>[];
+              if (displayFloor.isNotEmpty) {
+                stayParts.add(Text(
+                  displayFloor,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
                   ),
-                  Padding(
+                ));
+              }
+              if (displayRoom.isNotEmpty) {
+                if (stayParts.isNotEmpty) {
+                  stayParts.add(Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 7),
                     child: Text(
                       '•',
@@ -3506,16 +3518,20 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         color: const Color(0xFF9CA3AF),
                       ),
                     ),
+                  ));
+                }
+                stayParts.add(Text(
+                  displayRoom,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
                   ),
-                  Text(
-                    displayRoom,
-                    style: GoogleFonts.outfit(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  Padding(
+                ));
+              }
+              if (displaySharing.isNotEmpty) {
+                if (stayParts.isNotEmpty) {
+                  stayParts.add(Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 7),
                     child: Text(
                       '•',
@@ -3525,18 +3541,31 @@ class _OwnerRoomsScreenState extends State<OwnerRoomsScreen> {
                         color: const Color(0xFF9CA3AF),
                       ),
                     ),
+                  ));
+                }
+                stayParts.add(Text(
+                  displaySharing,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.greenDark,
                   ),
-                  Text(
-                    displaySharing,
-                    style: GoogleFonts.outfit(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.greenDark,
-                    ),
+                ));
+              }
+
+              if (stayParts.isEmpty) return const SizedBox.shrink();
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 7),
+                child: Center(
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    alignment: WrapAlignment.center,
+                    children: stayParts,
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 4),
 

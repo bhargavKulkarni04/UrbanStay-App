@@ -41,6 +41,7 @@ class _OwnerMoveOutNoticeScreenState extends State<OwnerMoveOutNoticeScreen> {
 
   bool _isLoadingDamages = true;
   bool _isSubmitting = false;
+  String _propertyStructure = '';
   final List<Map<String, dynamic>> _damageDeductions = [];
 
   // Local helper for logging a quick damage charge on the spot
@@ -93,35 +94,40 @@ class _OwnerMoveOutNoticeScreenState extends State<OwnerMoveOutNoticeScreen> {
 
     try {
       if (pId.isNotEmpty) {
-        // 1. Pull live notice_period from properties table in Supabase
+        // 1. Pull live notice_period and property_structure from properties table in Supabase
         try {
           final propRes = await SupabaseService.instance.client
               .from('properties')
-              .select('notice_period')
+              .select('notice_period, property_structure')
               .eq('id', pId)
               .maybeSingle();
 
-          if (propRes != null && propRes['notice_period'] != null) {
-            final pNotice = propRes['notice_period'].toString();
-            if (pNotice.isNotEmpty) {
-              final match = RegExp(r'\d+').firstMatch(pNotice);
-              if (match != null) {
-                final days = int.tryParse(match.group(0) ?? '');
-                if (days != null && days > 0 && mounted) {
-                  setState(() {
-                    _noticePeriodLabel = pNotice;
-                    _noticeDays = days;
-                    _selectedVacateDate =
-                        DateTime.now().add(Duration(days: days));
-                    _reasonController.text =
-                        'Owner Initiated Notice ($pNotice)';
-                  });
+          if (propRes != null) {
+            if (propRes['property_structure'] != null) {
+              _propertyStructure = propRes['property_structure'].toString();
+            }
+            if (propRes['notice_period'] != null) {
+              final pNotice = propRes['notice_period'].toString();
+              if (pNotice.isNotEmpty) {
+                final match = RegExp(r'\d+').firstMatch(pNotice);
+                if (match != null) {
+                  final days = int.tryParse(match.group(0) ?? '');
+                  if (days != null && days > 0 && mounted) {
+                    setState(() {
+                      _noticePeriodLabel = pNotice;
+                      _noticeDays = days;
+                      _selectedVacateDate =
+                          DateTime.now().add(Duration(days: days));
+                      _reasonController.text =
+                          'Owner Initiated Notice ($pNotice)';
+                    });
+                  }
                 }
               }
             }
           }
         } catch (e) {
-          debugPrint('Notice loading property notice_period: $e');
+          debugPrint('Notice loading property metadata: $e');
         }
 
         final res = await SupabaseService.instance.client
@@ -478,6 +484,8 @@ class _OwnerMoveOutNoticeScreenState extends State<OwnerMoveOutNoticeScreen> {
         'Bed';
     final rentStr = widget.resident['rent']?.toString() ?? '0';
     final depositStr = widget.resident['deposit']?.toString() ?? '0';
+    final bool isAlreadyNotice =
+        widget.resident['status']?.toString().toLowerCase() == 'notice';
 
     return Scaffold(
       backgroundColor: AppColors.pageBg,
@@ -490,7 +498,9 @@ class _OwnerMoveOutNoticeScreenState extends State<OwnerMoveOutNoticeScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Move-Out Notice',
+          isAlreadyNotice
+              ? 'Manage & Settle Move-Out'
+              : 'Initiate Move-Out Notice',
           style: GoogleFonts.outfit(
             fontSize: 17,
             fontWeight: FontWeight.w800,
@@ -556,7 +566,7 @@ class _OwnerMoveOutNoticeScreenState extends State<OwnerMoveOutNoticeScreen> {
                             const SizedBox(height: 3),
                             Row(
                               children: [
-                                Container(
+                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
@@ -565,7 +575,7 @@ class _OwnerMoveOutNoticeScreenState extends State<OwnerMoveOutNoticeScreen> {
                                     border: Border.all(color: AppColors.border),
                                   ),
                                   child: Text(
-                                    'Room ${widget.roomName}',
+                                    '${_propertyStructure.toLowerCase().contains("apartment") ? "Flat" : "Room"} ${widget.roomName}',
                                     style: GoogleFonts.outfit(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700,
@@ -1197,7 +1207,9 @@ class _OwnerMoveOutNoticeScreenState extends State<OwnerMoveOutNoticeScreen> {
                       ),
                     )
                   : Text(
-                      'Confirm Move-Out Notice',
+                      isAlreadyNotice
+                          ? 'Manage & Settle Move-Out'
+                          : 'Initiate Move-Out Notice',
                       style: GoogleFonts.outfit(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,

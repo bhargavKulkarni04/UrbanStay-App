@@ -20,6 +20,7 @@ import '../../../owner_rent/presentation/screens/owner_day_collection_screen.dar
 import '../../../owner_food_menu/presentation/screens/owner_food_menu_screen.dart';
 import '../../../owner_tenant_controls/presentation/screens/owner_tenant_controls_screen.dart';
 import '../../../owner_housekeeping/presentation/screens/owner_housekeeping_screen.dart';
+import '../../../owner_notices/presentation/screens/owner_notices_screen.dart';
 import '../../../owner_setup/presentation/screens/owner_setup_screen.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../core/state/owner_app_state.dart';
@@ -58,6 +59,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   set _activePropertyIndex(int val) {
     OwnerAppState.instance.setActivePropertyIndex(val);
   }
+
   final List<Map<String, dynamic>> _properties = [];
 
   String? get _currentPropertyId {
@@ -217,9 +219,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           loaded.add({
             'id': propId,
             'name': p.propertyName,
-            'ownerName': (p.ownerLegalName != null && p.ownerLegalName!.isNotEmpty)
-                ? p.ownerLegalName!
-                : (p.bankHolderName ?? 'Owner'),
+            'ownerName':
+                (p.ownerLegalName != null && p.ownerLegalName!.isNotEmpty)
+                    ? p.ownerLegalName!
+                    : (p.bankHolderName ?? 'Owner'),
             'location': '${p.areaLocality ?? ''}, ${p.city}'.trim(),
             'code': p.propertyCode,
             'occupiedBeds': occupied,
@@ -227,9 +230,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             'occupancyPct': pct,
             'vacantBeds': (total - occupied) > 0 ? (total - occupied) : 0,
             'noticeBeds': realNoticeCount,
-            'monthlyCollected': totalCollected > 0
-                ? '₹${totalCollected.round()}'
-                : '₹0',
+            'monthlyCollected':
+                totalCollected > 0 ? '₹${totalCollected.round()}' : '₹0',
             'collectedRatio': '$realPaidCount/$occupied Paid',
             'paidCount': realPaidCount,
             'pendingCount': realPendingCount,
@@ -240,14 +242,15 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           _properties.clear();
           _properties.addAll(loaded);
           final savedIdx = OwnerAppState.instance.activePropertyIndex;
-          final validIdx = (savedIdx >= 0 && savedIdx < _properties.length) ? savedIdx : 0;
+          final validIdx =
+              (savedIdx >= 0 && savedIdx < _properties.length) ? savedIdx : 0;
           _activePropertyIndex = validIdx;
           if (_properties.isNotEmpty) {
             SupabaseService.instance.activePropertyId =
                 _properties[validIdx]['id']?.toString();
             SupabaseService.instance.activePropertyName =
                 _properties[validIdx]['name']?.toString() ??
-                _properties[validIdx]['property_name']?.toString();
+                    _properties[validIdx]['property_name']?.toString();
           }
         });
       } else if (mounted && widget.initialProperty != null) {
@@ -412,209 +415,221 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            if (_activeSubScreen == 'rent')
-              OwnerRentCollectionScreen(
-                propertyId: _currentPropertyId,
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeNavIndex == 1 || _activeSubScreen == 'rooms')
-              OwnerRoomsScreen(
-                propertyId: _currentPropertyId,
-                propertyName: _currentPropertyName,
-                onBack: () {
-                  setState(() {
-                    _activeNavIndex = 0;
-                    _activeSubScreen = 'dashboard';
-                  });
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeNavIndex == 2 || _activeSubScreen == 'approvals')
-              OwnerApprovalsScreen(
-                propertyId: _currentPropertyId,
-                onBack: () {
-                  setState(() {
-                    _activeNavIndex = 0;
-                    _activeSubScreen = 'dashboard';
-                  });
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'complaints')
-              OwnerComplaintsScreen(
-                propertyId: _currentPropertyId,
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'expenses')
-              OwnerExpensesScreen(
-                propertyId: _currentPropertyId,
-                propertyName: _currentPropertyName,
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'staff')
-              OwnerStaffScreen(
-                propertyId: _currentPropertyId,
-                propertyName: _currentPropertyName,
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'settings')
-              OwnerSettingsScreen(
-                propertyId: _currentPropertyId,
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'onboarding')
-              OwnerOnboardingApprovalsScreen(
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'reports')
-              OwnerReportsScreen(
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'day_collection')
-              OwnerDayCollectionScreen(
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'food_menu')
-              OwnerFoodMenuScreen(
-                propertyId: _currentPropertyId,
-                propertyName: _currentPropertyName ?? (activeProp['property_name'] ?? activeProp['name'])?.toString() ?? '',
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'tenant_controls')
-              OwnerTenantControlsScreen(
-                propertyId: _currentPropertyId,
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'housekeeping')
-              OwnerHousekeepingScreen(
-                propertyId: _currentPropertyId,
-                propertyName: _currentPropertyName ??
-                    (activeProp['property_name'] ?? activeProp['name'])
-                        ?.toString() ??
-                    '',
-                onBack: () {
-                  setState(() => _activeSubScreen = 'dashboard');
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else if (_activeSubScreen == 'notifications')
-              _buildNotificationFullPage()
-            else if (_activeNavIndex == 3 || _activeSubScreen == 'billing')
-              OwnerSaaSBillingScreen(
-                propertyId: activeProp['id']?.toString(),
-                propertyName:
-                    _currentPropertyName ?? (activeProp['property_name'] ?? activeProp['name'])?.toString() ?? '',
-                totalBeds: (activeProp['totalBeds'] as num?)?.toInt() ?? 0,
-                ownerName: _currentOwnerName,
-                onBack: () {
-                  setState(() {
-                    _activeNavIndex = 0;
-                    _activeSubScreen = 'dashboard';
-                  });
-                  _loadPropertiesFromSupabase();
-                },
-              )
-            else
-              Column(
-                children: [
-                  // Top Unified White Header Banner
-                  _buildTopBrandHeader(),
+        body: SafeArea(
+          child: Stack(
+            children: [
+              if (_activeSubScreen == 'rent')
+                OwnerRentCollectionScreen(
+                  propertyId: _currentPropertyId,
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeNavIndex == 1 || _activeSubScreen == 'rooms')
+                OwnerRoomsScreen(
+                  propertyId: _currentPropertyId,
+                  propertyName: _currentPropertyName,
+                  onBack: () {
+                    setState(() {
+                      _activeNavIndex = 0;
+                      _activeSubScreen = 'dashboard';
+                    });
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeNavIndex == 2 || _activeSubScreen == 'approvals')
+                OwnerApprovalsScreen(
+                  propertyId: _currentPropertyId,
+                  onBack: () {
+                    setState(() {
+                      _activeNavIndex = 0;
+                      _activeSubScreen = 'dashboard';
+                    });
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'complaints')
+                OwnerComplaintsScreen(
+                  propertyId: _currentPropertyId,
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'expenses')
+                OwnerExpensesScreen(
+                  propertyId: _currentPropertyId,
+                  propertyName: _currentPropertyName,
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'staff')
+                OwnerStaffScreen(
+                  propertyId: _currentPropertyId,
+                  propertyName: _currentPropertyName,
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'settings')
+                OwnerSettingsScreen(
+                  propertyId: _currentPropertyId,
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'onboarding')
+                OwnerOnboardingApprovalsScreen(
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'reports')
+                OwnerReportsScreen(
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'day_collection')
+                OwnerDayCollectionScreen(
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'food_menu')
+                OwnerFoodMenuScreen(
+                  propertyId: _currentPropertyId,
+                  propertyName: _currentPropertyName ??
+                      (activeProp['property_name'] ?? activeProp['name'])
+                          ?.toString() ??
+                      '',
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'tenant_controls')
+                OwnerTenantControlsScreen(
+                  propertyId: _currentPropertyId,
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'housekeeping')
+                OwnerHousekeepingScreen(
+                  propertyId: _currentPropertyId,
+                  propertyName: _currentPropertyName ??
+                      (activeProp['property_name'] ?? activeProp['name'])
+                          ?.toString() ??
+                      '',
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'notices')
+                OwnerNoticesScreen(
+                  onBack: () {
+                    setState(() => _activeSubScreen = 'dashboard');
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else if (_activeSubScreen == 'notifications')
+                _buildNotificationFullPage()
+              else if (_activeNavIndex == 3 || _activeSubScreen == 'billing')
+                OwnerSaaSBillingScreen(
+                  propertyId: activeProp['id']?.toString(),
+                  propertyName: _currentPropertyName ??
+                      (activeProp['property_name'] ?? activeProp['name'])
+                          ?.toString() ??
+                      '',
+                  totalBeds: (activeProp['totalBeds'] as num?)?.toInt() ?? 0,
+                  ownerName: _currentOwnerName,
+                  onBack: () {
+                    setState(() {
+                      _activeNavIndex = 0;
+                      _activeSubScreen = 'dashboard';
+                    });
+                    _loadPropertiesFromSupabase();
+                  },
+                )
+              else
+                Column(
+                  children: [
+                    // Top Unified White Header Banner
+                    _buildTopBrandHeader(),
 
-                  // Scrollable Dashboard Body
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(
-                        context.responsiveHorizontalPadding,
-                        14.0,
-                        context.responsiveHorizontalPadding,
-                        96.0,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // 1. Property & Bed Occupancy Hero Card (Apple-Style Circular Radial Arc)
-                          _buildPropertyHeroCard(),
-                          const SizedBox(height: 16),
+                    // Scrollable Dashboard Body
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.fromLTRB(
+                          context.responsiveHorizontalPadding,
+                          14.0,
+                          context.responsiveHorizontalPadding,
+                          96.0,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 1. Property & Bed Occupancy Hero Card (Apple-Style Circular Radial Arc)
+                            _buildPropertyHeroCard(),
+                            const SizedBox(height: 16),
 
-                          // 2. Monthly Collection Health Card (Bigger, Eye-Catching Inside Blocks)
-                          _buildCollectionHealthCard(),
-                          const SizedBox(height: 16),
+                            // 2. Monthly Collection Health Card (Bigger, Eye-Catching Inside Blocks)
+                            _buildCollectionHealthCard(),
+                            const SizedBox(height: 16),
 
-                          // 3. UPI Payment Approvals Card (Submitted, Approved, Pending)
-                          _buildPaymentApprovalsCard(),
-                          const SizedBox(height: 16),
+                            // 3. UPI Payment Approvals Card (Submitted, Approved, Pending)
+                            _buildPaymentApprovalsCard(),
+                            const SizedBox(height: 16),
 
-                          // 4. Quick Actions 4x2 Grid (8 Modules)
-                          _buildQuickActionsSection(),
-                          const SizedBox(height: 16),
+                            // 4. Quick Actions 4x2 Grid (8 Modules)
+                            _buildQuickActionsSection(),
+                            const SizedBox(height: 16),
 
-                          // 5. Announcements & Notice Board Section
-                          _buildAnnouncementsSection(),
-                        ],
+                            // 5. Announcements & Notice Board Section
+                            _buildAnnouncementsSection(),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
 
-            // Bottom Navigation Bar (Fixed 4 Tabs - ONLY on Main Dashboard)
-            if (_activeSubScreen == 'dashboard' && _activeNavIndex == 0)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _buildBottomNavbar(),
-              ),
+              // Bottom Navigation Bar (Fixed 4 Tabs - ONLY on Main Dashboard)
+              if (_activeSubScreen == 'dashboard' && _activeNavIndex == 0)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _buildBottomNavbar(),
+                ),
 
-            // Active Interactive Modals
-            if (_showApprovalModal) _buildApprovalModalSheet(),
-            if (_showRentModal) _buildRentModalSheet(),
-            if (_showExpenseModal) _buildExpenseModalSheet(),
-            if (_showPoliceModal) _buildPoliceModalSheet(),
-            if (_showNoticeModal) _buildNoticeModalSheet(),
-            if (_showComplaintsModal) _buildComplaintsModalSheet(),
-            if (_showStaffModal) _buildStaffModalSheet(),
-            if (_showAnnouncementModal) _buildAnnouncementModalSheet(),
-          ],
+              // Active Interactive Modals
+              if (_showApprovalModal) _buildApprovalModalSheet(),
+              if (_showRentModal) _buildRentModalSheet(),
+              if (_showExpenseModal) _buildExpenseModalSheet(),
+              if (_showPoliceModal) _buildPoliceModalSheet(),
+              if (_showNoticeModal) _buildNoticeModalSheet(),
+              if (_showComplaintsModal) _buildComplaintsModalSheet(),
+              if (_showStaffModal) _buildStaffModalSheet(),
+              if (_showAnnouncementModal) _buildAnnouncementModalSheet(),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   // ===========================================================================
   // 1. ELEVATED SOLID WHITE HEADER BANNER CONTAINER
@@ -1152,24 +1167,45 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 13, color: AppColors.muted),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        '${prop['vacantBeds']} Vacant Beds Ready to Book',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.outfit(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.muted,
+                child: InkWell(
+                  onTap: () {
+                    final noticeCount =
+                        (prop['noticeBeds'] as num?)?.toInt() ?? 0;
+                    if (noticeCount > 0) {
+                      setState(() => _activeSubScreen = 'notices');
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      Icon(
+                        ((prop['noticeBeds'] as num?)?.toInt() ?? 0) > 0
+                            ? Icons.event_note_outlined
+                            : Icons.info_outline_rounded,
+                        size: 13,
+                        color: ((prop['noticeBeds'] as num?)?.toInt() ?? 0) > 0
+                            ? AppColors.warning
+                            : AppColors.muted,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          ((prop['noticeBeds'] as num?)?.toInt() ?? 0) > 0
+                              ? '${prop['noticeBeds']} on Notice • ${prop['vacantBeds']} Vacant'
+                              : '${prop['vacantBeds']} Vacant Beds Ready to Book',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color:
+                                ((prop['noticeBeds'] as num?)?.toInt() ?? 0) > 0
+                                    ? AppColors.ink
+                                    : AppColors.muted,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -1466,8 +1502,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 allPropIds.add(currentPropId);
               }
               if (allPropIds.isNotEmpty) {
-                Future.wait(allPropIds.map(
-                        (pId) => SupabaseService.instance.getPropertyTeamMembers(pId)))
+                Future.wait(allPropIds.map((pId) =>
+                        SupabaseService.instance.getPropertyTeamMembers(pId)))
                     .then((results) {
                   final List<Map<String, dynamic>> allLoaded = [];
                   for (int i = 0; i < allPropIds.length; i++) {
@@ -1494,12 +1530,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       if (!deduped.containsKey(key)) {
                         deduped[key] = Map<String, dynamic>.from(item);
                       } else {
-                        final existingAssigned = (deduped[key]!['assignedPropertyIds']
-                                as List)
-                            .cast<String>()
-                            .toSet();
+                        final existingAssigned =
+                            (deduped[key]!['assignedPropertyIds'] as List)
+                                .cast<String>()
+                                .toSet();
                         final newAssigned =
-                            (item['assignedPropertyIds'] as List).cast<String>();
+                            (item['assignedPropertyIds'] as List)
+                                .cast<String>();
                         existingAssigned.addAll(newAssigned);
                         deduped[key]!['assignedPropertyIds'] =
                             existingAssigned.toList();
@@ -1652,8 +1689,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                               InkWell(
                                 onTap: () {
                                   final mId = member['id']?.toString() ?? '';
-                                  if (mId.isNotEmpty && !mId.startsWith('tm_')) {
-                                    SupabaseService.instance.removeTeamMember(mId);
+                                  if (mId.isNotEmpty &&
+                                      !mId.startsWith('tm_')) {
+                                    SupabaseService.instance
+                                        .removeTeamMember(mId);
                                   }
                                   setModalState(() {
                                     _teamMembers.removeWhere(
@@ -2073,13 +2112,14 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         }
 
                         // Save to Supabase property_team table immediately for ALL selected properties!
-                        final List<String> targetPropIds = selectedPropertyIds.isNotEmpty
-                            ? selectedPropertyIds.toList()
-                            : (currentPropId.isNotEmpty
-                                ? [currentPropId]
-                                : (_properties.isNotEmpty
-                                    ? [_properties.first['id'].toString()]
-                                    : []));
+                        final List<String> targetPropIds =
+                            selectedPropertyIds.isNotEmpty
+                                ? selectedPropertyIds.toList()
+                                : (currentPropId.isNotEmpty
+                                    ? [currentPropId]
+                                    : (_properties.isNotEmpty
+                                        ? [_properties.first['id'].toString()]
+                                        : []));
 
                         if (targetPropIds.isNotEmpty) {
                           Future.wait(targetPropIds.map((pId) {
@@ -2102,7 +2142,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             final List<Map<String, dynamic>> allLoaded = [];
                             for (final pId in targetPropIds) {
                               try {
-                                final team = await SupabaseService.instance.getPropertyTeamMembers(pId);
+                                final team = await SupabaseService.instance
+                                    .getPropertyTeamMembers(pId);
                                 for (final m in team) {
                                   allLoaded.add({
                                     'id': m.id,
@@ -2749,7 +2790,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
       {
         'title': 'Notice Periods',
         'icon': Icons.event_note_outlined,
-        'onTap': () => setState(() => _showNoticeModal = true)
+        'onTap': () => setState(() => _activeSubScreen = 'notices')
       },
       {
         'title': 'Complaints',
@@ -4024,22 +4065,24 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               height: 48,
-              child: ElevatedButton(
+              child: OutlinedButton(
                 onPressed: () {
-                  setState(() => _showNoticeModal = false);
-                  _showToast('Vacancy flyer shared to WhatsApp');
+                  setState(() {
+                    _showNoticeModal = false;
+                    _activeSubScreen = 'notices';
+                  });
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.green,
-                  foregroundColor: Colors.white,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.ink,
+                  side: const BorderSide(color: Color(0xFFE5E7EB)),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                 ),
-                child: Text('Share Vacancy on WhatsApp',
+                child: Text('View All Move-Out Notices',
                     style: GoogleFonts.outfit(
                         fontSize: 14, fontWeight: FontWeight.w700)),
               ),

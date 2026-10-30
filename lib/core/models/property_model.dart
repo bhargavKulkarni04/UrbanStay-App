@@ -130,8 +130,8 @@ class PropertyModel {
       bankName: json['bank_name']?.toString(),
       upiVpa: json['upi_vpa']?.toString() ?? json['upi_id']?.toString(),
       creditingPhone: json['crediting_phone']?.toString(),
-      ownerPhone: json['owner_phone']?.toString() ??
-          json['owner_whatsapp']?.toString(),
+      ownerPhone:
+          json['owner_phone']?.toString() ?? json['owner_whatsapp']?.toString(),
       bankQrUrl: json['bank_qr_url']?.toString(),
       ownerAadhaarNumber: json['owner_aadhaar_number']?.toString(),
       totalFloors: json['total_floors'] is int
@@ -144,7 +144,8 @@ class PropertyModel {
           ? json['ground_floor_has_rooms'] as bool
           : (json['ground_floor_has_rooms'] == null
               ? true
-              : (json['ground_floor_has_rooms'].toString().toLowerCase() == 'true')),
+              : (json['ground_floor_has_rooms'].toString().toLowerCase() ==
+                  'true')),
       ownerId: json['owner_id']?.toString(),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
